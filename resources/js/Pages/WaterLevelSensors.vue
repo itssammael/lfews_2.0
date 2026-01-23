@@ -109,7 +109,7 @@ const closeModal = () => {
                             <div>Action</div>
                         </div>
                         
-                        <div v-for="sensor in props.sensors" :key="sensor.id" class="w-full grid grid-cols-7 gap-4 border-b border-gray-200 dark:border-gray-700 py-3 text-lg text-center items-center hover:bg-gray-50 dark:hover:bg-gray-700 transition duration-150 ease-in-out">
+                        <div v-for="sensor in props.sensors" :key="sensor.id" class="w-full grid grid-cols-7 gap-4 border-b border-gray-200 dark:border-gray-700 py-3 text-lg text-center items-center odd:bg-gray-100/[0.6] hover:bg-gray-100 dark:hover:bg-gray-700 transition duration-150 ease-in-out">
                             <div class="font-medium text-gray-900 dark:text-gray-100">{{ sensor.name }}</div>
                             <div class="text-gray-600 dark:text-gray-400">{{ sensor.brand }}</div>
                             <div class="text-gray-600 dark:text-gray-400">{{ sensor.model }}</div>
@@ -132,9 +132,16 @@ const closeModal = () => {
                                 >
                                     Edit
                                 </Link>
-                                <button class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
+                                <Link
+                                    :href="route('water-level-sensors.destroy', sensor.id)"
+                                    method="delete"
+                                    as="button"
+                                    type="button"
+                                    @click="(e) => { if (!confirm('Are you sure you want to delete this sensor?')) { e.preventDefault(); e.stopPropagation(); } }"
+                                    class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                                >
                                     Delete
-                                </button>
+                                </Link>
                             </div>
                         </div>
 

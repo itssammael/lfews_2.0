@@ -14,7 +14,7 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
-    sensor: {
+    station: {
         type: Object,
         default: null,
     },
@@ -35,33 +35,33 @@ const form = useForm({
     state: '',
     ip: '',
     port: '100',
-    slave_id: '1',
+    slave_id: '',
 });
 
-watch(() => props.sensor, (newSensor) => {
-    console.log(newSensor)
-    if (newSensor) {
-        form.name = newSensor.name || '';
-        form.brand = newSensor.brand || '';
-        form.model = newSensor.model || '';
-        form.lat = newSensor.lat !== null && newSensor.lat !== undefined ? String(newSensor.lat) : '';
-        form.long = newSensor.long !== null && newSensor.long !== undefined ? String(newSensor.long) : '';
-        form.location = newSensor.location || '';
-        form.level_2 = newSensor.level_2 !== null && newSensor.level_2 !== undefined ? String(newSensor.level_2) : '';
-        form.level_3 = newSensor.level_3 !== null && newSensor.level_3 !== undefined ? String(newSensor.level_3) : '';
-        form.level_4 = newSensor.level_4 !== null && newSensor.level_4 !== undefined ? String(newSensor.level_4) : '';
-        form.state = newSensor.state || '';
-        form.ip = newSensor.ip || '';
-        form.port = newSensor.port !== null && newSensor.port !== undefined ? String(newSensor.port) : '';
-        form.slave_id = newSensor.slave_id !== null && newSensor.slave_id !== undefined ? String(newSensor.slave_id) : '';
+watch(() => props.station, (newStation) => {
+    console.log(newStation)
+    if (newStation) {
+        form.name = newStation.name || '';
+        form.brand = newStation.brand || '';
+        form.model = newStation.model || '';
+        form.lat = newStation.lat !== null && newStation.lat !== undefined ? String(newStation.lat) : '';
+        form.long = newStation.long !== null && newStation.long !== undefined ? String(newStation.long) : '';
+        form.location = newStation.location || '';
+        form.level_2 = newStation.level_2 !== null && newStation.level_2 !== undefined ? String(newStation.level_2) : '';
+        form.level_3 = newStation.level_3 !== null && newStation.level_3 !== undefined ? String(newStation.level_3) : '';
+        form.level_4 = newStation.level_4 !== null && newStation.level_4 !== undefined ? String(newStation.level_4) : '';
+        form.state = newStation.state || '';
+        form.ip = newStation.ip || '';
+        form.port = newStation.port !== null && newStation.port !== undefined ? String(newStation.port) : '';
+        form.slave_id = newStation.slave_id !== null && newStation.slave_id !== undefined ? String(newStation.slave_id) : '';
     } else {
         form.reset();
     }
 }, { immediate: true });
 
 const submit = () => {
-    if (props.sensor?.id) {
-        form.put(route('water-level-sensors.update', props.sensor.id), {
+    if (props.station?.id) {
+        form.put(route('weather-stations.update', props.station.id), {
             preserveScroll: true,
             onSuccess: () => {
                 close();
@@ -69,7 +69,7 @@ const submit = () => {
             },
         });
     } else {
-        form.post(route('water-level-sensors.store'), {
+        form.post(route('weather-stations.store'), {
             preserveScroll: true,
             onSuccess: () => {
                 close();
@@ -87,7 +87,7 @@ const close = () => {
 <template>
     <DialogModal :show="show" @close="close">
         <template #title>
-            {{ sensor?.id ? 'Edit Water Level Sensor' : 'Add Water Level Sensor' }}
+            {{ station?.id ? 'Edit Weather Station' : 'Add Weather Station' }}
         </template>
 
         <template #content>
@@ -249,7 +249,6 @@ const close = () => {
                     <InputLabel for="slave_id" value="Slave ID" />
                     <TextInput
                         id="slave_id"
-                        disabled="true"
                         v-model="form.slave_id"
                         type="number"
                         class="mt-1 block w-full"
@@ -261,7 +260,7 @@ const close = () => {
 
         <template #footer>
         
-             <Link @click="close" :href="route('water-level-sensors')" class="inline-flex items-center px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-500 rounded-md font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-widest shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:opacity-25 transition ease-in-out duration-150 cursor-pointer">
+             <Link @click="close" :href="route('weather-stations')" class="inline-flex items-center px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-500 rounded-md font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-widest shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:opacity-25 transition ease-in-out duration-150 cursor-pointer">
                 Cancel
             </Link>
             <PrimaryButton

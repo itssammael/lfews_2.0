@@ -2,25 +2,26 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\WaterLevelSensor;
+use App\Models\WeatherStation;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
-class WaterLevelSensorController extends Controller
+class WeatherStationController extends Controller
 {
     /**
      * Display a listing of the resource.
      */
     public function index()
     {
-        $sensors = WaterLevelSensor::all();
+        $stations = WeatherStation::all();
         
-        return \Inertia\Inertia::render('WaterLevelSensors', [
-            'sensors' => $sensors,
+        return Inertia::render('WeatherStations', [
+            'stations' => $stations,
             'showCreateModal' => false,
             'showEditModal' => false,
-            'activeCount' => $sensors->where('state', '1')->count(),
-            'inactiveCount' => $sensors->where('state', '0')->count(),
-            'maintenanceCount' => $sensors->where('state', '2')->count(),
+            'activeCount' => $stations->where('state', '1')->count(),
+            'inactiveCount' => $stations->where('state', '0')->count(),
+            'maintenanceCount' => $stations->where('state', '2')->count(),
         ]);
     }
 
@@ -29,14 +30,14 @@ class WaterLevelSensorController extends Controller
      */
     public function create()
     {
-        $sensors = WaterLevelSensor::all();
-        return \Inertia\Inertia::render('WaterLevelSensors', [
-            'sensors' => $sensors,
+        $stations = WeatherStation::all();
+        return Inertia::render('WeatherStations', [
+            'stations' => $stations,
             'showCreateModal' => true,
             'showEditModal' => false,
-            'activeCount' => $sensors->where('state', '1')->count(),
-            'inactiveCount' => $sensors->where('state', '0')->count(),
-            'maintenanceCount' => $sensors->where('state', '2')->count(),
+            'activeCount' => $stations->where('state', '1')->count(),
+            'inactiveCount' => $stations->where('state', '0')->count(),
+            'maintenanceCount' => $stations->where('state', '2')->count(),
         ]);
     }
 
@@ -60,46 +61,50 @@ class WaterLevelSensorController extends Controller
             'port' => 'nullable|integer',
             'slave_id' => 'nullable|integer',
         ]);
+
         try {
-            WaterLevelSensor::create($validated);
-            return redirect()->route('water-level-sensors')->with('success', 'Water level sensor created successfully.');
+            WeatherStation::create($validated);
+            return redirect()->route('weather-stations')->with('success', 'Weather station created successfully.');
         } catch (\Exception $e) {
-            return redirect()->back()->with('error', 'Failed to create water level sensor: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Failed to create weather station: ' . $e->getMessage());
         }
     }
 
     /**
      * Display the specified resource.
      */
-    public function show(WaterLevelSensor $waterLevelSensor)
+    public function show(WeatherStation $weatherStation)
     {
         //
     }
 
+    /**
+     * Show the form for editing the specified resource.
+     */
     public function edit(string $id)
     {
-        $sensor = WaterLevelSensor::find($id);
+        $station = WeatherStation::find($id);
 
-        if (!$sensor) {
-            return redirect()->back()->with('error', 'Water level sensor not found.');
+        if (!$station) {
+            return redirect()->back()->with('error', 'Weather station not found.');
         }
 
-        $sensors = WaterLevelSensor::all();
+        $stations = WeatherStation::all();
 
-        return \Inertia\Inertia::render('WaterLevelSensors', [
-            'sensors' => $sensors,
-            'editingSensor' => $sensor,
+        return Inertia::render('WeatherStations', [
+            'stations' => $stations,
+            'editingStation' => $station,
             'showCreateModal' => false,
-            'activeCount' => $sensors->where('state', '1')->count(),
-            'inactiveCount' => $sensors->where('state', '0')->count(),
-            'maintenanceCount' => $sensors->where('state', '2')->count(),
+            'activeCount' => $stations->where('state', '1')->count(),
+            'inactiveCount' => $stations->where('state', '0')->count(),
+            'maintenanceCount' => $stations->where('state', '2')->count(),
         ]);
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, WaterLevelSensor $waterLevelSensor)
+    public function update(Request $request, WeatherStation $weatherStation)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -118,23 +123,23 @@ class WaterLevelSensorController extends Controller
         ]);
 
         try {
-            $waterLevelSensor->update($validated);
-            return redirect()->route('water-level-sensors')->with('success', 'Water level sensor updated successfully.');
+            $weatherStation->update($validated);
+            return redirect()->route('weather-stations')->with('success', 'Weather station updated successfully.');
         } catch (\Exception $e) {
-            return redirect()->back()->with('error', 'Failed to update water level sensor: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Failed to update weather station: ' . $e->getMessage());
         }
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(WaterLevelSensor $waterLevelSensor)
+    public function destroy(WeatherStation $weatherStation)
     {
         try {
-            $waterLevelSensor->delete();
-            return redirect()->route('water-level-sensors')->with('success', 'Water level sensor deleted successfully.');
+            $weatherStation->delete();
+            return redirect()->route('weather-stations')->with('success', 'Weather station deleted successfully.');
         } catch (\Exception $e) {
-            return redirect()->back()->with('error', 'Failed to delete water level sensor: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Failed to delete weather station: ' . $e->getMessage());
         }
     }
 }
