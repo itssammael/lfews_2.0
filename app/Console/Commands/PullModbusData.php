@@ -46,7 +46,7 @@ class PullModbusData extends Command
                         'sensor_id' => $sensor->id,
                         'name' => $sensor->name,
                         'success' => true,
-                        'data' => $data,
+                        'data' => $data[5],
                         'timestamp' => now()->toDateTimeString(),
                     ];
                 } catch (\Exception $e) {

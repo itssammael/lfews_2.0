@@ -18,7 +18,7 @@ const showSidebar = ref(false);
       <div class="flex items-center justify-center">
           <div class="font-bold text-xl w-3/4 text-center" :class="{'inline-block': showSidebar, 'hidden': ! showSidebar }">LFEWS</div>
           <div>
-            <button class="w-fit inline-flex items-right justify-center p-2 rounded-md text-gray-800 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-800 bg-orange-200 hover:bg-orange-100 dark:hover:bg-orange-900 focus:outline-none focus:bg-orange-100 dark:focus:bg-orange-900 focus:text-gray-800 dark:focus:text-gray-800 transition duration-150 ease-in-out" @click="showSidebar = ! showSidebar">
+            <button class="w-fit inline-flex items-right justify-center p-2 rounded-md text-gray-800 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-800 hover:bg-orange-100 dark:hover:bg-orange-900 focus:outline-none dark:focus:bg-orange-900 focus:text-gray-800 dark:focus:text-gray-800 transition duration-150 ease-in-out" @click="showSidebar = ! showSidebar">
               <svg
                   class="size-6"
                   stroke="currentColor"
@@ -49,21 +49,21 @@ const showSidebar = ref(false);
         :href="route('dashboard')"
         :active="route().current('dashboard')"
       >
-        <span :class="{'inline-block': showSidebar, 'hidden': ! showSidebar}">Dashboard</span><span :class="{'hidden': showSidebar, 'inline-block': ! showSidebar}">D</span>
+        <span :class="{'inline-block': showSidebar, 'hidden': ! showSidebar}">Dashboard</span><span :class="{'hidden': showSidebar, 'inline-block': ! showSidebar}">  <img src="/images/dashboard.png" alt="Logo" class="w-8" /></span>
       </ResponsiveNavLink>
 
       <ResponsiveNavLink
         :href="route('water-level-sensors')"
         :active="route().current('water-level-sensors')"
       >
-        <span :class="{'inline-block': showSidebar, 'hidden': ! showSidebar}">Water Level Sensors</span><span :class="{'hidden': showSidebar, 'inline-block': ! showSidebar}">WL</span>
+        <span :class="{'inline-block': showSidebar, 'hidden': ! showSidebar}">Water Level Sensors</span><span :class="{'hidden': showSidebar, 'inline-block': ! showSidebar}"><img src="/images/water-level.png" alt="Logo" class="w-8" /></span>
       </ResponsiveNavLink>
 
       <ResponsiveNavLink
         :href="route('weather-stations')"
         :active="route().current('weather-stations')"
       >
-        <span :class="{'inline-block': showSidebar, 'hidden': ! showSidebar}">Weather Stations</span><span :class="{'hidden': showSidebar, 'inline-block': ! showSidebar}">WS</span>
+        <span :class="{'inline-block': showSidebar, 'hidden': ! showSidebar}">Weather Stations</span><span :class="{'hidden': showSidebar, 'inline-block': ! showSidebar}"><img src="/images/weather-station.png" alt="Logo" class="w-8" /></span>
       </ResponsiveNavLink>
       <!-- Add more sidebar links here -->
     </div>

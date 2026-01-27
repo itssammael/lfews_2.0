@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, nextTick, onUnmounted } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import DialogModal from '@/Components/DialogModal.vue';
 import InputError from '@/Components/InputError.vue';
@@ -8,6 +8,25 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Link } from '@inertiajs/vue3';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix Leaflet marker icon issue
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerIconRetina from 'leaflet/dist/images/marker-icon-2x.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+let DefaultIcon = L.icon({
+    iconUrl: markerIcon,
+    iconRetinaUrl: markerIconRetina,
+    shadowUrl: markerShadow,
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+});
+
+L.Marker.prototype.options.icon = DefaultIcon;
 
 const props = defineProps({
     show: {
@@ -38,6 +57,62 @@ const form = useForm({
     slave_id: '1',
 });
 
+let map: L.Map | null = null;
+let marker: L.Marker | null = null;
+
+const initMap = async () => {
+    await nextTick();
+    
+    const defaultLat = 9.374062;
+    const defaultLong = 122.7992699;
+    
+    const lat = form.lat ? parseFloat(form.lat) : defaultLat;
+    const lng = form.long ? parseFloat(form.long) : defaultLong;
+    
+    // Clean up if already exists
+    if (map) {
+        map.remove();
+    }
+    
+    map = L.map('map').setView([lat, lng], 13);
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+    
+    marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+    
+    marker.on('dragend', () => {
+        const position = marker!.getLatLng();
+        form.lat = String(position.lat);
+        form.long = String(position.lng);
+    });
+    
+    map.on('click', (e) => {
+        const { lat, lng } = e.latlng;
+        marker!.setLatLng([lat, lng]);
+        form.lat = String(lat);
+        form.long = String(lng);
+    });
+
+    // Invalidate size in case of rendering issues in modal
+    setTimeout(() => {
+        map?.invalidateSize();
+    }, 100);
+};
+
+watch(() => props.show, (showing) => {
+    if (showing) {
+        initMap();
+    } else {
+        if (map) {
+            map.remove();
+            map = null;
+            marker = null;
+        }
+    }
+});
+
 watch(() => props.sensor, (newSensor) => {
     console.log(newSensor)
     if (newSensor) {
@@ -54,10 +129,20 @@ watch(() => props.sensor, (newSensor) => {
         form.ip = newSensor.ip || '';
         form.port = newSensor.port !== null && newSensor.port !== undefined ? String(newSensor.port) : '';
         form.slave_id = newSensor.slave_id !== null && newSensor.slave_id !== undefined ? String(newSensor.slave_id) : '';
+        
+        if (props.show) {
+            initMap();
+        }
     } else {
         form.reset();
     }
 }, { immediate: true });
+
+onUnmounted(() => {
+    if (map) {
+        map.remove();
+    }
+});
 
 const submit = () => {
     if (props.sensor?.id) {
@@ -257,6 +342,11 @@ const close = () => {
                     <InputError :message="form.errors.slave_id" class="mt-2" />
                 </div>
             </div>
+                <!-- Map -->
+                <div class="col-span-full mt-4">
+                    <InputLabel value="Location Map" />
+                    <div id="map" class="mt-1 h-64 w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm z-0"></div>
+                </div>
         </template>
 
         <template #footer>

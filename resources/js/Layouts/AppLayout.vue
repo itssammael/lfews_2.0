@@ -167,6 +167,7 @@ const currentDate = new Date().toLocaleDateString('en-US', {
                                 </Dropdown>
                             </div>
                         </div>
+                    </div>
 
                         <!-- Hamburger -->
                         <div class="-me-2 flex items-center sm:hidden">
@@ -195,7 +196,6 @@ const currentDate = new Date().toLocaleDateString('en-US', {
                             </button>
                         </div>
                     </div>
-                </div>
 
                 <!-- Responsive Navigation Menu -->
                 <div :class="{'block': showingNavigationDropdown, 'hidden': ! showingNavigationDropdown}" class="sm:hidden">

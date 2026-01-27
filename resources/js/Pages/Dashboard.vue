@@ -85,7 +85,7 @@ onUnmounted(() => {
                             <div class="p-4">
                                 <div v-if="result.success" class="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg p-4">
                                     <p class="font-bold mb-2 text-sm">Data Pulled Successfully ({{ result.timestamp }})</p>
-                                    <pre class="text-xs overflow-auto">{{ JSON.stringify(result.data, null, 2) }}</pre>
+                                    <pre class="text-xs overflow-auto">{{ result.data[5]/10 }}</pre>
                                 </div>
                                 <div v-else class="bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg p-4">
                                     <p class="font-bold mb-2 text-sm">Error Pulling Data ({{ result.timestamp }})</p>
