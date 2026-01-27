@@ -39,7 +39,7 @@ class PullModbusData extends Command
                         1, // startAddress (from previous requirement)
                         6, // quantity
                         (int)$sensor->slave_id,
-                        1.0 // timeout
+                        3.0// timeout
                     );
                     
                     $results[$sensor->id] = [
