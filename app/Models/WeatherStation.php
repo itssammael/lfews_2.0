@@ -8,18 +8,14 @@ class WeatherStation extends Model
 {
     protected $fillable = [
         'name',
-        'brand',
-        'model',
-        'lat',
-        'long',
-        'location',
-        'level_2',
-        'level_3',
-        'level_4',
-        'status',
+        'station_id',
+        'mode',
         'state',
-        'ip',
-        'port',
-        'slave_id',
+        'location_id',
     ];
+
+    public function location()
+    {
+        return $this->belongsTo(Location::class);
+    }
 }

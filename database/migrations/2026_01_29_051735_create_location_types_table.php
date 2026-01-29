@@ -11,12 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('weather_stations', function (Blueprint $table) {
+        Schema::create('location_types', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
-            $table->string('station_id');
-            $table->string('mode');
-            $table->tinyInteger('state')->default(1);
+            $table->string('description');
+            $table->boolean('has_multiple_dots')->default(false);
             $table->timestamps();
         });
     }
@@ -26,6 +24,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('weather_stations');
+        Schema::dropIfExists('location_types');
     }
 };

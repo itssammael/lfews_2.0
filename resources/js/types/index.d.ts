@@ -24,3 +24,28 @@ export type PageProps<T extends Record<string, unknown> = Record<string, unknown
     };
     jetstream: JetstreamProps;
 };
+
+export interface LocationType {
+    id: number;
+    name: string;
+    description: string;
+}
+
+export interface Location {
+    id: number;
+    latitude: number;
+    longitude: number;
+    location_type?: LocationType;
+}
+
+export interface WeatherStation {
+    id?: number;
+    name: string;
+    station_id: string;
+    mode: string;
+    state: number;
+    location_id?: number | string;
+    location?: Location;
+    created_at?: string;
+    updated_at?: string;
+}

@@ -29,4 +29,7 @@ Route::middleware([
     Route::get('/weather-stations/{id}/edit', [\App\Http\Controllers\WeatherStationController::class, 'edit'])->name('weather-stations.edit');
     Route::put('/weather-stations/{weather_station}', [\App\Http\Controllers\WeatherStationController::class, 'update'])->name('weather-stations.update');
     Route::delete('/weather-stations/{weather_station}', [\App\Http\Controllers\WeatherStationController::class, 'destroy'])->name('weather-stations.destroy');
+
+    Route::get('/locations/create', [\App\Http\Controllers\LocationController::class, 'create'])->name('locations.create');
+    Route::post('/locations', [\App\Http\Controllers\LocationController::class, 'store'])->name('locations.store');
 });

@@ -16,6 +16,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call(RoleSeeder::class);
+        $this->call(LocationTypeSeeder::class);
 
         $adminRole = \App\Models\Role::where('name', 'admin')->first();
 

@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use App\Models\WaterLevelSensorData;
 
 class PullModbusData extends Command
 {
@@ -42,13 +43,21 @@ class PullModbusData extends Command
                         3.0// timeout
                     );
                     
-                    $results[$sensor->id] = [
-                        'sensor_id' => $sensor->id,
-                        'name' => $sensor->name,
-                        'success' => true,
-                        'data' => $data[5],
-                        'timestamp' => now()->toDateTimeString(),
-                    ];
+                    if ($data[5] !== 0) {
+                        $results[$sensor->id] = [
+                            'sensor_id' => $sensor->id,
+                            'name' => $sensor->name,
+                            'success' => true,
+                            'data' => $data[5],
+                            'timestamp' => now()->toDateTimeString(),
+                        ];
+
+                        WaterLevelSensorData::create([
+                            'water_level_sensor_id' => $sensor->id,
+                            'sensor_data' => $data[5] / 10,
+                            'date' => now()->toDateTimeString(),
+                        ]);
+                    }
                 } catch (\Exception $e) {
                     $results[$sensor->id] = [
                         'sensor_id' => $sensor->id,
@@ -62,9 +71,31 @@ class PullModbusData extends Command
 
             \Illuminate\Support\Facades\Cache::put('latest_modbus_data', $results, 60);
             
+            // Update history
+            $history = \Illuminate\Support\Facades\Cache::get('modbus_history', []);
+            foreach ($results as $sensorId => $result) {
+                if ($result['success']) {
+                    if (!isset($history[$sensorId])) {
+                        $history[$sensorId] = [];
+                    }
+                    
+                    $history[$sensorId][] = [
+                        'value' => $result['data']/ 10,
+                        'timestamp' => $result['timestamp']
+                    ];
+                    
+
+                    // Keep only last 50 points
+                    // if (count($history[$sensorId]) > 50) {
+                    //     array_shift($history[$sensorId]);
+                    // }
+                }
+            }
+            \Illuminate\Support\Facades\Cache::put('modbus_history', $history, 1440); // 24 hours
+            
             $this->info('[' . now()->toDateTimeString() . '] Pulled data for ' . $sensors->count() . ' sensors.');
 
-            sleep(1);
+            sleep(10);
         }
     }
 }

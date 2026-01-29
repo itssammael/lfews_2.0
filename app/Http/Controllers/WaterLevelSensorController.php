@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\WaterLevelSensor;
 use Illuminate\Http\Request;
 
+use App\Models\Location;
+
 class WaterLevelSensorController extends Controller
 {
     /**
@@ -12,15 +14,16 @@ class WaterLevelSensorController extends Controller
      */
     public function index()
     {
-        $sensors = WaterLevelSensor::all();
+        $sensors = WaterLevelSensor::with(['location', 'location.locationType'])->get();
+        // Assuming we want to show location description in the table, we fetch it with relation.
         
         return \Inertia\Inertia::render('WaterLevelSensors', [
             'sensors' => $sensors,
             'showCreateModal' => false,
             'showEditModal' => false,
-            'activeCount' => $sensors->where('state', '1')->count(),
-            'inactiveCount' => $sensors->where('state', '0')->count(),
-            'maintenanceCount' => $sensors->where('state', '2')->count(),
+            'activeCount' => $sensors->where('state', 1)->count(),
+            'inactiveCount' => $sensors->where('state', 0)->count(),
+            'maintenanceCount' => $sensors->where('state', 2)->count(),
         ]);
     }
 
@@ -29,14 +32,17 @@ class WaterLevelSensorController extends Controller
      */
     public function create()
     {
-        $sensors = WaterLevelSensor::all();
+        $sensors = WaterLevelSensor::with(['location', 'location.locationType'])->get();
+        $locations = Location::with('locationType')->get(); // Fetch locations for dropdown if needed or just for data
+
         return \Inertia\Inertia::render('WaterLevelSensors', [
             'sensors' => $sensors,
+            'locations' => $locations,
             'showCreateModal' => true,
             'showEditModal' => false,
-            'activeCount' => $sensors->where('state', '1')->count(),
-            'inactiveCount' => $sensors->where('state', '0')->count(),
-            'maintenanceCount' => $sensors->where('state', '2')->count(),
+            'activeCount' => $sensors->where('state', 1)->count(),
+            'inactiveCount' => $sensors->where('state', 0)->count(),
+            'maintenanceCount' => $sensors->where('state', 2)->count(),
         ]);
     }
 
@@ -47,21 +53,39 @@ class WaterLevelSensorController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'brand' => 'nullable|string|max:255',
-            'model' => 'nullable|string|max:255',
-            'lat' => 'nullable|numeric',
-            'long' => 'nullable|numeric',
-            'location' => 'nullable|string|max:255',
-            'level_2' => 'nullable|numeric',
-            'level_3' => 'nullable|numeric',
-            'level_4' => 'nullable|numeric',
-            'state' => 'nullable|string|max:255',
-            'ip' => 'nullable|string|max:255',
-            'port' => 'nullable|integer',
-            'slave_id' => 'nullable|integer',
+            'brand' => 'required|string|max:255',
+            'mode' => 'required|string|max:255',
+            'lat' => 'required|numeric',
+            'long' => 'required|numeric',
+            'level_2' => 'required|numeric',
+            'level_3' => 'required|numeric',
+            'level_4' => 'required|numeric',
+            'state' => 'required|integer',
+            'ip' => 'required|string|max:255',
+            'port' => 'required|integer',
+            'slave_id' => 'required|integer',
         ]);
+
         try {
-            WaterLevelSensor::create($validated);
+            $location = Location::create([
+                'latitude' => $validated['lat'],
+                'longitude' => $validated['long'],
+                'location_type_id' => 2, // location_type_id = 2 for Device Sensors
+            ]);
+            
+            WaterLevelSensor::create([
+                'name' => $validated['name'],
+                'brand' => $validated['brand'],
+                'mode' => $validated['mode'],
+                'level_2' => $validated['level_2'],
+                'level_3' => $validated['level_3'],
+                'level_4' => $validated['level_4'],
+                'state' => $validated['state'],
+                'ip' => $validated['ip'],
+                'port' => $validated['port'],
+                'slave_id' => $validated['slave_id'],
+                'location_id' => $location->id,
+            ]);
             return redirect()->route('water-level-sensors')->with('success', 'Water level sensor created successfully.');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Failed to create water level sensor: ' . $e->getMessage());
@@ -84,15 +108,23 @@ class WaterLevelSensorController extends Controller
             return redirect()->back()->with('error', 'Water level sensor not found.');
         }
 
-        $sensors = WaterLevelSensor::all();
+        // Attach location coords to sensor object for edit form
+        $location = Location::find($sensor->location_id);
+        if ($location) {
+             $sensor->location = ['latitude' => $location->latitude, 'longitude' => $location->longitude];
+        }
+
+        $sensors = WaterLevelSensor::with(['location', 'location.locationType'])->get();
+        $locations = Location::with('locationType')->get();
 
         return \Inertia\Inertia::render('WaterLevelSensors', [
             'sensors' => $sensors,
+            'locations' => $locations,
             'editingSensor' => $sensor,
             'showCreateModal' => false,
-            'activeCount' => $sensors->where('state', '1')->count(),
-            'inactiveCount' => $sensors->where('state', '0')->count(),
-            'maintenanceCount' => $sensors->where('state', '2')->count(),
+            'activeCount' => $sensors->where('state', 1)->count(),
+            'inactiveCount' => $sensors->where('state', 0)->count(),
+            'maintenanceCount' => $sensors->where('state', 2)->count(),
         ]);
     }
 
@@ -103,22 +135,42 @@ class WaterLevelSensorController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'brand' => 'nullable|string|max:255',
-            'model' => 'nullable|string|max:255',
-            'lat' => 'nullable|numeric',
-            'long' => 'nullable|numeric',
-            'location' => 'nullable|string|max:255',
-            'level_2' => 'nullable|numeric',
-            'level_3' => 'nullable|numeric',
-            'level_4' => 'nullable|numeric',
-            'state' => 'nullable|string|max:255',
-            'ip' => 'nullable|string|max:255',
-            'port' => 'nullable|integer',
-            'slave_id' => 'nullable|integer',
+            'brand' => 'required|string|max:255',
+            'mode' => 'required|string|max:255',
+            'lat' => 'required|numeric',
+            'long' => 'required|numeric',
+            'level_2' => 'required|numeric',
+            'level_3' => 'required|numeric',
+            'level_4' => 'required|numeric',
+            'state' => 'required|integer',
+            'ip' => 'required|string|max:255',
+            'port' => 'required|integer',
+            'slave_id' => 'required|integer',
+            'location_id' => 'required|exists:locations,id',
         ]);
 
         try {
-            $waterLevelSensor->update($validated);
+            $location = Location::find($validated['location_id']);
+            if ($location) {
+                $location->update([
+                    'latitude' => $validated['lat'],
+                    'longitude' => $validated['long'],
+                ]);
+            }
+
+            $waterLevelSensor->update([
+                 'name' => $validated['name'],
+                'brand' => $validated['brand'],
+                'mode' => $validated['mode'],
+                'level_2' => $validated['level_2'],
+                'level_3' => $validated['level_3'],
+                'level_4' => $validated['level_4'],
+                'state' => $validated['state'],
+                'ip' => $validated['ip'],
+                'port' => $validated['port'],
+                'slave_id' => $validated['slave_id'],
+                'location_id' => $validated['location_id'],
+            ]);
             return redirect()->route('water-level-sensors')->with('success', 'Water level sensor updated successfully.');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Failed to update water level sensor: ' . $e->getMessage());

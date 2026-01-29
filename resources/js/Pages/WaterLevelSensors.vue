@@ -3,27 +3,31 @@ import { ref, onMounted, computed, watch } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import WaterLevelSensorModal from '@/Components/WaterLevelSensorModal.vue';
+import ConfirmationModal from '@/Components/ConfirmationModal.vue';
+import SecondaryButton from '@/Components/SecondaryButton.vue';
+import DangerButton from '@/Components/DangerButton.vue';
+import { router } from '@inertiajs/vue3';
+import { Location } from '@/types';
 
 interface Sensor {
     id: number;
     name: string;
     brand: string;
-    model: string;
+    mode: string;
     ip: string;
-    location: string;
-    state: string;
-    status: string;
-    lat?: number;
-    long?: number;
-    level_2?: number;
-    level_3?: number;
-    level_4?: number;
-    port?: number;
-    slave_id?: number;
+    location_id?: number | string;
+    location?: Location;
+    state: number;
+    level_2: number;
+    level_3: number;
+    level_4: number;
+    port: number;
+    slave_id: number;
 }
 
 const props = defineProps<{
     sensors: Sensor[];
+    locations?: Location[];
     showCreateModal?: boolean;
     editingSensor?: Sensor;
     activeCount?: number;
@@ -55,6 +59,31 @@ onMounted(() => {
 const closeModal = () => {
     showingModal.value = false;
     activeSensor.value = null;
+};
+
+const confirmingSensorDeletion = ref(false);
+const sensorToDelete = ref<Sensor | null>(null);
+
+const confirmSensorDeletion = (sensor: Sensor) => {
+    sensorToDelete.value = sensor;
+    confirmingSensorDeletion.value = true;
+};
+
+const deleteSensor = () => {
+    if (sensorToDelete.value) {
+        router.delete(route('water-level-sensors.destroy', sensorToDelete.value.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                confirmingSensorDeletion.value = false;
+                sensorToDelete.value = null;
+            },
+        });
+    }
+};
+
+const closeDeleteModal = () => {
+    confirmingSensorDeletion.value = false;
+    sensorToDelete.value = null;
 };
 </script>
 
@@ -102,7 +131,7 @@ const closeModal = () => {
                         <div class="w-full grid grid-cols-7 gap-4 bg-gray-200 text-xl text-center font-bold">
                             <div>Name</div>
                             <div>Brand</div>
-                            <div>Model</div>
+                            <div>Mode</div>
                             <div>IP</div>
                             <div>Location</div>
                             <div>State</div>
@@ -112,17 +141,20 @@ const closeModal = () => {
                         <div v-for="sensor in props.sensors" :key="sensor.id" class="w-full grid grid-cols-7 gap-4 border-b border-gray-200 dark:border-gray-700 py-3 text-lg text-center items-center odd:bg-gray-100/[0.6] hover:bg-gray-100 dark:hover:bg-gray-700 transition duration-150 ease-in-out">
                             <div class="font-medium text-gray-900 dark:text-gray-100">{{ sensor.name }}</div>
                             <div class="text-gray-600 dark:text-gray-400">{{ sensor.brand }}</div>
-                            <div class="text-gray-600 dark:text-gray-400">{{ sensor.model }}</div>
+                            <div class="text-gray-600 dark:text-gray-400">{{ sensor.mode }}</div>
                             <div class="text-gray-600 dark:text-gray-400 font-mono text-sm">{{ sensor.ip }}</div>
-                            <div class="text-gray-600 dark:text-gray-400">{{ sensor.location }}</div>
+                            <div class="text-gray-600 dark:text-gray-400">
+                                {{ sensor.location?.location_type?.description || 'N/A' }} 
+                                <span v-if="sensor.location" class="text-xs text-gray-500 block">({{ sensor.location.latitude }}, {{ sensor.location.longitude }})</span>
+                            </div>
                             <div class="text-gray-600 dark:text-gray-400">
                                 <span :class="{
                                     'px-2 py-1 text-xs font-semibold rounded-full': true,
-                                    'bg-green-100 text-green-800': sensor.state === '1',
-                                    'bg-red-100 text-red-800': sensor.state === '0',
-                                    'bg-gray-100 text-gray-800': sensor.state !== '1' && sensor.state !== '0'
+                                    'bg-green-100 text-green-800': sensor.state === 1,
+                                    'bg-red-100 text-red-800': sensor.state === 0,
+                                    'bg-gray-100 text-gray-800': sensor.state !== 1 && sensor.state !== 0
                                 }">
-                                    {{ sensor.state }}
+                                    {{ sensor.state === 1 ? 'Active' : (sensor.state === 0 ? 'Inactive' : sensor.state) }}
                                 </span>
                             </div>
                             <div class="flex justify-center space-x-2">
@@ -132,16 +164,12 @@ const closeModal = () => {
                                 >
                                     Edit
                                 </Link>
-                                <Link
-                                    :href="route('water-level-sensors.destroy', sensor.id)"
-                                    method="delete"
-                                    as="button"
-                                    type="button"
-                                    @click="(e) => { if (!confirm('Are you sure you want to delete this sensor?')) { e.preventDefault(); e.stopPropagation(); } }"
+                                <button
+                                    @click="confirmSensorDeletion(sensor)"
                                     class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
                                 >
                                     Delete
-                                </Link>
+                                </button>
                             </div>
                         </div>
 
@@ -156,7 +184,31 @@ const closeModal = () => {
         <WaterLevelSensorModal
             :show="showingModal"
             :sensor="activeSensor"
+            :locations="props.locations || []"
             @close="closeModal"
         />
+
+        <ConfirmationModal :show="confirmingSensorDeletion" @close="closeDeleteModal">
+            <template #title>
+                Delete Water Level Sensor
+            </template>
+
+            <template #content>
+                Are you sure you want to delete this water level sensor? This action cannot be undone.
+            </template>
+
+            <template #footer>
+                <SecondaryButton @click="closeDeleteModal">
+                    Cancel
+                </SecondaryButton>
+
+                <DangerButton
+                    class="ms-3"
+                    @click="deleteSensor"
+                >
+                    Delete Sensor
+                </DangerButton>
+            </template>
+        </ConfirmationModal>
     </AppLayout>
 </template>

@@ -27,6 +27,8 @@
         "vue-tsc": "^3.2.2"
     },
     "dependencies": {
+        "@amcharts/amcharts5": "^5.15.4",
+        "@amcharts/amcharts5-geodata": "^5.1.5",
         "@types/leaflet": "^1.9.21",
         "leaflet": "^1.9.4"
     }

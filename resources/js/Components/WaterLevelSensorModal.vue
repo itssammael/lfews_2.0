@@ -37,6 +37,10 @@ const props = defineProps({
         type: Object,
         default: null,
     },
+    locations: {
+        type: Array,
+        default: () => [],
+    },
 });
 
 const emit = defineEmits(['close']);
@@ -44,14 +48,14 @@ const emit = defineEmits(['close']);
 const form = useForm({
     name: '',
     brand: '',
-    model: '',
+    mode: '',
     lat: '',
     long: '',
-    location: '',
+    location_id: '',
     level_2: '',
     level_3: '',
     level_4: '',
-    state: '',
+    state: 1, // Default to 1 (active)
     ip: '',
     port: '100',
     slave_id: '1',
@@ -101,7 +105,7 @@ const initMap = async () => {
     }, 100);
 };
 
-watch(() => props.show, (showing) => {
+watch(() => props.show, (showing: boolean) => {
     if (showing) {
         initMap();
     } else {
@@ -113,22 +117,36 @@ watch(() => props.show, (showing) => {
     }
 });
 
+watch([() => form.lat, () => form.long], ([newLat, newLong]: [string, string]) => {
+    if (marker && newLat && newLong) {
+        const lat = parseFloat(newLat);
+        const lng = parseFloat(newLong);
+        if (!isNaN(lat) && !isNaN(lng)) {
+            const pos = L.latLng(lat, lng);
+            if (!marker.getLatLng().equals(pos)) {
+                marker.setLatLng(pos);
+                map?.panTo(pos);
+            }
+        }
+    }
+});
+
 watch(() => props.sensor, (newSensor) => {
     console.log(newSensor)
     if (newSensor) {
         form.name = newSensor.name || '';
         form.brand = newSensor.brand || '';
-        form.model = newSensor.model || '';
-        form.lat = newSensor.lat !== null && newSensor.lat !== undefined ? String(newSensor.lat) : '';
-        form.long = newSensor.long !== null && newSensor.long !== undefined ? String(newSensor.long) : '';
-        form.location = newSensor.location || '';
+        form.mode = newSensor.mode || '';
+        form.lat = newSensor.location ? String(newSensor.location.latitude) : '';
+        form.long = newSensor.location ? String(newSensor.location.longitude) : '';
+        form.location_id = newSensor.location_id || '';
         form.level_2 = newSensor.level_2 !== null && newSensor.level_2 !== undefined ? String(newSensor.level_2) : '';
         form.level_3 = newSensor.level_3 !== null && newSensor.level_3 !== undefined ? String(newSensor.level_3) : '';
         form.level_4 = newSensor.level_4 !== null && newSensor.level_4 !== undefined ? String(newSensor.level_4) : '';
-        form.state = newSensor.state || '';
+        form.state = newSensor.state !== undefined ? newSensor.state : 1;
         form.ip = newSensor.ip || '';
-        form.port = newSensor.port !== null && newSensor.port !== undefined ? String(newSensor.port) : '';
-        form.slave_id = newSensor.slave_id !== null && newSensor.slave_id !== undefined ? String(newSensor.slave_id) : '';
+        form.port = newSensor.port !== null && newSensor.port !== undefined ? String(newSensor.port) : '100';
+        form.slave_id = newSensor.slave_id !== null && newSensor.slave_id !== undefined ? String(newSensor.slave_id) : '1';
         
         if (props.show) {
             initMap();
@@ -203,29 +221,19 @@ const close = () => {
                     <InputError :message="form.errors.brand" class="mt-2" />
                 </div>
 
-                <!-- Model -->
+                <!-- Mode -->
                 <div>
-                    <InputLabel for="model" value="Model" />
+                    <InputLabel for="mode" value="Mode" />
                     <TextInput
-                        id="model"
-                        v-model="form.model"
+                        id="mode"
+                        v-model="form.mode"
                         type="text"
                         class="mt-1 block w-full"
+                        required
                     />
-                    <InputError :message="form.errors.model" class="mt-2" />
+                    <InputError :message="form.errors.mode" class="mt-2" />
                 </div>
 
-                <!-- Location -->
-                <div>
-                    <InputLabel for="location" value="Location" />
-                    <TextInput
-                        id="location"
-                        v-model="form.location"
-                        type="text"
-                        class="mt-1 block w-full"
-                    />
-                    <InputError :message="form.errors.location" class="mt-2" />
-                </div>
 
                 <!-- Lat -->
                 <div>
@@ -295,12 +303,16 @@ const close = () => {
                 <!-- State -->
                 <div>
                     <InputLabel for="state" value="State" />
-                    <TextInput
+                    <select
                         id="state"
                         v-model="form.state"
-                        type="text"
-                        class="mt-1 block w-full"
-                    />
+                        class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600 rounded-md shadow-sm"
+                        required
+                    >
+                        <option :value="1">Active</option>
+                        <option :value="0">Inactive</option>
+                        <option :value="2">Maintenance</option>
+                    </select>
                     <InputError :message="form.errors.state" class="mt-2" />
                 </div>
 

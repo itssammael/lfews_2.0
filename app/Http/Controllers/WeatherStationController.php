@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\WeatherStation;
+use App\Models\Location;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -13,15 +14,16 @@ class WeatherStationController extends Controller
      */
     public function index()
     {
-        $stations = WeatherStation::all();
+        $stations = WeatherStation::with(['location', 'location.locationType'])->get();
+        // Assuming we want to show location description in the table, we fetch it with relation.
         
         return Inertia::render('WeatherStations', [
             'stations' => $stations,
             'showCreateModal' => false,
             'showEditModal' => false,
-            'activeCount' => $stations->where('state', '1')->count(),
-            'inactiveCount' => $stations->where('state', '0')->count(),
-            'maintenanceCount' => $stations->where('state', '2')->count(),
+            'activeCount' => $stations->where('state', 1)->count(), // Changed to integer check
+            'inactiveCount' => $stations->where('state', 0)->count(), // Changed to integer check
+            'maintenanceCount' => $stations->where('state', 2)->count(),
         ]);
     }
 
@@ -30,14 +32,17 @@ class WeatherStationController extends Controller
      */
     public function create()
     {
-        $stations = WeatherStation::all();
+        $stations = WeatherStation::with(['location', 'location.locationType'])->get();
+        $locations = Location::with('locationType')->get(); // Fetch locations for dropdown
+
         return Inertia::render('WeatherStations', [
             'stations' => $stations,
+            'locations' => $locations, // Pass locations
             'showCreateModal' => true,
             'showEditModal' => false,
-            'activeCount' => $stations->where('state', '1')->count(),
-            'inactiveCount' => $stations->where('state', '0')->count(),
-            'maintenanceCount' => $stations->where('state', '2')->count(),
+            'activeCount' => $stations->where('state', 1)->count(),
+            'inactiveCount' => $stations->where('state', 0)->count(),
+            'maintenanceCount' => $stations->where('state', 2)->count(),
         ]);
     }
 
@@ -48,22 +53,26 @@ class WeatherStationController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'brand' => 'nullable|string|max:255',
-            'model' => 'nullable|string|max:255',
-            'lat' => 'nullable|numeric',
-            'long' => 'nullable|numeric',
-            'location' => 'nullable|string|max:255',
-            'level_2' => 'nullable|numeric',
-            'level_3' => 'nullable|numeric',
-            'level_4' => 'nullable|numeric',
-            'state' => 'nullable|string|max:255',
-            'ip' => 'nullable|string|max:255',
-            'port' => 'nullable|integer',
-            'slave_id' => 'nullable|integer',
+            'station_id' => 'required|string|max:255',
+            'mode' => 'required|string|max:255',
+            'state' => 'required|integer', // Changed to integer validation
+            'lat' => 'required|numeric',
+            'long' => 'required|numeric',
         ]);
 
         try {
-            WeatherStation::create($validated);
+            $location = Location::create([
+                'latitude' => $validated['lat'],
+                'longitude' => $validated['long'],
+                'location_type_id' => 3,
+            ]);
+            WeatherStation::create([
+                'name' => $validated['name'],
+                'station_id' => $validated['station_id'],
+                'mode' => $validated['mode'],
+                'state' => $validated['state'],
+                'location_id' => $location->id,
+            ]);
             return redirect()->route('weather-stations')->with('success', 'Weather station created successfully.');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Failed to create weather station: ' . $e->getMessage());
@@ -88,16 +97,19 @@ class WeatherStationController extends Controller
         if (!$station) {
             return redirect()->back()->with('error', 'Weather station not found.');
         }
-
-        $stations = WeatherStation::all();
+        $location = Location::find($station->location_id);
+        $station->location = ['latitude' => $location->latitude, 'longitude' => $location->longitude];
+        $stations = WeatherStation::with(['location', 'location.locationType'])->get();
+        $locations = Location::with('locationType')->get();
 
         return Inertia::render('WeatherStations', [
             'stations' => $stations,
+            'locations' => $locations,
             'editingStation' => $station,
             'showCreateModal' => false,
-            'activeCount' => $stations->where('state', '1')->count(),
-            'inactiveCount' => $stations->where('state', '0')->count(),
-            'maintenanceCount' => $stations->where('state', '2')->count(),
+            'activeCount' => $stations->where('state', 1)->count(),
+            'inactiveCount' => $stations->where('state', 0)->count(),
+            'maintenanceCount' => $stations->where('state', 2)->count(),
         ]);
     }
 
@@ -108,22 +120,30 @@ class WeatherStationController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'brand' => 'nullable|string|max:255',
-            'model' => 'nullable|string|max:255',
-            'lat' => 'nullable|numeric',
-            'long' => 'nullable|numeric',
-            'location' => 'nullable|string|max:255',
-            'level_2' => 'nullable|numeric',
-            'level_3' => 'nullable|numeric',
-            'level_4' => 'nullable|numeric',
-            'state' => 'nullable|string|max:255',
-            'ip' => 'nullable|string|max:255',
-            'port' => 'nullable|integer',
-            'slave_id' => 'nullable|integer',
+            'station_id' => 'required|string|max:255',
+            'mode' => 'required|string|max:255',
+            'state' => 'required|integer',
+            'lat' => 'required|numeric',
+            'long' => 'required|numeric',
+            'location_id' => 'required|exists:locations,id',
         ]);
-
+        // dd($validated);
         try {
-            $weatherStation->update($validated);
+            $location = Location::find($validated['location_id']);
+            if ($location) {
+                $location->update([
+                    'latitude' => $validated['lat'],
+                    'longitude' => $validated['long'],
+                ]);
+            }
+
+            $weatherStation->update([
+                'name' => $validated['name'],
+                'station_id' => $validated['station_id'],
+                'mode' => $validated['mode'],
+                'state' => $validated['state'],
+                'location_id' => $validated['location_id'],
+            ]);
             return redirect()->route('weather-stations')->with('success', 'Weather station updated successfully.');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Failed to update weather station: ' . $e->getMessage());

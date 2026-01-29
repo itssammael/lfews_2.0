@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, nextTick, onUnmounted } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import DialogModal from '@/Components/DialogModal.vue';
 import InputError from '@/Components/InputError.vue';
@@ -8,6 +8,25 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Link } from '@inertiajs/vue3';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix Leaflet marker icon issue
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerIconRetina from 'leaflet/dist/images/marker-icon-2x.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+let DefaultIcon = L.icon({
+    iconUrl: markerIcon,
+    iconRetinaUrl: markerIconRetina,
+    shadowUrl: markerShadow,
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+});
+
+L.Marker.prototype.options.icon = DefaultIcon;
 
 const props = defineProps({
     show: {
@@ -18,46 +37,124 @@ const props = defineProps({
         type: Object,
         default: null,
     },
+    locations: {
+        type: Array,
+        default: () => [],
+    },
 });
 
 const emit = defineEmits(['close']);
 
 const form = useForm({
     name: '',
-    brand: '',
-    model: '',
+    station_id: '',
+    mode: '',
+    state: 1, // Default to 1 (active)
     lat: '',
     long: '',
-    location: '',
-    level_2: '',
-    level_3: '',
-    level_4: '',
-    state: '',
-    ip: '',
-    port: '100',
-    slave_id: '',
+    location_id: '',
+});
+
+let map: L.Map | null = null;
+let marker: L.Marker | null = null;
+
+const initMap = async () => {
+    await nextTick();
+    
+    // Default to a central location if no lat/long provided
+    const defaultLat = 9.374062;
+    const defaultLong = 122.7992699;
+    
+    const lat = form.lat ? parseFloat(form.lat) : defaultLat;
+    const lng = form.long ? parseFloat(form.long) : defaultLong;
+    
+    // Clean up if already exists
+    if (map) {
+        map.remove();
+    }
+    
+    // Check if map container exists
+    if (!document.getElementById('map')) {
+        return;
+    }
+    
+    map = L.map('map').setView([lat, lng], 13);
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+    
+    marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+    
+    marker.on('dragend', () => {
+        const position = marker!.getLatLng();
+        form.lat = String(position.lat);
+        form.long = String(position.lng);
+    });
+    
+    map.on('click', (e) => {
+        const { lat, lng } = e.latlng;
+        marker!.setLatLng([lat, lng]);
+        form.lat = String(lat);
+        form.long = String(lng);
+    });
+
+    // Invalidate size in case of rendering issues in modal
+    setTimeout(() => {
+        map?.invalidateSize();
+    }, 100);
+};
+
+watch(() => props.show, (showing) => {
+    if (showing) {
+        initMap();
+    } else {
+        if (map) {
+            map.remove();
+            map = null;
+            marker = null;
+        }
+    }
+});
+
+watch([() => form.lat, () => form.long], ([newLat, newLong]: [string, string]) => {
+    if (marker && newLat && newLong) {
+        const lat = parseFloat(newLat);
+        const lng = parseFloat(newLong);
+        if (!isNaN(lat) && !isNaN(lng)) {
+            const pos = L.latLng(lat, lng);
+            if (!marker.getLatLng().equals(pos)) {
+                marker.setLatLng(pos);
+                map?.panTo(pos);
+            }
+        }
+    }
 });
 
 watch(() => props.station, (newStation) => {
-    console.log(newStation)
     if (newStation) {
         form.name = newStation.name || '';
-        form.brand = newStation.brand || '';
-        form.model = newStation.model || '';
-        form.lat = newStation.lat !== null && newStation.lat !== undefined ? String(newStation.lat) : '';
-        form.long = newStation.long !== null && newStation.long !== undefined ? String(newStation.long) : '';
-        form.location = newStation.location || '';
-        form.level_2 = newStation.level_2 !== null && newStation.level_2 !== undefined ? String(newStation.level_2) : '';
-        form.level_3 = newStation.level_3 !== null && newStation.level_3 !== undefined ? String(newStation.level_3) : '';
-        form.level_4 = newStation.level_4 !== null && newStation.level_4 !== undefined ? String(newStation.level_4) : '';
-        form.state = newStation.state || '';
-        form.ip = newStation.ip || '';
-        form.port = newStation.port !== null && newStation.port !== undefined ? String(newStation.port) : '';
-        form.slave_id = newStation.slave_id !== null && newStation.slave_id !== undefined ? String(newStation.slave_id) : '';
+        form.station_id = newStation.station_id || '';
+        form.mode = newStation.mode || '';
+        form.state = newStation.state !== undefined ? newStation.state : 1;
+        form.lat = newStation.location ? String(newStation.location.latitude) : '';
+        form.long = newStation.location ? String(newStation.location.longitude) : '';
+        form.location_id = newStation.location_id || '';
+        
+        if (props.show) {
+            initMap();
+        }
     } else {
         form.reset();
+        form.state = 1;
     }
 }, { immediate: true });
+
+onUnmounted(() => {
+    if (map) {
+        map.remove();
+    }
+});
 
 const submit = () => {
     if (props.station?.id) {
@@ -91,9 +188,9 @@ const close = () => {
         </template>
 
         <template #content>
-            <div class="grid grid-cols-3 gap-4">
+            <div class="grid grid-cols-2 gap-4">
                 <!-- Name -->
-                <div>
+                <div class="col-span-2">
                     <InputLabel for="name" value="Name" />
                     <TextInput
                         id="name"
@@ -106,40 +203,30 @@ const close = () => {
                     <InputError :message="form.errors.name" class="mt-2" />
                 </div>
 
-                <!-- Brand -->
+                <!-- Station ID -->
                 <div>
-                    <InputLabel for="brand" value="Brand" />
+                    <InputLabel for="station_id" value="Station ID" />
                     <TextInput
-                        id="brand"
-                        v-model="form.brand"
+                        id="station_id"
+                        v-model="form.station_id"
                         type="text"
                         class="mt-1 block w-full"
+                        required
                     />
-                    <InputError :message="form.errors.brand" class="mt-2" />
+                    <InputError :message="form.errors.station_id" class="mt-2" />
                 </div>
 
-                <!-- Model -->
+                <!-- Mode -->
                 <div>
-                    <InputLabel for="model" value="Model" />
+                    <InputLabel for="mode" value="Mode" />
                     <TextInput
-                        id="model"
-                        v-model="form.model"
+                        id="mode"
+                        v-model="form.mode"
                         type="text"
                         class="mt-1 block w-full"
+                        required
                     />
-                    <InputError :message="form.errors.model" class="mt-2" />
-                </div>
-
-                <!-- Location -->
-                <div>
-                    <InputLabel for="location" value="Location" />
-                    <TextInput
-                        id="location"
-                        v-model="form.location"
-                        type="text"
-                        class="mt-1 block w-full"
-                    />
-                    <InputError :message="form.errors.location" class="mt-2" />
+                    <InputError :message="form.errors.mode" class="mt-2" />
                 </div>
 
                 <!-- Lat -->
@@ -151,6 +238,7 @@ const close = () => {
                         type="number"
                         step="any"
                         class="mt-1 block w-full"
+                        required
                     />
                     <InputError :message="form.errors.lat" class="mt-2" />
                 </div>
@@ -164,97 +252,47 @@ const close = () => {
                         type="number"
                         step="any"
                         class="mt-1 block w-full"
+                        required
                     />
                     <InputError :message="form.errors.long" class="mt-2" />
                 </div>
 
-                 <!-- Level 2 -->
-                <div>
-                    <InputLabel for="level_2" value="Level 2" />
-                    <TextInput
-                        id="level_2"
-                        v-model="form.level_2"
-                        type="number"
-                        step="any"
-                        class="mt-1 block w-full"
-                    />
-                    <InputError :message="form.errors.level_2" class="mt-2" />
-                </div>
-
-                 <!-- Level 3 -->
-                <div>
-                    <InputLabel for="level_3" value="Level 3" />
-                    <TextInput
-                        id="level_3"
-                        v-model="form.level_3"
-                        type="number"
-                        step="any"
-                        class="mt-1 block w-full"
-                    />
-                    <InputError :message="form.errors.level_3" class="mt-2" />
-                </div>
-
-                 <!-- Level 4 -->
-                <div>
-                    <InputLabel for="level_4" value="Level 4" />
-                    <TextInput
-                        id="level_4"
-                        v-model="form.level_4"
-                        type="number"
-                        step="any"
-                        class="mt-1 block w-full"
-                    />
-                    <InputError :message="form.errors.level_4" class="mt-2" />
+                <!-- Location (Hidden or Optional? User didn't say to remove, but controller ignores it on create. I'll keep it for now but maybe it shouldn't be required if we are creating new ones? User's controller code doesn't use it for create. I will keep it in the template as requested but maybe I should remove `required` if it's not used? The user only asked to ADD lat/long.) -->
+                 <div class="col-span-2" v-if="false"> <!-- Hiding location selection as per implied controller logic that creates new location -->
+                    <InputLabel for="location_id" value="Location" />
+                    <select
+                        id="location_id"
+                        v-model="form.location_id"
+                        class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600 rounded-md shadow-sm"
+                    >
+                        <option value="" disabled>Select a location</option>
+                        <option v-for="location in locations" :key="location.id" :value="location.id">
+                            {{ location.location_type?.description }} ({{ location.latitude }}, {{ location.longitude }})
+                        </option>
+                    </select>
+                    <InputError :message="form.errors.location_id" class="mt-2" />
                 </div>
 
                 <!-- State -->
-                <div>
+                <div class="col-span-2">
                     <InputLabel for="state" value="State" />
-                    <TextInput
+                    <select
                         id="state"
                         v-model="form.state"
-                        type="text"
-                        class="mt-1 block w-full"
-                    />
+                        class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600 rounded-md shadow-sm"
+                        required
+                    >
+                        <option :value="1">Active</option>
+                        <option :value="0">Inactive</option>
+                        <option :value="2">Maintenance</option>
+                    </select>
                     <InputError :message="form.errors.state" class="mt-2" />
                 </div>
-
-                <!-- IP -->
-                <div>
-                    <InputLabel for="ip" value="IP Address" />
-                    <TextInput
-                        id="ip"
-                        v-model="form.ip"
-                        type="text"
-                        class="mt-1 block w-full"
-                    />
-                    <InputError :message="form.errors.ip" class="mt-2" />
-                </div>
-
-                <!-- Port -->
-                <div>
-                    <InputLabel for="port" value="Port" />
-                    <TextInput
-                        id="port"
-                        disabled="true"
-                        v-model="form.port"
-                        type="number"
-                        class="mt-1 block w-full"
-                    />
-                    <InputError :message="form.errors.port" class="mt-2" />
-                </div>
-
-                <!-- Slave ID -->
-                <div>
-                    <InputLabel for="slave_id" value="Slave ID" />
-                    <TextInput
-                        id="slave_id"
-                        v-model="form.slave_id"
-                        type="number"
-                        class="mt-1 block w-full"
-                    />
-                    <InputError :message="form.errors.slave_id" class="mt-2" />
-                </div>
+            </div>
+            <!-- Map -->
+            <div class="col-span-full mt-4">
+                <InputLabel value="Location Map" />
+                <div id="map" class="mt-1 h-64 w-full rounded-md border border-gray-300 dark:border-gray-700 shadow-sm z-0"></div>
             </div>
         </template>
 

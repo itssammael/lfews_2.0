@@ -13,20 +13,16 @@ return new class extends Migration
     {
         Schema::create('water_level_sensors', function (Blueprint $table) {
             $table->id();
-            $table->string('name')->nullable();
-            $table->string('brand')->nullable();
-            $table->string('model')->nullable();
-            $table->decimal('lat', 10, 7)->nullable();
-            $table->decimal('long', 10, 7)->nullable();
-            $table->string('location')->nullable();
-            $table->decimal('level_2', 8, 2)->nullable();
-            $table->decimal('level_3', 8, 2)->nullable();
-            $table->decimal('level_4', 8, 2)->nullable();
-            $table->string('status')->nullable();
-            $table->string('state')->nullable();
-            $table->string('ip')->nullable();
-            $table->integer('port')->nullable();
-            $table->integer('slave_id')->nullable();
+            $table->string('name');
+            $table->string('brand');
+            $table->string('mode');
+            $table->decimal('level_2', 8, 2);
+            $table->decimal('level_3', 8, 2);
+            $table->decimal('level_4', 8, 2);
+            $table->tinyInteger('state')->default(1);;
+            $table->string('ip');
+            $table->integer('port');
+            $table->integer('slave_id');
             $table->timestamps();
         });
     }

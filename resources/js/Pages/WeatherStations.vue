@@ -3,27 +3,31 @@ import { ref, onMounted, watch } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import WeatherStationModal from '@/Components/WeatherStationModal.vue';
+import ConfirmationModal from '@/Components/ConfirmationModal.vue';
+import SecondaryButton from '@/Components/SecondaryButton.vue';
+import DangerButton from '@/Components/DangerButton.vue';
+import { router } from '@inertiajs/vue3';
 
 interface Station {
     id: number;
     name: string;
-    brand: string;
-    model: string;
-    ip: string;
-    location: string;
-    state: string;
-    status: string;
-    lat?: number;
-    long?: number;
-    level_2?: number;
-    level_3?: number;
-    level_4?: number;
-    port?: number;
-    slave_id?: number;
+    station_id: string;
+    mode: string;
+    state: number; // Changed to number
+    location_id: number;
+    location?: {
+        id: number;
+        latitude: number;
+        longitude: number;
+        location_type?: {
+            description: string;
+        }
+    };
 }
 
 const props = defineProps<{
     stations: Station[];
+    locations?: any[]; // Allow locations prop
     showCreateModal?: boolean;
     editingStation?: Station;
     activeCount?: number;
@@ -55,6 +59,31 @@ onMounted(() => {
 const closeModal = () => {
     showingModal.value = false;
     activeStation.value = null;
+};
+
+const confirmingStationDeletion = ref(false);
+const stationToDelete = ref<Station | null>(null);
+
+const confirmStationDeletion = (station: Station) => {
+    stationToDelete.value = station;
+    confirmingStationDeletion.value = true;
+};
+
+const deleteStation = () => {
+    if (stationToDelete.value) {
+        router.delete(route('weather-stations.destroy', stationToDelete.value.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                confirmingStationDeletion.value = false;
+                stationToDelete.value = null;
+            },
+        });
+    }
+};
+
+const closeDeleteModal = () => {
+    confirmingStationDeletion.value = false;
+    stationToDelete.value = null;
 };
 </script>
 
@@ -99,30 +128,31 @@ const closeModal = () => {
                                 </div>
                             </div>
                         </div>
-                        <div class="w-full grid grid-cols-7 gap-4 bg-gray-200 text-xl text-center font-bold">
+                        <div class="w-full grid grid-cols-6 gap-4 bg-gray-200 text-xl text-center font-bold">
                             <div>Name</div>
-                            <div>Brand</div>
-                            <div>Model</div>
-                            <div>IP</div>
+                            <div>Station ID</div>
+                            <div>Mode</div>
                             <div>Location</div>
                             <div>State</div>
                             <div>Action</div>
                         </div>
                         
-                        <div v-for="station in props.stations" :key="station.id" class="w-full grid grid-cols-7 gap-4 border-b border-gray-200 dark:border-gray-700 py-3 text-lg text-center items-center odd:bg-gray-100/[0.6] hover:bg-gray-100 dark:hover:bg-gray-700 transition duration-150 ease-in-out">
+                        <div v-for="station in props.stations" :key="station.id" class="w-full grid grid-cols-6 gap-4 border-b border-gray-200 dark:border-gray-700 py-3 text-lg text-center items-center odd:bg-gray-100/[0.6] hover:bg-gray-100 dark:hover:bg-gray-700 transition duration-150 ease-in-out">
                             <div class="font-medium text-gray-900 dark:text-gray-100">{{ station.name }}</div>
-                            <div class="text-gray-600 dark:text-gray-400">{{ station.brand }}</div>
-                            <div class="text-gray-600 dark:text-gray-400">{{ station.model }}</div>
-                            <div class="text-gray-600 dark:text-gray-400 font-mono text-sm">{{ station.ip }}</div>
-                            <div class="text-gray-600 dark:text-gray-400">{{ station.location }}</div>
+                            <div class="text-gray-600 dark:text-gray-400 font-mono">{{ station.station_id }}</div>
+                            <div class="text-gray-600 dark:text-gray-400">{{ station.mode }}</div>
+                            <div class="text-gray-600 dark:text-gray-400">
+                                {{ station.location?.location_type?.description || 'N/A' }} 
+                                <span v-if="station.location" class="text-xs text-gray-500 block">({{ station.location.latitude }}, {{ station.location.longitude }})</span>
+                            </div>
                             <div class="text-gray-600 dark:text-gray-400">
                                 <span :class="{
                                     'px-2 py-1 text-xs font-semibold rounded-full': true,
-                                    'bg-green-100 text-green-800': station.state === '1',
-                                    'bg-red-100 text-red-800': station.state === '0',
-                                    'bg-gray-100 text-gray-800': station.state !== '1' && station.state !== '0'
+                                    'bg-green-100 text-green-800': station.state === 1,
+                                    'bg-red-100 text-red-800': station.state === 0,
+                                    'bg-gray-100 text-gray-800': station.state !== 1 && station.state !== 0
                                 }">
-                                    {{ station.state }}
+                                    {{ station.state === 1 ? 'Active' : (station.state === 0 ? 'Inactive' : station.state) }}
                                 </span>
                             </div>
                             <div class="flex justify-center space-x-2">
@@ -132,16 +162,12 @@ const closeModal = () => {
                                 >
                                     Edit
                                 </Link>
-                                <Link
-                                    :href="route('weather-stations.destroy', station.id)"
-                                    method="delete"
-                                    as="button"
-                                    type="button"
-                                    @click="(e) => { if (!confirm('Are you sure you want to delete this station?')) { e.preventDefault(); e.stopPropagation(); } }"
+                                <button
+                                    @click="confirmStationDeletion(station)"
                                     class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
                                 >
                                     Delete
-                                </Link>
+                                </button>
                             </div>
                         </div>
 
@@ -156,7 +182,31 @@ const closeModal = () => {
         <WeatherStationModal
             :show="showingModal"
             :station="activeStation"
+            :locations="props.locations || []" 
             @close="closeModal"
         />
+
+        <ConfirmationModal :show="confirmingStationDeletion" @close="closeDeleteModal">
+            <template #title>
+                Delete Weather Station
+            </template>
+
+            <template #content>
+                Are you sure you want to delete this weather station? This action cannot be undone.
+            </template>
+
+            <template #footer>
+                <SecondaryButton @click="closeDeleteModal">
+                    Cancel
+                </SecondaryButton>
+
+                <DangerButton
+                    class="ms-3"
+                    @click="deleteStation"
+                >
+                    Delete Station
+                </DangerButton>
+            </template>
+        </ConfirmationModal>
     </AppLayout>
 </template>
