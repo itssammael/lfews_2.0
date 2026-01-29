@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\ModbusService;
 use App\Models\WaterLevelSensor;
 use Illuminate\Http\Request;
 
@@ -169,7 +170,7 @@ class WaterLevelSensorController extends Controller
                 'ip' => $validated['ip'],
                 'port' => $validated['port'],
                 'slave_id' => $validated['slave_id'],
-                'location_id' => $validated['location_id'],
+            
             ]);
             return redirect()->route('water-level-sensors')->with('success', 'Water level sensor updated successfully.');
         } catch (\Exception $e) {
@@ -187,6 +188,92 @@ class WaterLevelSensorController extends Controller
             return redirect()->route('water-level-sensors')->with('success', 'Water level sensor deleted successfully.');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Failed to delete water level sensor: ' . $e->getMessage());
+        }
+    }
+
+
+    public function pullWaterData(ModbusService $modbusService)
+    {
+        // Simple lock to prevent concurrent Modbus pulls
+        $lockKey = 'modbus_pull_lock';
+        if (\Illuminate\Support\Facades\Cache::has($lockKey)) {
+            return redirect()->back()->with('warning', 'A data pull is already in progress.');
+        }
+
+        try {
+            \Illuminate\Support\Facades\Cache::put($lockKey, true, 30); // 30 second lock
+
+            $sensors = \App\Models\WaterLevelSensor::all();
+            $results = [];
+
+            foreach ($sensors as $sensor) {
+                try {
+                    $data = $modbusService->readModbusData(
+                        $sensor->ip,
+                        (int)$sensor->port,
+                        1,
+                        6,
+                        (int)$sensor->slave_id,
+                        1.5
+                    );
+
+                    $results[$sensor->id] = [
+                        'sensor_id' => $sensor->id,
+                        'name' => $sensor->name,
+                        'success' => true,
+                        'data' => $data[5]/ 10,
+                        'timestamp' => now()->toDateTimeString(),
+                    ];
+                } catch (\Exception $e) {
+                    $results[$sensor->id] = [
+                        'sensor_id' => $sensor->id,
+                        'name' => $sensor->name,
+                        'success' => false,
+                        'error' => $e->getMessage(),
+                        'timestamp' => now()->toDateTimeString(),
+                    ];
+                }
+            }
+
+            // Update latest data
+            \Illuminate\Support\Facades\Cache::put('latest_modbus_data', $results, 60);
+
+            // Update history
+            $history = \Illuminate\Support\Facades\Cache::get('modbus_history', []);
+            foreach ($results as $sensorId => $result) {
+                if ($result['success']) {
+                    if (!isset($history[$sensorId])) {
+                        $history[$sensorId] = [];
+                    }
+                    
+                    $history[$sensorId][] = [
+                        'value' => $result['data'] ,
+                        'timestamp' => $result['timestamp']
+                    ];
+
+                    // Keep only last 50 points
+                    if (count($history[$sensorId]) > 50) {
+                        array_shift($history[$sensorId]);
+                    }
+                }
+            }
+            \Illuminate\Support\Facades\Cache::put('modbus_history', $history, 1440); // 24 hours
+
+            \Illuminate\Support\Facades\Cache::forget($lockKey);
+
+            return $results;
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Cache::forget($lockKey);
+            $errorResult = [
+                'system' => [
+                    'sensor_id' => 0,
+                    'name' => 'System Error',
+                    'success' => false,
+                    'error' => $e->getMessage(),
+                    'timestamp' => now()->toDateTimeString(),
+                ]
+            ];
+            return $errorResult;
         }
     }
 }

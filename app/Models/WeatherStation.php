@@ -10,6 +10,8 @@ class WeatherStation extends Model
         'name',
         'station_id',
         'mode',
+        'key',
+        'ip',
         'state',
         'location_id',
     ];
@@ -17,5 +19,10 @@ class WeatherStation extends Model
     public function location()
     {
         return $this->belongsTo(Location::class);
+    }
+
+    public function observations()
+    {
+        return $this->hasMany(WeatherStationObservationData::class);
     }
 }

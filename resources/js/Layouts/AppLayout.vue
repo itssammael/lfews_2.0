@@ -266,7 +266,7 @@ const currentDate = new Date().toLocaleDateString('en-US', {
                     </div>
                 </nav>
 
-                <div class="flex h-full">
+                <div class="flex h-screen mb-6">
                     <Sidebar />
                 
                     <!-- Page Content -->

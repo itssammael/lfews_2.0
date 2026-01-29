@@ -23,12 +23,12 @@ class ModbusService
      * @throws Exception
      */
     public function readModbusData(
-        string $host = '192.168.41.10',
-        int $port = 100,
-        int $startAddress = 1,
-        int $quantity = 6,
-        int $unitId = 1,
-        float $timeout = 1.0
+        string $host,
+        int $port ,
+        int $startAddress ,
+        int $quantity ,
+        int $unitId ,
+        float $timeout
     ): array {
         $connection = BinaryStreamConnection::getBuilder()
             ->setHost($host)
@@ -55,12 +55,12 @@ class ModbusService
     }
 
     public function readHoldingRegisters(
-        string $host = "192.168.41.10",
-        int $port = 100,
-        int $startAddress = 6,
-        int $quantity = 3,
-        int $unitId = 1,
-        float $timeout = 1
+      string $host,
+        int $port ,
+        int $startAddress ,
+        int $quantity ,
+        int $unitId ,
+        float $timeout
     ): array {
         return $this->readModbusData($host, $port, $startAddress, $quantity, $unitId, $timeout);
     }

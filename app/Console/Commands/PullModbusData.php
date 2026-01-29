@@ -19,7 +19,7 @@ class PullModbusData extends Command
      *
      * @var string
      */
-    protected $description = 'Pulls data from Modbus device every 1 second and stores it in cache.';
+    protected $description = 'Pulls data from Modbus device every 10 seconds and stores it in cache.';
 
     /**
      * Execute the console command.
@@ -86,9 +86,9 @@ class PullModbusData extends Command
                     
 
                     // Keep only last 50 points
-                    // if (count($history[$sensorId]) > 50) {
-                    //     array_shift($history[$sensorId]);
-                    // }
+                    if (count($history[$sensorId]) > 50) {
+                        array_shift($history[$sensorId]);
+                    }
                 }
             }
             \Illuminate\Support\Facades\Cache::put('modbus_history', $history, 1440); // 24 hours

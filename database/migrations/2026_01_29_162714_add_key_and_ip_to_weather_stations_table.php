@@ -11,11 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasColumn('weather_stations', 'location_id')) {
-            Schema::table('weather_stations', function (Blueprint $table) {
-                $table->foreignId('location_id')->constrained('locations')->onDelete('cascade');
-            });
-        }
+        Schema::table('weather_stations', function (Blueprint $table) {
+            $table->string('key')->nullable()->after('mode');
+            $table->string('ip')->nullable()->after('key');
+        });
     }
 
     /**
@@ -24,8 +23,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('weather_stations', function (Blueprint $table) {
-            $table->dropForeign(['location_id']);
-            $table->dropColumn('location_id');
+            $table->dropColumn(['key', 'ip']);
         });
     }
 };

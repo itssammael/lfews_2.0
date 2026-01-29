@@ -49,6 +49,8 @@ const form = useForm({
     name: '',
     station_id: '',
     mode: '',
+    key: '',
+    ip: '',
     state: 1, // Default to 1 (active)
     lat: '',
     long: '',
@@ -136,6 +138,8 @@ watch(() => props.station, (newStation) => {
         form.name = newStation.name || '';
         form.station_id = newStation.station_id || '';
         form.mode = newStation.mode || '';
+        form.key = newStation.key || '';
+        form.ip = newStation.ip || '';
         form.state = newStation.state !== undefined ? newStation.state : 1;
         form.lat = newStation.location ? String(newStation.location.latitude) : '';
         form.long = newStation.location ? String(newStation.location.longitude) : '';
@@ -227,6 +231,30 @@ const close = () => {
                         required
                     />
                     <InputError :message="form.errors.mode" class="mt-2" />
+                </div>
+
+                <!-- Key -->
+                <div>
+                    <InputLabel for="key" value="Key" />
+                    <TextInput
+                        id="key"
+                        v-model="form.key"
+                        type="text"
+                        class="mt-1 block w-full"
+                    />
+                    <InputError :message="form.errors.key" class="mt-2" />
+                </div>
+
+                <!-- IP -->
+                <div>
+                    <InputLabel for="ip" value="IP Address" />
+                    <TextInput
+                        id="ip"
+                        v-model="form.ip"
+                        type="text"
+                        class="mt-1 block w-full"
+                    />
+                    <InputError :message="form.errors.ip" class="mt-2" />
                 </div>
 
                 <!-- Lat -->
