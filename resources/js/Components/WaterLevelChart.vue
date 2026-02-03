@@ -117,7 +117,7 @@ onMounted(() => {
         am5xy.ValueAxis.new(root, {
             renderer: yRenderer,
             min: 0,
-            max: l4 + 200 // Buffer above max level
+            max: 1500
         })
     );
 
@@ -250,7 +250,20 @@ onMounted(() => {
     // Make stuff animate on load
     series.appear(1000);
     chart.appear(1000, 100);
+
+    // Initial tooltip display
+    series.events.on("datavalidated", () => {
+        showLastTooltip();
+    });
 });
+
+const showLastTooltip = () => {
+    if (!series || series.dataItems.length === 0) return;
+    const lastDataItem = series.dataItems[series.dataItems.length - 1];
+    if (lastDataItem) {
+        series.showDataItemTooltip(lastDataItem);
+    }
+};
 
 onUnmounted(() => {
     if (root) {
@@ -278,6 +291,9 @@ const addDataPoint = (value: number, timestamp: string) => {
     if (series.data.length > 61) {
         series.data.removeIndex(0);
     }
+
+    // Always show tooltip for the latest point
+    showLastTooltip();
 };
 
 watch(() => props.value, (newValue: number | undefined) => {

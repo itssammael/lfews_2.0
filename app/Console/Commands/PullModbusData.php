@@ -48,7 +48,7 @@ class PullModbusData extends Command
                             'sensor_id' => $sensor->id,
                             'name' => $sensor->name,
                             'success' => true,
-                            'data' => $data[5],
+                            'data' => $data[5] / 10,
                             'timestamp' => now()->toDateTimeString(),
                         ];
 
@@ -74,13 +74,14 @@ class PullModbusData extends Command
             // Update history
             $history = \Illuminate\Support\Facades\Cache::get('modbus_history', []);
             foreach ($results as $sensorId => $result) {
+            
                 if ($result['success']) {
                     if (!isset($history[$sensorId])) {
                         $history[$sensorId] = [];
                     }
                     
                     $history[$sensorId][] = [
-                        'value' => $result['data']/ 10,
+                        'value' => $result['data'],
                         'timestamp' => $result['timestamp']
                     ];
                     

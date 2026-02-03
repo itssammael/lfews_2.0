@@ -1,50 +1,62 @@
 <script setup lang="ts">
-import AppLayout from '@/Layouts/AppLayout.vue';
-import { Link, usePage, router } from '@inertiajs/vue3';
-import { computed, onMounted, onUnmounted, ref } from 'vue';
-import WaterLevelChart from '@/Components/WaterLevelChart.vue';
-import Checkbox from '@/Components/Checkbox.vue';
-import InputLabel from '@/Components/InputLabel.vue';
+import AppLayout from "@/Layouts/AppLayout.vue";
+import { Link, usePage, router } from "@inertiajs/vue3";
+import { computed, onMounted, onUnmounted, ref } from "vue";
+import WaterLevelChart from "@/Components/WaterLevelChart.vue";
+import Checkbox from "@/Components/Checkbox.vue";
+import InputLabel from "@/Components/InputLabel.vue";
 
 declare function route(name: string, params?: any, absolute?: boolean): string;
 
 const props = defineProps<{
-    latestData?: Record<number, {
-        sensor_id: number;
-        name: string;
-        success: boolean;
-        data?: any;
-        error?: string;
-        timestamp: string;
-    }> | null;
-    historyData?: Record<number, Array<{
-        value: number;
-        timestamp: string;
-    }>> | null;
-    sensors?: Array<{
-        id: number;
-        name: string;
-        level_2: number;
-        level_3: number;
-        level_4: number;
-    }>;
-    stations?: Array<{
-        id: number;
-        station_id: string;
-    }>;
-    latestWeatherData?: Record<number, {
-        id: number;
-        station_id: string;
-        name: string;
-        success: boolean;
-        data?: any;
-        error?: string;
-        timestamp: string;
-    }> | null;
-    historyWeatherData?: Record<number, Array<{
-        data: any;
-        timestamp: string;
-    }>> | null; 
+  latestData?: Record<
+    number,
+    {
+      sensor_id: number;
+      name: string;
+      success: boolean;
+      data?: any;
+      error?: string;
+      timestamp: string;
+    }
+  > | null;
+  historyData?: Record<
+    number,
+    Array<{
+      value: number;
+      timestamp: string;
+    }>
+  > | null;
+  sensors?: Array<{
+    id: number;
+    name: string;
+    level_2: number;
+    level_3: number;
+    level_4: number;
+  }>;
+  stations?: Array<{
+    id: number;
+    station_id: string;
+  }>;
+  latestWeatherData?: Record<
+    number,
+    {
+      id: number;
+      station_id: string;
+      name: string;
+      success: boolean;
+      data?: any;
+      error?: string;
+      timestamp: string;
+    }
+  > | null;
+  historyWeatherData?: Record<
+    number,
+    Array<{
+      data: any;
+      timestamp: string;
+    }>
+  > | null;
 }>();
 
 const page = usePage();
@@ -53,84 +65,116 @@ const flashResult = computed(() => page.props.flash.modbusResult);
 // Use latestData prop if available, otherwise fallback to flash
 // Normalize to always be a Record/mapped object
 const modbusResult = computed(() => {
-    const data: any = props.latestData || flashResult.value;
-    if (!data) return null;
-    
-    // If it has 'success' but no keyed sensors, it's likely the old flat format
-    if (data.success !== undefined && !data[Object.keys(data)[0]]?.timestamp) {
-        return { system: data };
-    }
-    
-    return data;
+  const data: any = props.latestData || flashResult.value;
+  if (!data) return null;
+
+  // If it has 'success' but no keyed sensors, it's likely the old flat format
+  if (data.success !== undefined && !data[Object.keys(data)[0]]?.timestamp) {
+    return { system: data };
+  }
+
+  return data;
 });
 const flashWeatherResult = computed(() => page.props.flash.weatherResult);
 
 // Use latestData prop if available, otherwise fallback to flash
 // Normalize to always be a Record/mapped object
 const weatherResult = computed(() => {
-    const data: any = props.latestWeatherData || flashWeatherResult.value;
-    if (!data) return null;
-    
-    // If it has 'success' but no keyed sensors, it's likely the old flat format
-    if (data.success !== undefined && !data[Object.keys(data)[0]]?.timestamp) {
-        return { system: data };
-    }
-    
-    return data;
+  const data: any = props.latestWeatherData || flashWeatherResult.value;
+  if (!data) return null;
+
+  // If it has 'success' but no keyed sensors, it's likely the old flat format
+  if (data.success !== undefined && !data[Object.keys(data)[0]]?.timestamp) {
+    return { system: data };
+  }
+
+  return data;
 });
 
 const getWindDirection = (degrees: number) => {
-    const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
-    const index = Math.round(degrees / 22.5) % 16;
-    return directions[index];
+  const directions = [
+    "N",
+    "NNE",
+    "NE",
+    "ENE",
+    "E",
+    "ESE",
+    "SE",
+    "SSE",
+    "S",
+    "SSW",
+    "SW",
+    "WSW",
+    "W",
+    "WNW",
+    "NW",
+    "NNW",
+  ];
+  const index = Math.round(degrees / 22.5) % 16;
+  return directions[index];
 };
-
 
 const isAutoPulling = ref(true);
 const isAutoWeatherPulling = ref(true);
+const processingWater = ref(false);
+const processingWeather = ref(false);
 let interval: any = null;
 
 const pullData = () => {
-    router.post(route('dashboard.pull-water-data'), {}, {
-        preserveScroll: true,
-        preserveState: true,
-        only: ['latestData', 'historyData'],
-    });
+  if (processingWater.value) return;
+  processingWater.value = true;
+  router.post(
+    route("dashboard.pull-water-data"),
+    {},
+    {
+      preserveScroll: true,
+      preserveState: true,
+      only: ["latestData", "historyData"],
+      onFinish: () => {
+        processingWater.value = false;
+      },
+    }
+  );
 };
 
 const pullWeatherData = () => {
-    router.post(route('dashboard.pull-weather-data'), {}, {
-        preserveScroll: true,
-        preserveState: true,
-        only: ['latestWeatherData', 'historyWeatherData'],
-    });
+  if (processingWeather.value) return;
+  processingWeather.value = true;
+  router.post(
+    route("dashboard.pull-weather-data"),
+    {},
+    {
+      preserveScroll: true,
+      preserveState: true,
+      only: ["latestWeatherData", "historyWeatherData"],
+      onFinish: () => {
+        processingWeather.value = false;
+      },
+    }
+  );
 };
 
 onMounted(() => {
-    // Initial pull if needed can be handled by controller, 
-    // but we'll set up the periodic pull here.
-    interval = setInterval(() => {
-        if (isAutoPulling.value) {
-            pullData();
-        }
-        
-        if (isAutoWeatherPulling.value) {
-            pullWeatherData();
-        }
-
-        if (!isAutoPulling.value && !isAutoWeatherPulling.value) {
-            // Just refresh data from cache if not pulling from sensors
-            router.reload({ 
-                only: ['latestData', 'historyData', 'latestWeatherData', 'historyWeatherData'] as any,
-                preserveScroll: true,
-                preserveState: true,
-            });
-        }
-    }, 10000); // Pull every 10 seconds to avoid overloading
+  interval = setInterval(() => {
+    // If auto-pulling is enabled for anything, just do a single partial reload of the cache data.
+    // This is more efficient than separate POST requests and avoids network cancellations.
+    if (isAutoPulling.value || isAutoWeatherPulling.value) {
+      router.reload({
+        only: [
+          "latestData",
+          "historyData",
+          "latestWeatherData",
+          "historyWeatherData",
+        ] as any,
+        preserveScroll: true,
+        preserveState: true,
+      });
+    }
+  }, 10000); 
 });
 
 onUnmounted(() => {
-    if (interval) clearInterval(interval);
+  if (interval) clearInterval(interval);
 });
 </script>
 
@@ -162,15 +206,14 @@ onUnmounted(() => {
                                     <InputLabel for="auto-pull" value="Auto Pull Data" class="cursor-pointer" />
                                 </div>
 
-                                <Link
-                                    :href="route('dashboard.pull-water-data')"
-                                    method="post"
-                                    as="button"
+                                <button
+                                    @click="pullData"
                                     type="button"
-                                    class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 focus:bg-blue-700 active:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150"
+                                    :disabled="processingWater"
+                                    class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 focus:bg-blue-700 active:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150 disabled:opacity-50"
                                 >
-                                    Pull Data Now
-                                </Link>
+                                    {{ processingWater ? 'Pulling...' : 'Pull Data Now' }}
+                                </button>
                             </div>
                         </div>
 
@@ -185,17 +228,18 @@ onUnmounted(() => {
                                 </div>
                                 
                                 <div class="p-4">
+                                  {{ JSON.stringify(result.data) }}
                                     <!-- <div v-if="result.success"> -->
                                         <div>
                                         <WaterLevelChart 
                                             :sensorId="Number(sensorId)" 
                                             :name="result.name" 
-                                            :value="result.data / 10" 
+                                            :value="result.data" 
                                             :timestamp="result.timestamp" 
                                             :history="historyData?.[Number(sensorId)] || []"
-                                            :level2="sensors?.find(s => s.id === Number(sensorId))?.level_2"
-                                            :level3="sensors?.find(s => s.id === Number(sensorId))?.level_3"
-                                            :level4="sensors?.find(s => s.id === Number(sensorId))?.level_4"
+                                            :level2="Number(sensors?.find(s => s.id === Number(sensorId))?.level_2)"
+                                            :level3="Number(sensors?.find(s => s.id === Number(sensorId))?.level_3)"
+                                            :level4="Number(sensors?.find(s => s.id === Number(sensorId))?.level_4)"
                                         />
                                     </div>
                                     <!-- <div v-else class="bg-red-50 dark:bg-red-900/10 text-red-700 dark:text-red-300 rounded-lg p-4">
@@ -224,15 +268,14 @@ onUnmounted(() => {
                                     <InputLabel for="auto-weather-pull" value="Auto Pull Data" class="cursor-pointer" />
                                 </div>
 
-                                <Link
-                                    :href="route('dashboard.pull-weather-data')"
-                                    method="post"
-                                    as="button"
+                                <button
+                                    @click="pullWeatherData"
                                     type="button"
-                                    class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 focus:bg-blue-700 active:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150"
+                                    :disabled="processingWeather"
+                                    class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 focus:bg-blue-700 active:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150 disabled:opacity-50"
                                 >
-                                    Pull Data Now
-                                </Link>
+                                    {{ processingWeather ? 'Pulling...' : 'Pull Data Now' }}
+                                </button>
                             </div>
                         </div>
                       
@@ -242,7 +285,7 @@ onUnmounted(() => {
                                 class="bg-white dark:bg-gray-800 border-2 border-blue-600 rounded-2xl overflow-hidden shadow-md w-1/3">
                                 <div class="px-4 py-3 border-b dark:border-gray-700">
                                     <h4 class="text-center font-bold text-xl text-gray-700 dark:text-gray-200 uppercase flex items-center justify-between">
-                                        <span>{{ observation.name }}  <span class="text-[12px] font-light text-gray-500 text-sm italic capitalize">data as of {{ observation.data.date_time }}</span> </span><span class="text-gray-500 text-sm italic">PWS ID: {{ observation.station_id }}</span>
+                                        <span>{{ observation.name }}  <span v-if="observation.success && observation.data" class="text-[12px] font-light text-gray-500 text-sm italic capitalize">data as of {{ observation.data.date_time }}</span> </span><span class="text-gray-500 text-sm italic">PWS ID: {{ observation.station_id }}</span>
                                     </h4>
                                 </div>
                                 <div class="p-4">

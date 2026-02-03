@@ -30,7 +30,7 @@ class PullWundergroundApiData extends Command
     public function handle()
     {
         $this->info('Starting Wunderground API data pulling loop for all stations...');
-
+        $controller = new \App\Http\Controllers\WeatherStationController();
         while (true) {
             $stations = \App\Models\WeatherStation::where('mode', 'API/wunderground')->get();
             $observations = [];
@@ -38,14 +38,9 @@ class PullWundergroundApiData extends Command
             foreach ($stations as $station) {
                 $this->info("Pulling data for station: {$station->name} ({$station->station_id})");
                 try {
-                    $response = Http::get('https://api.weather.com/v2/pws/observations/current', [
-                        'stationId' => $station->station_id,
-                        'format' => 'json',
-                        'units' => 'm',
-                        'numericPrecision' => 'decimal',
-                        'apiKey' => 'cb0c2dc0f7e84bdd8c2dc0f7e8ebdd4d',
-                    ]);
-                    
+                    if($station->mode === "API/wunderground"){
+                        $response = $controller->wundergroundAPI($station);
+                    }
                     if ($response->successful()) {
                         $weatherData = $response->json();
                         

@@ -20,6 +20,20 @@ class WaterLevelSensor extends Model
         'location_id',
     ];
 
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'level_2' => 'float',
+            'level_3' => 'float',
+            'level_4' => 'float',
+        ];
+    }
+
     public function location()
     {
         return $this->belongsTo(Location::class);

@@ -151,6 +151,14 @@ const currentDate = new Date().toLocaleDateString('en-US', {
                                             <DropdownLink :href="route('profile.show')">
                                                 Profile
                                             </DropdownLink>
+                                            
+                                            <div class="block px-4 py-2 text-xs text-gray-400">
+                                                System Administration
+                                            </div>
+
+                                            <DropdownLink :href="route('users.index')">
+                                                Manage Users
+                                            </DropdownLink>
 
                                             <DropdownLink v-if="$page.props.jetstream.hasApiFeatures" :href="route('api-tokens.index')">
                                                 API Tokens

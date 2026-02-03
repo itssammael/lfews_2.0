@@ -178,22 +178,30 @@ class WeatherStationController extends Controller
        // Simple lock to prevent concurrent Wunderground api pulls
         $lockKey = 'wunderground_pull_lock';
         if (\Illuminate\Support\Facades\Cache::has($lockKey)) {
-            if (request()->expectsJson() || !request()->ajax()) {
-                return ['error' => 'Data pull is already in progress.'];
+            $message = 'Data pull is already in progress.';
+            if (request()->ajax() || request()->wantsJson()) {
+                return ['error' => $message];
             }
-            return redirect()->back()->with('warning', 'Data pull is already in progress. Please try again later.');
+            return redirect()->back()->with('warning', $message);
         }
 
         try {
             \Illuminate\Support\Facades\Cache::put($lockKey, true, 30); // 30 second lock
+            
+            // Release session lock to prevent blocking other requests
+            if (session_id()) {
+                session_write_close();
+            }
+            set_time_limit(60);
 
             $stations = WeatherStation::all();
             $observations = [];
             foreach ($stations as $station) {
                 try {
                     if($station->mode === 'API/wunderground') {
-                        $weatherData = $this->wundergroundAPI($station);
+                        $response= $this->wundergroundAPI($station);
                     }
+                    $weatherData = $response->json();
                     // dd($weatherData);
                     $observations[$station->id] = [
                        'id' => $station->id,
@@ -282,11 +290,17 @@ class WeatherStationController extends Controller
     {
         $response = Http::get('https://api.weather.com/v2/pws/observations/current', [
                                 'stationId' => $station->station_id,
+                 
                                 'format' => 'json',
                                 'units' => 'm',
                                 'numericPrecision' => 'decimal',
                                 'apiKey' => 'cb0c2dc0f7e84bdd8c2dc0f7e8ebdd4d',
                             ]);
-        return $response->json();
+        return $response;
+    }
+
+    public function davisWeatherStation()
+    {
+        
     }
 }

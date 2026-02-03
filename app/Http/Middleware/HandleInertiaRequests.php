@@ -39,7 +39,9 @@ class HandleInertiaRequests extends Middleware
             'flash' => [
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),
+                'warning' => $request->session()->get('warning'),
                 'modbusResult' => $request->session()->get('modbusResult'),
+                'weatherResult' => $request->session()->get('weatherResult'),
             ],
         ];
     }

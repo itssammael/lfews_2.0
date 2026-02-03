@@ -35,4 +35,6 @@ Route::middleware([
 
     Route::get('/locations/create', [\App\Http\Controllers\LocationController::class, 'create'])->name('locations.create');
     Route::post('/locations', [\App\Http\Controllers\LocationController::class, 'store'])->name('locations.store');
+
+    Route::resource('users', \App\Http\Controllers\UserController::class);
 });

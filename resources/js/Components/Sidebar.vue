@@ -58,7 +58,6 @@ const showSidebar = ref(false);
       >
         <span :class="{'inline-block': showSidebar, 'hidden': ! showSidebar}">Water Level Sensors</span><span :class="{'hidden': showSidebar, 'inline-block': ! showSidebar}"><img src="/images/water-level.png" alt="Logo" class="w-8" /></span>
       </ResponsiveNavLink>
-
       <ResponsiveNavLink
         :href="route('weather-stations')"
         :active="route().current('weather-stations')"

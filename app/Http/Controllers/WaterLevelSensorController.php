@@ -7,6 +7,8 @@ use App\Models\WaterLevelSensor;
 use Illuminate\Http\Request;
 
 use App\Models\Location;
+use App\Models\WaterLevelSensorData;
+use Carbon\Carbon;
 
 class WaterLevelSensorController extends Controller
 {
@@ -197,11 +199,21 @@ class WaterLevelSensorController extends Controller
         // Simple lock to prevent concurrent Modbus pulls
         $lockKey = 'modbus_pull_lock';
         if (\Illuminate\Support\Facades\Cache::has($lockKey)) {
-            return redirect()->back()->with('warning', 'A data pull is already in progress.');
+            $message = 'A data pull is already in progress.';
+            if (request()->ajax() || request()->wantsJson()) {
+                return ['error' => $message];
+            }
+            return redirect()->back()->with('warning', $message);
         }
 
         try {
             \Illuminate\Support\Facades\Cache::put($lockKey, true, 30); // 30 second lock
+            
+            // Releasing session lock allows other requests to proceed while we wait for I/O (Modbus)
+            if (session_id()) {
+                session_write_close();
+            }
+            set_time_limit(60);
 
             $sensors = \App\Models\WaterLevelSensor::all();
             $results = [];
@@ -224,6 +236,7 @@ class WaterLevelSensorController extends Controller
                         'data' => $data[5]/ 10,
                         'timestamp' => now()->toDateTimeString(),
                     ];
+                   
                 } catch (\Exception $e) {
                     $results[$sensor->id] = [
                         'sensor_id' => $sensor->id,
@@ -240,23 +253,43 @@ class WaterLevelSensorController extends Controller
 
             // Update history
             $history = \Illuminate\Support\Facades\Cache::get('modbus_history', []);
+            
+            if (empty($history)) {
+                $todayData = WaterLevelSensorData::whereDate('date', Carbon::today())
+                    ->orderBy('date', 'asc')
+                    ->get();
+
+                foreach ($todayData as $entry) {
+                    if (!isset($history[$entry->water_level_sensor_id])) {
+                        $history[$entry->water_level_sensor_id] = [];
+                    }
+                    $history[$entry->water_level_sensor_id][] = [
+                        'value' => $entry->sensor_data,
+                        'timestamp' => $entry->date,
+                    ];
+                    
+                }
+            }
+
             foreach ($results as $sensorId => $result) {
+                
                 if ($result['success']) {
                     if (!isset($history[$sensorId])) {
                         $history[$sensorId] = [];
                     }
                     
                     $history[$sensorId][] = [
-                        'value' => $result['data'] ,
+                        'value' => $result['data'],
                         'timestamp' => $result['timestamp']
                     ];
-
-                    // Keep only last 50 points
+                    
+                    // Keep only last 50 points per sensor
                     if (count($history[$sensorId]) > 50) {
                         array_shift($history[$sensorId]);
                     }
                 }
             }
+            
             \Illuminate\Support\Facades\Cache::put('modbus_history', $history, 1440); // 24 hours
 
             \Illuminate\Support\Facades\Cache::forget($lockKey);
