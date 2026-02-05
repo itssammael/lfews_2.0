@@ -215,7 +215,7 @@ class WaterLevelSensorController extends Controller
             }
             set_time_limit(60);
 
-            $sensors = \App\Models\WaterLevelSensor::all();
+            $sensors = \App\Models\WaterLevelSensor::where('state', 1)->get();
             $results = [];
 
             foreach ($sensors as $sensor) {
@@ -249,7 +249,7 @@ class WaterLevelSensorController extends Controller
             }
 
             // Update latest data
-            \Illuminate\Support\Facades\Cache::put('latest_modbus_data', $results, 60);
+            \Illuminate\Support\Facades\Cache::put('latest_modbus_data', $results, 1440);
 
             // Update history
             $history = \Illuminate\Support\Facades\Cache::get('modbus_history', []);

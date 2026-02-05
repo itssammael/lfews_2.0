@@ -333,7 +333,6 @@ const close = () => {
                     <InputLabel for="port" value="Port" />
                     <TextInput
                         id="port"
-                        disabled="true"
                         v-model="form.port"
                         type="number"
                         class="mt-1 block w-full"

@@ -69,7 +69,7 @@ class PullModbusData extends Command
                 }
             }
 
-            \Illuminate\Support\Facades\Cache::put('latest_modbus_data', $results, 60);
+            \Illuminate\Support\Facades\Cache::put('latest_modbus_data', $results, 1440);
             
             // Update history
             $history = \Illuminate\Support\Facades\Cache::get('modbus_history', []);
@@ -96,7 +96,7 @@ class PullModbusData extends Command
             
             $this->info('[' . now()->toDateTimeString() . '] Pulled data for ' . $sensors->count() . ' sensors.');
 
-            sleep(10);
+            sleep(60);
         }
     }
 }

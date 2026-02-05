@@ -3,6 +3,7 @@ import AppLayout from "@/Layouts/AppLayout.vue";
 import { Link, usePage, router } from "@inertiajs/vue3";
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import WaterLevelChart from "@/Components/WaterLevelChart.vue";
+import WaterLevelCombinedChart from "@/Components/WaterLevelCombinedChart.vue";
 import Checkbox from "@/Components/Checkbox.vue";
 import InputLabel from "@/Components/InputLabel.vue";
 
@@ -37,6 +38,7 @@ const props = defineProps<{
   stations?: Array<{
     id: number;
     station_id: string;
+    name: string;
   }>;
   latestWeatherData?: Record<
     number,
@@ -217,35 +219,44 @@ onUnmounted(() => {
                             </div>
                         </div>
 
-                        <div v-if="modbusResult" class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                            <div v-for="(result, sensorId) in modbusResult" :key="sensorId" 
+                        <!-- Combined Trend Chart -->
+                        <div class="mt-8">
+                            <WaterLevelCombinedChart 
+                                :sensors="sensors" 
+                                :latestData="modbusResult" 
+                                :historyData="historyData" 
+                            />
+                        </div>
+
+                        <div v-if="sensors && sensors.length > 0" class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                            <div v-for="sensor in sensors" :key="sensor.id" 
                                 class="bg-white dark:bg-gray-800 border-2 border-blue-600 rounded-2xl overflow-hidden shadow-md"
                             >
                                 <div class="px-4 py-3 border-b dark:border-gray-700">
                                     <h4 class="text-center font-bold text-gray-700 dark:text-gray-200">
-                                        {{ result.name }}
+                                        {{ sensor.name }}
                                     </h4>
                                 </div>
                                 
                                 <div class="p-4">
-                                  {{ JSON.stringify(result.data) }}
-                                    <!-- <div v-if="result.success"> -->
-                                        <div>
+                                    <div v-if="modbusResult?.[sensor.id]">
                                         <WaterLevelChart 
-                                            :sensorId="Number(sensorId)" 
-                                            :name="result.name" 
-                                            :value="result.data" 
-                                            :timestamp="result.timestamp" 
-                                            :history="historyData?.[Number(sensorId)] || []"
-                                            :level2="Number(sensors?.find(s => s.id === Number(sensorId))?.level_2)"
-                                            :level3="Number(sensors?.find(s => s.id === Number(sensorId))?.level_3)"
-                                            :level4="Number(sensors?.find(s => s.id === Number(sensorId))?.level_4)"
+                                            :sensorId="sensor.id" 
+                                            :name="sensor.name" 
+                                            :value="modbusResult[sensor.id].data" 
+                                            :timestamp="modbusResult[sensor.id].timestamp" 
+                                            :history="historyData?.[sensor.id] || []"
+                                            :level2="Number(sensor.level_2)"
+                                            :level3="Number(sensor.level_3)"
+                                            :level4="Number(sensor.level_4)"
                                         />
                                     </div>
-                                    <!-- <div v-else class="bg-red-50 dark:bg-red-900/10 text-red-700 dark:text-red-300 rounded-lg p-4">
-                                        <p class="font-bold mb-2 text-sm text-center">Error Pulling Data ({{ result.timestamp }})</p>
-                                        <p class="text-xs text-center">{{ result.error }}</p>
-                                    </div> -->
+                                    <div v-else class="flex flex-col items-center justify-center py-12 text-gray-400">
+                                        <svg class="w-12 h-12 mb-3 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                        </svg>
+                                        <p class="text-sm italic">Waiting for data pull...</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -279,110 +290,138 @@ onUnmounted(() => {
                             </div>
                         </div>
                       
-                        <div v-if="weatherResult" class="flex space-x-6 mt-6">
+                        <div v-if="stations && stations.length > 0" class="flex flex-wrap gap-6 mt-6">
                            
-                              <div v-for="(observation, stationId) in weatherResult" :key="stationId" 
-                                class="bg-white dark:bg-gray-800 border-2 border-blue-600 rounded-2xl overflow-hidden shadow-md w-1/3">
-                                <div class="px-4 py-3 border-b dark:border-gray-700">
-                                    <h4 class="text-center font-bold text-xl text-gray-700 dark:text-gray-200 uppercase flex items-center justify-between">
-                                        <span>{{ observation.name }}  <span v-if="observation.success && observation.data" class="text-[12px] font-light text-gray-500 text-sm italic capitalize">data as of {{ observation.data.date_time }}</span> </span><span class="text-gray-500 text-sm italic">PWS ID: {{ observation.station_id }}</span>
-                                    </h4>
-                                </div>
-                                <div class="p-4">
-                                    <div v-if="observation.success" class="flex flex-col space-y-6">
-                                        <!-- Main Conditions Row -->
-                                        <div class="flex items-center justify-between">
-                                            <!-- Temperature -->
-                                            <div class="flex flex-col">
-                                                <div class="flex items-baseline">
-                                                    <span class="text-6xl font-normal text-orange-500">{{ Number(observation.data.temperature) }}</span>
-                                                    <span class="text-2xl text-gray-500 ml-1">°C</span>
+                              <div v-for="station in stations" :key="station.id" 
+                                class="bg-white dark:bg-gray-800 border-2 border-blue-600 rounded-2xl overflow-hidden shadow-md w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)]">
+                                <template v-if="weatherResult?.[station.id]">
+                                    <div class="px-4 py-3 border-b dark:border-gray-700">
+                                        <h4 class="text-center font-bold text-lg text-gray-700 dark:text-gray-200 uppercase flex flex-col md:flex-row items-center justify-between">
+                                            <span class="flex flex-col items-start">
+                                                <span>{{ station.name }}</span>
+                                                <span v-if="weatherResult[station.id].success && weatherResult[station.id].data" class="text-[10px] font-light text-gray-500 italic normal-case">
+                                                    last update: {{ weatherResult[station.id].data.date_time }}
+                                                </span>
+                                            </span>
+                                            <span class="text-gray-500 text-xs italic mt-1 md:mt-0">ID: {{ station.station_id }}</span>
+                                        </h4>
+                                    </div>
+                                    <div class="p-4">
+                                        <div v-if="weatherResult[station.id].success" class="flex flex-col space-y-6">
+                                            <!-- Main Conditions Row -->
+                                            <div class="flex items-center justify-between pt-2">
+                                                <!-- Rain Rate -->
+                                                <div class="flex flex-col">
+                                                    <span class="text-[10px] font-bold text-gray-400 uppercase leading-none">Rain Rate</span>
+                                                    <div class="flex items-baseline mt-1">
+                                                        <span class="text-4xl font-semibold text-orange-500">{{ weatherResult[station.id].data.precipitation_rate }}</span>
+                                                        <span class="text-lg text-gray-500 ml-1">mm/h</span>
+                                                    </div>
                                                 </div>
-                                                <div class="text-gray-500 text-sm mt-1">
-                                                    Feels Like {{ Number(observation.data.heat_index) }}° <span class="text-[10px] italic uppercase">(Heat Index)</span>
+
+                                                <!-- Rain Total -->
+                                                <div class="flex flex-col pl-4 border-l dark:border-gray-700">
+                                                    <span class="text-[10px] font-bold text-gray-400 uppercase leading-none">Rain Total</span>
+                                                    <div class="flex items-baseline mt-1">
+                                                        <span class="text-4xl font-semibold text-orange-500">{{ weatherResult[station.id].data.precipitation_total }}</span>
+                                                        <span class="text-lg text-gray-500 ml-1">mm</span>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Animated Icon -->
+                                                <div class="flex items-center justify-center text-gray-400 ml-4">
+                                                    <svg class="w-12 h-12 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+                                                    </svg>
                                                 </div>
                                             </div>
 
-                                            <!-- Wind Compass (Simple implementation) -->
-                                            <div class="relative w-20 h-20 flex items-center justify-center">
-                                                <div class="absolute inset-0 border-2 border-dashed border-gray-300 rounded-full"></div>
-                                                <span class="font-bold text-gray-800">{{ getWindDirection(observation.data.wind_direction) }}</span>
-                                                <!-- Compass Needle -->
-                                                <div 
-                                                    class="absolute w-1 h-8 bg-gray-400 rounded-full"
-                                                    :style="{ transform: `rotate(${observation.data.wind_direction}deg)`, transformOrigin: 'center bottom', bottom: '50%' }"
-                                                ></div>
-                                            </div>
-
-                                            <!-- Wind & Gust -->
-                                            <div class="flex flex-col items-end">
-                                                <span class="text-xs font-bold text-gray-400 uppercase">Wind & Gust</span>
-                                                <div class="flex items-baseline text-gray-800 font-bold mt-1">
-                                                    <span class="text-lg">{{ Number(observation.data.wind_speed) }}</span>
-                                                    <span class="mx-1 text-gray-400">/</span>
-                                                    <span class="text-lg">{{ Number(observation.data.wind_gust) }}</span>
-                                                    <span class="ml-1 text-sm font-normal">km/h</span>
+                                            <!-- Secondary Grid -->
+                                            <div class="grid grid-cols-4 gap-y-4 gap-x-4 pt-4 border-t dark:border-gray-700">
+                                                <!-- Wind Compass -->
+                                                <div class="relative w-16 h-16 flex items-center justify-center">
+                                                    <div class="absolute inset-0 border-2 border-dashed border-gray-300 rounded-full"></div>
+                                                    <span class="font-bold text-gray-800 text-sm">{{ getWindDirection(weatherResult[station.id].data.wind_direction) }}</span>
+                                                    <div 
+                                                        class="absolute w-1 h-6 bg-gray-400 rounded-full"
+                                                        :style="{ transform: `rotate(${weatherResult[station.id].data.wind_direction}deg)`, transformOrigin: 'center bottom', bottom: '50%' }"
+                                                    ></div>
+                                                </div>
+                                                
+                                                <div class="flex flex-col">
+                                                    <span class="text-[9px] font-bold text-gray-400 uppercase">Dewpoint</span>
+                                                    <div class="flex items-baseline font-bold text-gray-800 text-sm mt-0.5">
+                                                        <span>{{ weatherResult[station.id].data.dewpoint }}</span>
+                                                        <span class="ml-0.5 text-[10px] font-normal">°C</span>
+                                                    </div>
+                                                </div>
+                                                <div class="flex flex-col">
+                                                    <span class="text-[9px] font-bold text-gray-400 uppercase">Temperature</span>
+                                                    <div class="flex items-baseline font-bold text-gray-800 text-sm mt-0.5">
+                                                        <span>{{ Number(weatherResult[station.id].data.temperature) }}</span>
+                                                        <span class="ml-0.5 text-[10px] font-normal">°C</span>
+                                                    </div>
+                                                </div>
+                                                <div class="flex flex-col">
+                                                    <span class="text-[9px] font-bold text-gray-400 uppercase">Pressure</span>
+                                                    <div class="flex items-baseline font-bold text-gray-800 text-sm mt-0.5">
+                                                        <span>{{ Math.round(weatherResult[station.id].data.pressure) }}</span>
+                                                        <span class="ml-0.5 text-[10px] font-normal">hPa</span>
+                                                    </div>
+                                                </div>
+                                                <!-- Wind & Gust -->
+                                                <div class="flex flex-col">
+                                                    <span class="text-[9px] font-bold text-gray-400 uppercase">Wind / Gust</span>
+                                                    <div class="flex items-baseline text-gray-800 font-bold mt-1">
+                                                        <span class="text-base">{{ Number(weatherResult[station.id].data.wind_speed) }}</span>
+                                                        <span class="mx-1 text-gray-400">/</span>
+                                                        <span class="text-base">{{ Number(weatherResult[station.id].data.wind_gust) }}</span>
+                                                        <span class="ml-1 text-[10px] font-normal uppercase">km/h</span>
+                                                    </div>
+                                                </div>
+                                                <div class="flex flex-col">
+                                                    <span class="text-[9px] font-bold text-gray-400 uppercase">Humidity</span>
+                                                    <div class="flex items-baseline font-bold text-gray-800 text-sm mt-0.5">
+                                                        <span>{{ weatherResult[station.id].data.humidity }}</span>
+                                                        <span class="ml-0.5 text-[10px] font-normal">%</span>
+                                                    </div>
+                                                </div>
+                                                <div class="flex flex-col">
+                                                    <span class="text-[9px] font-bold text-gray-400 uppercase">Heat Index</span>
+                                                    <div class="flex items-baseline font-bold text-gray-800 text-sm mt-0.5">
+                                                        <span>{{ Number(weatherResult[station.id].data.heat_index) }}</span>
+                                                        <span class="ml-0.5 text-[10px] font-normal">°C</span>
+                                                    </div>
+                                                </div>
+                                                <div class="flex flex-col">
+                                                    <span class="text-[9px] font-bold text-gray-400 uppercase">UV</span>
+                                                    <div class="flex items-baseline font-bold text-gray-800 text-sm mt-0.5">
+                                                        <span>{{ weatherResult[station.id].data.uv ?? '--' }}</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
-
-                                        <!-- Secondary Grid -->
-                                        <div class="grid grid-cols-3 gap-y-4 gap-x-8 pt-4">
-                                            <!-- Dewpoint -->
-                                            <div class="flex flex-col">
-                                                <span class="text-xs font-bold text-gray-400 uppercase">Dewpoint</span>
-                                                <div class="flex items-baseline font-bold text-gray-800 mt-1">
-                                                    <span>{{ observation.data.dewpoint }}</span>
-                                                    <span class="ml-1 text-xs font-normal">°C</span>
-                                                </div>
-                                            </div>
-                                            <!-- Precip Rate -->
-                                            <div class="flex flex-col">
-                                                <span class="text-xs font-bold text-gray-400 uppercase">Precip Rate</span>
-                                                <div class="flex items-baseline font-bold text-gray-800 mt-1">
-                                                    <span>{{ observation.data.precipitation_rate }}</span>
-                                                    <span class="ml-1 text-xs font-normal">mm/hr</span>
-                                                </div>
-                                            </div>
-                                            <!-- Pressure -->
-                                            <div class="flex flex-col">
-                                                <span class="text-xs font-bold text-gray-400 uppercase">Pressure</span>
-                                                <div class="flex items-baseline font-bold text-gray-800 mt-1">
-                                                    <span>{{ Number(observation.data.pressure) }}</span>
-                                                    <span class="ml-1 text-xs font-normal">hPa</span>
-                                                </div>
-                                            </div>
-                                            <!-- Humidity -->
-                                            <div class="flex flex-col">
-                                                <span class="text-xs font-bold text-gray-400 uppercase">Humidity</span>
-                                                <div class="flex items-baseline font-bold text-gray-800 mt-1">
-                                                    <span>{{ observation.data.humidity }}</span>
-                                                    <span class="ml-1 text-xs font-normal">%</span>
-                                                </div>
-                                            </div>
-                                            <!-- Precip Accum -->
-                                            <div class="flex flex-col">
-                                                <span class="text-xs font-bold text-gray-400 uppercase">Precip Accum</span>
-                                                <div class="flex items-baseline font-bold text-gray-800 mt-1">
-                                                    <span>{{ observation.data.precipitation_total }}</span>
-                                                    <span class="ml-1 text-xs font-normal">mm</span>
-                                                </div>
-                                            </div>
-                                            <!-- UV -->
-                                            <div class="flex flex-col">
-                                                <span class="text-xs font-bold text-gray-400 uppercase">UV</span>
-                                                <div class="flex items-baseline font-bold text-gray-800 mt-1">
-                                                    <span>{{ observation.data.uv ?? '--' }}</span>
-                                                </div>
-                                            </div>
+                                        <div v-else class="bg-red-50 dark:bg-red-900/10 text-red-700 dark:text-red-300 rounded-lg p-4">
+                                            <p class="font-bold mb-2 text-xs text-center">Connection Issue</p>
+                                            <p class="text-[10px] text-center line-clamp-2" :title="weatherResult[station.id].error">{{ weatherResult[station.id].error }}</p>
+                                            <p class="text-[9px] text-center mt-2 opacity-50">{{ weatherResult[station.id].timestamp }}</p>
                                         </div>
                                     </div>
-                                    <div v-else class="bg-red-50 dark:bg-red-900/10 text-red-700 dark:text-red-300 rounded-lg p-4">
-                                        <p class="font-bold mb-2 text-sm text-center">Error Pulling Data ({{ observation.timestamp }})</p>
-                                        <p class="text-xs text-center">{{ observation.error }}</p>
+                                </template>
+                                <template v-else>
+                                    <div class="px-4 py-3 border-b dark:border-gray-700">
+                                        <h4 class="text-center font-bold text-gray-700 dark:text-gray-200">
+                                            {{ station.name }}
+                                        </h4>
                                     </div>
-                                </div>
-                            </div>
+                                    <div class="p-8 flex flex-col items-center justify-center text-gray-400">
+                                        <svg class="w-10 h-10 mb-2 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+                                        </svg>
+                                        <p class="text-xs italic">Syncing weather data...</p>
+                                    </div>
+                                </template>
+                              </div>
 
                         </div>
                     </div>
