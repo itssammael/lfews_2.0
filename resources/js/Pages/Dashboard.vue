@@ -234,7 +234,7 @@ onUnmounted(() => {
                             >
                                 <div class="px-4 py-3 border-b dark:border-gray-700">
                                     <h4 class="text-center font-bold text-gray-700 dark:text-gray-200">
-                                        {{ sensor.name }}
+                                        {{ sensor.name }} <span v-if="modbusResult?.[sensor.id]">- {{ modbusResult[sensor.id].data }}</span>
                                     </h4>
                                 </div>
                                 
@@ -314,7 +314,7 @@ onUnmounted(() => {
                                                 <div class="flex flex-col">
                                                     <span class="text-[10px] font-bold text-gray-400 uppercase leading-none">Rain Rate</span>
                                                     <div class="flex items-baseline mt-1">
-                                                        <span class="text-4xl font-semibold text-orange-500">{{ weatherResult[station.id].data.precipitation_rate }}</span>
+                                                        <span class="text-4xl font-semibold text-orange-500">{{weatherResult[station.id].data.precipitation_rate }}</span>
                                                         <span class="text-lg text-gray-500 ml-1">mm/h</span>
                                                     </div>
                                                 </div>

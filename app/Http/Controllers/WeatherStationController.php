@@ -354,14 +354,14 @@ class WeatherStationController extends Controller
                 // Scaling and "No Data" handling
                 // Davis sentinel values: 32767 or 65535 for words, 255 for bytes
                 $weather = [
-                    'temperature'               => ($temp_out == 32767) ? null : $temp_out / 10,
-                    'dewpoint'           => ($dewpoint == 255) ? null : $dewpoint,
-                    'heat_index'         => ($heat_index == 255) ? null : $heat_index,
-                    'humidity'           => ($humidity == 255) ? null : $humidity,
-                    'wind_speed'         => ($wind_speed['wind_speed'] == 255) ? null : $wind_speed['wind_speed'],
+                    'temperature'               => ($temp_out == 32767) ? 0 : $temp_out / 10,
+                    'dewpoint'           => ($dewpoint == 255) ? 0 : $dewpoint,
+                    'heat_index'         => ($heat_index == 255) ? 0 : $heat_index,
+                    'humidity'           => ($humidity == 255) ? 0 : $humidity,
+                    'wind_speed'         => ($wind_speed['wind_speed'] == 255) ? 0 : $wind_speed['wind_speed'],
                     'wind_direction'     => ($wind_direction == 32767 || $wind_direction == 0) ? 0 : $wind_direction,
                     'wind_gust'          => ($wind_gust['wind_gust'] == 32767 || $wind_gust['wind_gust'] == 65535) ? 0 : $wind_gust['wind_gust'],
-                    'pressure'           => ($barometer == 0) ? null : $barometer / 10,
+                    'pressure'           => ($barometer == 0) ? 0 : $barometer / 10,
                     'precipitation_rate' => ($rain_rate == 65535) ? 0 : $rain_rate * 0.01,
                     'precipitation_total'=> ($rain_total == 65535) ? 0 : $rain_total * 0.01,
                     'solar_radiation'    => ($solar == 65535) ? 0 : $solar,

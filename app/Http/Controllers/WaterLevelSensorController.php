@@ -256,7 +256,8 @@ class WaterLevelSensorController extends Controller
             
             if (empty($history)) {
                 $todayData = WaterLevelSensorData::whereDate('date', Carbon::today())
-                    ->orderBy('date', 'asc')
+                    ->orderBy('date_time', 'asc')
+                    ->limit(50)
                     ->get();
 
                 foreach ($todayData as $entry) {

@@ -29,7 +29,7 @@ class PullModbusData extends Command
         $this->info('Starting Modbus data pulling loop for all sensors...');
 
         while (true) {
-            $sensors = \App\Models\WaterLevelSensor::all();
+            $sensors = \App\Models\WaterLevelSensor::where('state', 1)->get();
             $results = [];
 
             foreach ($sensors as $sensor) {
@@ -73,6 +73,23 @@ class PullModbusData extends Command
             
             // Update history
             $history = \Illuminate\Support\Facades\Cache::get('modbus_history', []);
+            if (empty($history)) {
+                $todayData = WaterLevelSensorData::whereDate('date', Carbon::today())
+                    ->orderBy('date_time', 'asc')
+                    ->limit(50)
+                    ->get();
+
+                foreach ($todayData as $entry) {
+                    if (!isset($history[$entry->water_level_sensor_id])) {
+                        $history[$entry->water_level_sensor_id] = [];
+                    }
+                    $history[$entry->water_level_sensor_id][] = [
+                        'value' => $entry->sensor_data,
+                        'timestamp' => $entry->date,
+                    ];
+                    
+                }
+            }
             foreach ($results as $sensorId => $result) {
             
                 if ($result['success']) {
