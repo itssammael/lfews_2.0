@@ -25,6 +25,8 @@ Route::middleware([
     Route::delete('/water-level-sensors/{water_level_sensor}', [\App\Http\Controllers\WaterLevelSensorController::class, 'destroy'])->name('water-level-sensors.destroy');
     Route::post('/water-level-sensors/pull-data', [\App\Http\Controllers\WaterLevelSensorController::class, 'pullWaterData'])->name('water-level-sensors.pull-data');
   
+    Route::get('/reports', [\App\Http\Controllers\ReportController::class, 'index'])->name('reports');
+
     Route::get('/weather-stations', [\App\Http\Controllers\WeatherStationController::class, 'index'])->name('weather-stations');
     Route::get('/weather-stations/create', [\App\Http\Controllers\WeatherStationController::class, 'create'])->name('weather-stations.create');
     Route::post('/weather-stations', [\App\Http\Controllers\WeatherStationController::class, 'store'])->name('weather-stations.store');

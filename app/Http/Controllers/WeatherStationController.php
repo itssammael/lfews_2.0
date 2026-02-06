@@ -333,14 +333,15 @@ class WeatherStationController extends Controller
             if (strlen($binaryData) === 100 && ord($binaryData[0]) === 6) {
                 $packet = substr($binaryData, 1);
           
-                // Individual bytes/offsets based on Davis LOOP 1 Packet Spec
+                // // Individual bytes/offsets based on Davis LOOP 1 Packet Spec
                 $barometer      = unpack("v", substr($packet, 7, 2))[1];
                 $temp_out       = unpack("v", substr($packet, 12, 2))[1];
                 $wind_speed     = unpack("Cwind_speed/x4/", $packet);
                 $wind_direction = unpack("v", substr($packet, 16, 2))[1];
                 $humidity       = ord($packet[33]);
-                $rain_rate      = unpack("v", substr($packet, 45, 2))[1];
-                $rain_total     = unpack("v", substr($packet, 54, 2))[1];
+                $rain_day      = unpack("v", substr($packet, 52, 2))[1]/100; // Rain rate (clicks/hr)
+                $rain_rate      = unpack("v", substr($packet, 41, 2))[1];
+                $rain_total     = unpack("v", substr($packet, 50, 2))[1];
                 $wind_gust      = unpack(
                     "x64/" .       // Skip to Offset 64
                     "vwind_gust",  // Read 2 bytes (unsigned short, little-endian)
@@ -350,7 +351,7 @@ class WeatherStationController extends Controller
                 $uv             = ord($packet[70]);
                     $dewpoint       = unpack("c", $packet[42])[1]; // 1-byte signed
                 $heat_index     = unpack("c", $packet[44])[1]; // 1-byte signed
-
+            //    $rain_storm     = unpack("v", substr($packet, 46, 2))[1] / 100; // Offset 46
                 // Scaling and "No Data" handling
                 // Davis sentinel values: 32767 or 65535 for words, 255 for bytes
                 $weather = [
@@ -368,7 +369,7 @@ class WeatherStationController extends Controller
                     'uv'                 => ($uv == 255) ? 0 : $uv / 10,
                 ];
         
-               
+            //    dd($rain_day);    
             }
             $weather['heat_index'] = $this->calculateHeatIndex($weather['temperature'], $weather['humidity']);
             $weather['dewpoint'] = $this->calculateDewPoint($weather['temperature'], $weather['humidity']);

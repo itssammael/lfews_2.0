@@ -64,6 +64,12 @@ const showSidebar = ref(false);
       >
         <span :class="{'inline-block': showSidebar, 'hidden': ! showSidebar}">Weather Stations</span><span :class="{'hidden': showSidebar, 'inline-block': ! showSidebar}"><img src="/images/weather-station.png" alt="Logo" class="w-8" /></span>
       </ResponsiveNavLink>
+      <ResponsiveNavLink
+        :href="route('reports')"
+        :active="route().current('reports')"
+      >
+        <span :class="{'inline-block': showSidebar, 'hidden': ! showSidebar}">Reports</span><span :class="{'hidden': showSidebar, 'inline-block': ! showSidebar}"><img src="/images/dashboard.png" alt="Logo" class="w-8" /></span>
+      </ResponsiveNavLink>
       <!-- Add more sidebar links here -->
     </div>
   </aside>

@@ -71,6 +71,7 @@ onMounted(() => {
                 minGridDistance: 30
             }),
             min: 0,
+            max: 2000,
         })
     );
 
