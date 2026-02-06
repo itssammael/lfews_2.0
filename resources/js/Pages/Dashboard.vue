@@ -172,7 +172,7 @@ onMounted(() => {
         preserveState: true,
       });
     }
-  }, 10000); 
+  }, 300000); 
 });
 
 onUnmounted(() => {

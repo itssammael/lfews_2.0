@@ -131,7 +131,7 @@ class PullWeatherObservationData extends Command
             \Illuminate\Support\Facades\Cache::put('weather_observation_history', $history, 1440); 
             
             $this->info('[' . now()->toDateTimeString() . '] Processed ' . count($observations) . ' stations.');
-            sleep(60);
+            sleep(300);
         }
     }
 }

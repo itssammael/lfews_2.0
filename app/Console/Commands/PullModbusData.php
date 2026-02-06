@@ -113,7 +113,7 @@ class PullModbusData extends Command
             
             $this->info('[' . now()->toDateTimeString() . '] Pulled data for ' . $sensors->count() . ' sensors.');
 
-            sleep(60);
+            sleep(300);
         }
     }
 }
