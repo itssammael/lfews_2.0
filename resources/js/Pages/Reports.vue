@@ -1060,7 +1060,12 @@ const generateReport = async () => {
         }
     } catch (error) {
         console.error(`Error generating ${selectedReport.value} report:`, error);
-        alert(`Failed to generate ${selectedReport.value} report. Please try again.`);
+        window.dispatchEvent(new CustomEvent('toast', { 
+            detail: { 
+                message: `Failed to generate ${selectedReport.value} report. Please try again.`, 
+                type: 'error' 
+            } 
+        }));
     } finally {
         isGenerating.value = false;
     }
@@ -1232,7 +1237,9 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
             
             // Export to PNG with high quality
             exporting.export("png").then((response: any) => {
-                console.log("Export successful, initiating download...");
+                window.dispatchEvent(new CustomEvent('toast', { 
+                    detail: { message: "Export successful, initiating download...", type: 'success' } 
+                }));
                 const link = document.createElement("a");
                 link.href = response;
                 link.download = `${exporting.get("filePrefix")}.png`;
@@ -1241,15 +1248,21 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                 document.body.removeChild(link);
             }).catch((error: any) => {
                 console.error("Export failed:", error);
-                alert("Failed to export chart. Please check console for details.");
+                window.dispatchEvent(new CustomEvent('toast', { 
+                    detail: { message: "Failed to export chart. Please check console for details.", type: 'error' } 
+                }));
             });
         } catch (e: any) {
             console.error("Error creating Exporting instance:", e);
-            alert("Error creating chart export component.");
+            window.dispatchEvent(new CustomEvent('toast', { 
+                detail: { message: "Error creating chart export component.", type: 'error' } 
+            }));
         }
     } else {
         console.warn("No active chart root found.");
-        alert("Chart is not ready for export yet.");
+        window.dispatchEvent(new CustomEvent('toast', { 
+            detail: { message: "Chart is not ready for export yet.", type: 'error' } 
+        }));
     }
 };
 

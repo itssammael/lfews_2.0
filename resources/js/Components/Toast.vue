@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onUnmounted } from 'vue';
+import { ref, watch, onUnmounted, onMounted } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 
 const page = usePage();
@@ -25,8 +25,26 @@ watch(() => page.props.flash, (flash: any) => {
     }
 }, { deep: true, immediate: true });
 
+// Manual trigger via window event
+const handleToastEvent = (e: any) => {
+    const { detail } = e;
+    message.value = detail.message;
+    type.value = detail.type || 'success';
+    show.value = true;
+
+    if (timeout) clearTimeout(timeout);
+    timeout = setTimeout(() => {
+        show.value = false;
+    }, 5000);
+};
+
+onMounted(() => {
+    window.addEventListener('toast', handleToastEvent);
+});
+
 onUnmounted(() => {
     if (timeout) clearTimeout(timeout);
+    window.removeEventListener('toast', handleToastEvent);
 });
 </script>
 
