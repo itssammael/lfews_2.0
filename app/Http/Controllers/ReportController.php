@@ -58,6 +58,19 @@ class ReportController extends Controller
 
         $records = $query->orderBy('date', 'asc')->get();
 
+        $thresholds = null;
+        if ($request->has('sensor') && $request->sensor !== 'All' && $request->sensor !== '') {
+            $sensor = WaterLevelSensor::where('name', $request->sensor)->first();
+            if ($sensor) {
+                $thresholds = [
+                    'level_2' => $sensor->level_2,
+                    'level_3' => $sensor->level_3,
+                    'level_4' => $sensor->level_4,
+                    'name' => $sensor->name
+                ];
+            }
+        }
+
         return response()->json([
             'records' => $records->map(function ($record) {
                 return [
@@ -65,7 +78,8 @@ class ReportController extends Controller
                     'water_level' => (float) $record->sensor_data,
                     'date_time' => $record->date,
                 ];
-            })
+            }),
+            'thresholds' => $thresholds
         ]);
     }
 

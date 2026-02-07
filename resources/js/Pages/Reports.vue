@@ -4,6 +4,7 @@ import { ref, onMounted, watch, nextTick, onUnmounted, computed } from 'vue';
 import * as am5 from '@amcharts/amcharts5';
 import * as am5xy from '@amcharts/amcharts5/xy';
 import am5themes_Animated from '@amcharts/amcharts5/themes/Animated';
+import { Exporting } from "@amcharts/amcharts5/plugins/exporting";
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 
@@ -32,7 +33,7 @@ const months = [
 ];
 
 // Form states
-const selectedReport = ref('Rain');
+const selectedReport = ref('Water Level');
 const reportTypes = ['Rain', 'Heat Index', 'Water Level'];
 const rainReportType = ref('Monthly');
 const heatIndexReportType = ref('Monthly');
@@ -43,6 +44,7 @@ const heatIndexReport = ref({ station: '', from: '', to: '', year: '', month: ''
 const waterLevelReport = ref({ sensor: '', from: '', to: '', year: '', month: '' });
 
 const isGenerating = ref(false);
+const hasSearched = ref(false);
 
 // Chart Refs
 const rainChartDiv = ref<HTMLElement | null>(null);
@@ -50,6 +52,7 @@ const heatIndexChartDiv = ref<HTMLElement | null>(null);
 const waterLevelChartDiv = ref<HTMLElement | null>(null);
 
 const waterLevelRecords = ref<any[]>([]);
+const waterLevelThresholds = ref<any>(null);
 const rainRecords = ref<any[]>([]);
 const heatIndexRecords = ref<any[]>([]);
 
@@ -97,7 +100,7 @@ const initChart = (rootElement: HTMLElement, title: string, data: any[], seriesN
         wheelX: "panX",
         wheelY: "zoomX",
         pinchZoomX: true,
-        layout: root.verticalLayout
+        layout: am5.VerticalLayout.new(root, {})
     }));
 
     let cursor = chart.set("cursor", am5xy.XYCursor.new(root, {}));
@@ -124,10 +127,6 @@ const initChart = (rootElement: HTMLElement, title: string, data: any[], seriesN
             paddingRight: 15,
             fontSize: 10
         });
-
-        chart.set("scrollbarX", am5.Scrollbar.new(root, {
-            orientation: "horizontal"
-        }));
     }
 
     let yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, {
@@ -175,6 +174,21 @@ const initChart = (rootElement: HTMLElement, title: string, data: any[], seriesN
                 strokeOpacity: 0
             });
 
+            series.bullets.push(function () {
+                return am5.Bullet.new(root, {
+                    locationY: 0.5,
+                    sprite: am5.Label.new(root, {
+                        text: "{valueY}" + unit,
+                        fill: am5.color(0x000000),
+                        centerY: am5.p50,
+                        centerX: am5.p50,
+                        populateText: true,
+                        fontSize: 10,
+                        fontWeight: "bold"
+                    })
+                });
+            });
+
             series.get("tooltip")!.get("background")!.setAll({
                 fill: am5.color(0xffffff),
                 stroke: seriesColor,
@@ -215,6 +229,21 @@ const initChart = (rootElement: HTMLElement, title: string, data: any[], seriesN
                 width: am5.percent(90),
                 strokeOpacity: 0
             });
+
+            series.bullets.push(function () {
+                return am5.Bullet.new(root, {
+                    locationY: 0.5,
+                    sprite: am5.Label.new(root, {
+                        text: "{valueY}" + unit,
+                        fill: am5.color(0x000000),
+                        centerY: am5.p50,
+                        centerX: am5.p50,
+                        populateText: true,
+                        fontSize: 10,
+                        fontWeight: "bold"
+                    })
+                });
+            });
         } else {
             series = chart.series.push(am5xy.LineSeries.new(root, {
                 name: title,
@@ -245,37 +274,653 @@ const initChart = (rootElement: HTMLElement, title: string, data: any[], seriesN
     return root;
 }
 
+const initWaterLevelRangeChart = (rootElement: HTMLElement, data: any[], thresholds: any) => {
+    let root = am5.Root.new(rootElement);
+    root.setThemes([am5themes_Animated.new(root)]);
+
+    let chart = root.container.children.push(am5xy.XYChart.new(root, {
+        panX: true,
+        panY: true,
+        wheelX: "panX",
+        wheelY: "zoomX",
+        pinchZoomX: true,
+        layout: am5.VerticalLayout.new(root, {}),
+        paddingLeft: 0,
+        paddingTop: 10
+    }));
+
+    chart.children.unshift(am5.Label.new(root, {
+        text: `Monthly Water Level Report (with Daily Fluctuations) - ${waterLevelReportType.value==='Monthly' ? waterLevelReport.value.month+' '+waterLevelReport.value.year : waterLevelReport.value.from+' - '+waterLevelReport.value.to}`,
+        fontSize: 18,
+        fontWeight: "600",
+        textAlign: "center",
+        x: am5.percent(50),
+        centerX: am5.percent(50),
+        paddingTop: 10,
+        paddingBottom: 20
+    }));
+
+    let cursor = chart.set("cursor", am5xy.XYCursor.new(root, {}));
+    cursor.lineY.set("visible", false);
+
+    let xAxis = chart.xAxes.push(am5xy.CategoryAxis.new(root, {
+        maxDeviation: 0.3,
+        categoryField: "date",
+        renderer: am5xy.AxisRendererX.new(root, { 
+            minGridDistance: 30
+        }),
+        tooltip: am5.Tooltip.new(root, {})
+    }));
+
+    xAxis.get("renderer").grid.template.setAll({
+        strokeDasharray: [3, 3],
+        strokeOpacity: 0.2
+    });
+
+    let yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, {
+        maxDeviation: 0.3,
+        renderer: am5xy.AxisRendererY.new(root, {
+            pan: "zoom"
+        })
+    }));
+
+    yAxis.get("renderer").grid.template.setAll({
+        strokeDasharray: [3, 3],
+        strokeOpacity: 0.2
+    });
+
+    yAxis.children.unshift(
+        am5.Label.new(root, {
+            rotation: -90,
+            text: "Water Level (m)",
+            y: am5.p50,
+            centerX: am5.p50
+        })
+    );
+
+    // 1. Shaded Area for Min-Max Range
+    let rangeSeries = chart.series.push(am5xy.LineSeries.new(root, {
+        name: "Daily Range (Min-Max)",
+        xAxis: xAxis,
+        yAxis: yAxis,
+        valueYField: "max",
+        openValueYField: "min",
+        categoryXField: "date",
+        fill: am5.color(0x0a61f4),
+        stroke: am5.color(0x0a61f4),
+        tooltip: am5.Tooltip.new(root, {
+            labelText: "Range: {openValueY}m - {valueY}m"
+        })
+    }));
+
+    rangeSeries.fills.template.setAll({
+        visible: true,
+        fillOpacity: 0.2
+    });
+
+    rangeSeries.strokes.template.setAll({
+        strokeWidth: 0
+    });
+
+    // 2. Solid Blue Line for Daily Average
+    let avgSeries = chart.series.push(am5xy.LineSeries.new(root, {
+        name: "Daily Average",
+        xAxis: xAxis,
+        yAxis: yAxis,
+        valueYField: "avg",
+        categoryXField: "date",
+        stroke: am5.color(0x0a61f4),
+        fill: am5.color(0x0a61f4),
+        tooltip: am5.Tooltip.new(root, {
+            labelText: "Average: [bold]{valueY}m[/]"
+        })
+    }));
+
+    avgSeries.strokes.template.setAll({
+        strokeWidth: 2
+    });
+
+    avgSeries.bullets.push(function() {
+        return am5.Bullet.new(root, {
+            sprite: am5.Circle.new(root, {
+                radius: 4,
+                fill: avgSeries.get("fill")
+            })
+        });
+    });
+
+    // 3. Threshold Lines
+    if (thresholds) {
+        const thresholdColors = [0xff5b5b, 0xffa500, 0xffff00]; // Red, Orange, Yellow
+        const thresholdLabels = ["Critical (Level 2)", "Warning (Level 3)", "Notice (Level 4)"];
+        const levels = ["level_2", "level_3", "level_4"];
+
+        levels.forEach((level, index) => {
+            if (thresholds[level]) {
+                let rangeDataItem = yAxis.makeDataItem({
+                    value: thresholds[level],
+                    endValue: thresholds[level]
+                });
+
+                let range = yAxis.createAxisRange(rangeDataItem);
+
+                range.get("grid").setAll({
+                    stroke: am5.color(thresholdColors[index]),
+                    strokeOpacity: 1,
+                    strokeDasharray: [4, 4],
+                    strokeWidth: 2,
+                    visible: true
+                });
+
+                range.get("label").setAll({
+                    text: thresholdLabels[index] + ": " + thresholds[level] + "m",
+                    fill: am5.color(thresholdColors[index]),
+                    location: 1,
+                    fontWeight: "bold",
+                    fontSize: 10,
+                    centerX: am5.p100,
+                    centerY: am5.p100
+                });
+            }
+        });
+    }
+
+    let legend = chart.children.push(am5.Legend.new(root, {
+        centerX: am5.p0,
+        x: am5.p0,
+        y: am5.p0,
+        paddingLeft: 80,
+        layout: root.horizontalLayout
+    }));
+    
+    // Add custom legend item for Threshold if it exists
+    if (thresholds && (thresholds.level_2 || thresholds.level_3 || thresholds.level_4)) {
+        legend.data.push({
+            name: "Critical Threshold",
+            color: am5.color(0xff5b5b),
+            strokeDasharray: [4, 4],
+            icon: am5.Rectangle.new(root, {
+                fill: am5.color(0x000000), // dummy icon to be replaced or kept simple
+                fillOpacity: 0
+            })
+        } as any);
+    }
+
+    legend.data.setAll(chart.series.values);
+
+    xAxis.data.setAll(data);
+    rangeSeries.data.setAll(data);
+    avgSeries.data.setAll(data);
+
+    rangeSeries.appear(1000);
+    avgSeries.appear(1000);
+    chart.appear(1000, 100);
+
+    return root;
+}
+
+const processHeatmapData = (records: any[]) => {
+    const data: any[] = [];
+    const map = new Map();
+
+    records.forEach(record => {
+        const date = new Date(record.date_time);
+        const day = date.getDate().toString();
+        const hour = date.getHours();
+        
+        // Format hour to "12 AM", "1 AM", etc.
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const h12 = hour % 12 || 12;
+        const hourStr = `${h12} ${ampm}`;
+        
+        // Key for aggregation
+        const key = `${day}-${hourStr}`;
+        
+        if (!map.has(key)) {
+            map.set(key, { 
+                day, 
+                hour: hourStr, 
+                sum: 0, 
+                count: 0,
+                hourVal: hour // for sorting if needed
+            });
+        }
+        
+        const entry = map.get(key);
+        entry.sum += parseFloat(record.heat_index);
+        entry.count++;
+    });
+
+    map.forEach(value => {
+        data.push({
+            day: value.day,
+            hour: value.hour,
+            value: parseFloat((value.sum / value.count).toFixed(2)),
+            hourVal: value.hourVal // Keep for reference if needed, though axes will handle order
+        });
+    });
+
+    return data;
+};
+
+const getDaysInMonth = (monthName: string, year: number) => {
+    const monthIndex = months.indexOf(monthName);
+    if (monthIndex === -1) return 31; // Fallback
+    return new Date(year, monthIndex + 1, 0).getDate();
+};
+
+const initHeatmapChart = (root: am5.Root, data: any[], numDays: number = 31) => {
+    const chart = root.container.children.push(am5xy.XYChart.new(root, {
+        panX: false,
+        panY: false,
+        wheelX: "none",
+        wheelY: "none",
+        layout: am5.VerticalLayout.new(root, {}),
+        paddingRight: 60,
+        paddingLeft: 60,
+        paddingBottom: 0
+    }));
+    root.container.set("paddingBottom", 0);
+    chart.children.unshift(am5.Label.new(root, {
+        text: `Monthly Heat Index Heat Map - ${heatIndexReport.value.station} ${heatIndexReportType.value === 'Monthly'   ? heatIndexReport.value.month+''+heatIndexReport.value.year : heatIndexReport.value.year}`,
+        fontSize: 16,
+        fontWeight: "bold",
+        textAlign: "center",
+        x: am5.percent(50),
+        centerX: am5.percent(50),
+        paddingTop: 0,
+        paddingBottom: 20
+    }));
+    // Create Axes
+    // Y Axis - Hours (12 AM to 11 PM)
+    // We want 12 AM at bottom? Or top? Usually time progresses downwards?
+    // User spec: 12 AM - 11 PM. I'll do standard bottom-up for now unless chart looks weird.
+    // Actually, matrix usually has 0,0 at top-left. Let's try to put 12 AM at top (inverted).
+    
+    // Sort orders
+    const hours = [
+        "12 AM", "1 AM", "2 AM", "3 AM", "4 AM", "5 AM", "6 AM", "7 AM", "8 AM", "9 AM", "10 AM", "11 AM",
+        "12 PM", "1 PM", "2 PM", "3 PM", "4 PM", "5 PM", "6 PM", "7 PM", "8 PM", "9 PM", "10 PM", "11 PM"
+    ];
+    
+    const yAxis = chart.yAxes.push(am5xy.CategoryAxis.new(root, {
+        categoryField: "hour",
+        renderer: am5xy.AxisRendererY.new(root, {
+            inversed: true,
+            minGridDistance: 20
+        }),
+        tooltip: am5.Tooltip.new(root, {})
+    }));
+    
+    yAxis.data.setAll(hours.map(h => ({ hour: h })));
+
+    // X Axis - Days
+    // Generate days dynamically based on month length
+    const days = Array.from({length: numDays}, (_, i) => (i + 1).toString());
+
+    const xAxis = chart.xAxes.push(am5xy.CategoryAxis.new(root, {
+        categoryField: "day",
+        renderer: am5xy.AxisRendererX.new(root, {
+            minGridDistance: 20
+        }),
+        tooltip: am5.Tooltip.new(root, {})
+    }));
+    
+    xAxis.data.setAll(days.map(d => ({ day: d })));
+
+    // Series
+    const series = chart.series.push(am5xy.ColumnSeries.new(root, {
+        calculateAggregates: true,
+        stroke: am5.color(0xffffff),
+        clustered: false,
+        xAxis: xAxis,
+        yAxis: yAxis,
+        categoryXField: "day",
+        categoryYField: "hour",
+        valueField: "value"
+    }));
+
+    series.columns.template.setAll({
+        tooltipText: "Day: {day}, Time: {hour}\nHeat Index: [bold]{value}[/]",
+        strokeOpacity: 1,
+        strokeWidth: 2,
+        width: am5.percent(100),
+        height: am5.percent(100)
+    });
+
+    // Heat Rules (Light Red to Dark Red)
+    // Dark Red: 0x8b0000, Light Red/White: 0xffcccc or similar.
+    // User said: "Color: Darker red for higher Heat Index."
+    series.set("heatRules", [{
+        target: series.columns.template,
+        min: am5.color(0xffcccc), // Light red/pink
+        max: am5.color(0x8b0000), // Dark red
+        dataField: "value",
+        key: "fill"
+    }]);
+
+    series.data.setAll(data);
+    series.appear(1000);
+
+    // Add Legend for Heatmap values (Color Key) on the Right
+    const heatLegend = chart.children.push(am5.HeatLegend.new(root, {
+        orientation: "vertical",
+        startColor: am5.color(0xfff7bc),
+        endColor: am5.color(0x800026),
+        startText: "Low",
+        endText: "High",
+        stepCount: 5,
+        height: am5.percent(100),
+        centerY: am5.p50,
+        y: am5.p50,
+        x: am5.p100,
+        centerX: am5.p100,
+        paddingTop: -20,
+        paddingLeft: 10,
+        startOpacity: 1,
+        endOpacity: 1
+    }));
+
+    chart.appear(1000, 100);
+
+    return root;
+};
+
+const processStationHeatmapData = (records: any[]) => {
+    const data: any[] = [];
+    const map = new Map();
+
+    records.forEach(record => {
+        const date = new Date(record.date_time);
+        const day = date.getDate().toString();
+        const station = record.station_name;
+        
+        // Key for aggregation
+        const key = `${station}-${day}`;
+        
+        if (!map.has(key)) {
+            map.set(key, { 
+                station, 
+                day, 
+                sum: 0, 
+                count: 0
+            });
+        }
+        
+        const entry = map.get(key);
+        entry.sum += parseFloat(record.heat_index);
+        entry.count++;
+    });
+
+    map.forEach(value => {
+        data.push({
+            station: value.station,
+            day: value.day,
+            value: parseFloat((value.sum / value.count).toFixed(2))
+        });
+    });
+
+    return data;
+};
+
+const initStationHeatmapChart = (root: am5.Root, data: any[], stations: any[], numDays: number = 31) => {
+    const chart = root.container.children.push(am5xy.XYChart.new(root, {
+        panX: false,
+        panY: false,
+        wheelX: "none",
+        wheelY: "none",
+        height: am5.percent(100),
+        layout: am5.VerticalLayout.new(root, {}),
+        
+        paddingRight: 50,
+        paddingLeft: 10,
+        paddingBottom: 0,
+        paddingTop: 0
+    }));
+    root.container.setAll({
+        paddingBottom: 0,
+        paddingTop: 0
+    });
+    
+    // Add Title
+    chart.children.unshift(am5.Label.new(root, {
+        text: `Monthly Heat Index Comparison Across Devices`,
+        fontSize: 16,
+        fontWeight: "bold",
+        textAlign: "center",
+        x: am5.percent(50),
+        centerX: am5.percent(50),
+        paddingTop: 60,
+        paddingBottom: 20
+    }));
+
+    // Y Axis - Stations
+    // Collect all unique station names
+    const stationNames = stations.map(s => s.name);
+    
+    // Map colors to stations
+    const stationColors: any = {};
+    stationNames.forEach((name, i) => {
+        stationColors[name] = am5.color(colors[i % colors.length]);
+    });
+
+    const yAxis = chart.yAxes.push(am5xy.CategoryAxis.new(root, {
+        categoryField: "station",
+        renderer: am5xy.AxisRendererY.new(root, {
+            inversed: true,
+            minGridDistance: 20
+        }),
+        tooltip: am5.Tooltip.new(root, {})
+    }));
+    
+    // Show text labels
+    yAxis.get("renderer").labels.template.setAll({
+        forceHidden: false,
+        fontSize: 12
+    });
+
+    yAxis.data.setAll(stationNames.map(s => ({ station: s })));
+
+    // X Axis - Days
+    const days = Array.from({length: numDays}, (_, i) => (i + 1).toString());
+
+    const xAxis = chart.xAxes.push(am5xy.CategoryAxis.new(root, {
+        categoryField: "day",
+        renderer: am5xy.AxisRendererX.new(root, {
+            minGridDistance: 20
+        }),
+        tooltip: am5.Tooltip.new(root, {})
+    }));
+    
+    xAxis.data.setAll(days.map(d => ({ day: d })));
+    
+    // X-Axis Title
+    xAxis.children.push(
+        am5.Label.new(root, {
+            text: "Day of Month",
+            x: am5.p50,
+            centerX: am5.p50
+        })
+    );
+
+    // Series
+    const series = chart.series.push(am5xy.ColumnSeries.new(root, {
+        calculateAggregates: true,
+        stroke: am5.color(0xffffff),
+        clustered: false,
+        xAxis: xAxis,
+        yAxis: yAxis,
+        categoryXField: "day",
+        categoryYField: "station",
+        valueField: "value"
+    }));
+
+    series.columns.template.setAll({
+        tooltipText: "{station}, Day {day}\nHeat Index: [bold]{value}[/]",
+        strokeOpacity: 1,
+        strokeWidth: 2,
+        width: am5.percent(100),
+        height: am5.percent(100)
+    });
+    
+    // Add Label to show value inside the cell
+    // The user example shows values inside.
+    series.bullets.push(function () {
+        return am5.Bullet.new(root, {
+            locationY: 0.5,
+            locationX: 0.5,
+            sprite: am5.Label.new(root, {
+                text: "{value}",
+                fill: am5.color(0x000000), // Black text for contrast on headers, might need adjustment for dark red
+                // Logic for contrast: if value is high (dark red), text should technically be white.
+                // But user example has black text on light cells. 
+                // Let's stick to black or auto. 
+                // amCharts autoTextColor might work if background is set. 
+                // But column fill is set via heatRules.
+                // explicitly setting to black for now as per user request "text color black" in previous turn.
+                centerY: am5.p50,
+                centerX: am5.p50,
+                populateText: true,
+                fontSize: 10
+            })
+        });
+    });
+
+    // Heat Rules (Light Yellow to Dark Red as per user example image which looks like spectral/heat)
+    // User text said: "Color: Darker red for higher Heat Index." 
+    // User image shows: Light Yellow -> Orange -> Dark Red.
+    // Let's try to match that gradient.
+    series.set("heatRules", [{
+        target: series.columns.template,
+        min: am5.color(0xfff7bc), // Light yellow
+        max: am5.color(0x800026), // Dark red
+        dataField: "value",
+        key: "fill"
+    }]);
+
+    series.data.setAll(data);
+    series.appear(1000);
+    
+    // Add Legend for Heatmap values (Color Key) on the Right
+    const heatLegend = chart.children.push(am5.HeatLegend.new(root, {
+        orientation: "vertical",
+        startColor: am5.color(0xfff7bc),
+        endColor: am5.color(0x800026),
+        startText: "Low",
+        endText: "High",
+        stepCount: 5,
+        height: am5.percent(100),
+        centerY: am5.p50,
+        y: am5.p50,
+        x: am5.p100,
+        centerX: am5.p100,
+        paddingLeft: 15,
+        startOpacity: 1,
+        endOpacity: 1
+    }));
+
+    heatLegend.startLabel.setAll({
+        fontSize: 12,
+        fill: heatLegend.get("startColor")
+    });
+
+    heatLegend.endLabel.setAll({
+        fontSize: 12,
+        fill: heatLegend.get("endColor")
+    });
+
+    chart.appear(1000, 100);
+
+    return root;
+};
+
 const renderChart = async (chartData?: any[], seriesNames: string[] = []) => {
+    await nextTick(); // Wait for v-if DOM updates to ensure refs are available
+
     // Dispose existing chart if any to prevent memory leaks and conflicts
     if (activeChartRoot) {
-        activeChartRoot.dispose();
+        try {
+            activeChartRoot.dispose();
+        } catch (e) {
+            console.warn("Error disposing chart root:", e);
+        }
         activeChartRoot = null;
     }
 
-    await nextTick(); // Wait for v-if DOM updates
+    // Determine target element based on report type
+    let chartDiv: HTMLElement | null = null;
+    let title = '';
+    let unit = '';
+    
+    if (selectedReport.value === 'Rain') {
+        chartDiv = rainChartDiv.value;
+        title = 'Rainfall';
+        unit = 'mm';
+    } else if (selectedReport.value === 'Heat Index') {
+        chartDiv = heatIndexChartDiv.value;
+        title = 'Heat Index';
+        unit = '°C';
+        
+        // Special handling for Heat Index Heatmap
+        if (chartDiv && heatIndexRecords.value.length > 0) {
+            const root = am5.Root.new(chartDiv);
+            activeChartRoot = root;
+            root.setThemes([am5themes_Animated.new(root)]);
+            
+            // Determine number of days in the selected month
+            const numDays = getDaysInMonth(heatIndexReport.value.month, parseInt(heatIndexReport.value.year));
 
-    // Fallback/Default Dummy Data if no data provided
-    const defaultData = months.map(m => ({
-        date: m.substring(0, 3),
-        value: Math.floor(Math.random() * 100)
-    }));
+            // Check if "All Stations" is selected for Heat Index
+            if (heatIndexReport.value.station === 'All') {
+                const heatmapData = processStationHeatmapData(heatIndexRecords.value);
+                initStationHeatmapChart(root, heatmapData, props.stations, numDays);
+            } else {
+                // Default Time-based Heatmap (Hours x Days)
+                const heatmapData = processHeatmapData(heatIndexRecords.value);
+                initHeatmapChart(root, heatmapData, numDays);
+            }
+            return;
+        }
 
-    if (selectedReport.value === 'Rain' && rainChartDiv.value) {
-        activeChartRoot = initChart(rainChartDiv.value, "Rain", chartData || defaultData, seriesNames, true, 'mm');
-    } else if (selectedReport.value === 'Heat Index' && heatIndexChartDiv.value) {
-        activeChartRoot = initChart(heatIndexChartDiv.value, "Heat Index", chartData || defaultData);
-    } else if (selectedReport.value === 'Water Level' && waterLevelChartDiv.value) {
-        activeChartRoot = initChart(waterLevelChartDiv.value, "Water Level", chartData || [], seriesNames, true, 'm');
+    } else if (selectedReport.value === 'Water Level') {
+        chartDiv = waterLevelChartDiv.value;
+        title = 'Water Level';
+        unit = 'm';
+
+        if (chartDiv && waterLevelRecords.value.length > 0 && waterLevelReport.value.sensor !== 'All') {
+            activeChartRoot = initWaterLevelRangeChart(chartDiv, chartData || [], waterLevelThresholds.value);
+            return;
+        }
+    }
+
+    if (!chartData || chartData.length === 0) {
+        return;
+    }
+
+    if (chartDiv) {
+        activeChartRoot = initChart(chartDiv, title, chartData, seriesNames, true, unit);
     }
 };
 
 const generateReport = async () => {
     console.log(`Generating ${selectedReport.value} report...`);
+    
+    // Dispose existing chart immediately when starting a new search
+    if (activeChartRoot) {
+        try {
+            activeChartRoot.dispose();
+        } catch (e) {
+            console.warn("Error disposing chart:", e);
+        }
+        activeChartRoot = null;
+    }
+
     isGenerating.value = true;
     currentPage.value = 1; // Reset to first page
-    
+    hasSearched.value = true;
     try {
         if (selectedReport.value === 'Water Level') {
+            
             const response = await axios.get('/reports/water-level-data', {
                 params: {
                     sensor: waterLevelReport.value.sensor,
@@ -288,18 +933,54 @@ const generateReport = async () => {
             });
             
             waterLevelRecords.value = response.data.records;
+            waterLevelThresholds.value = response.data.thresholds;
             
-            // Group data by exact timestamp for clustered bars
+            // Special processing for Daily Range chart (only if single sensor)
+            if (waterLevelReport.value.sensor !== 'All') {
+                const dailyData = waterLevelRecords.value.reduce((acc: any, record: any) => {
+                    const dateObj = new Date(record.date_time);
+                    const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    
+                    if (!acc[dateStr]) {
+                        acc[dateStr] = { min: record.water_level, max: record.water_level, sum: 0, count: 0, timestamp: dateObj.getTime() };
+                    }
+                    
+                    acc[dateStr].min = Math.min(acc[dateStr].min, record.water_level);
+                    acc[dateStr].max = Math.max(acc[dateStr].max, record.water_level);
+                    acc[dateStr].sum += record.water_level;
+                    acc[dateStr].count++;
+                    return acc;
+                }, {});
+
+                const chartData = Object.entries(dailyData).map(([date, vals]: [string, any]) => ({
+                    date,
+                    min: vals.min,
+                    max: vals.max,
+                    avg: parseFloat((vals.sum / vals.count).toFixed(2)),
+                    timestamp: vals.timestamp
+                })).sort((a, b) => a.timestamp - b.timestamp);
+
+                await renderChart(chartData);
+                isGenerating.value = false;
+                return;
+            }
+
+            // Group data by exact timestamp for clustered bars (legacy behavior for "All")
             const timestampDataRaw = waterLevelRecords.value.reduce((acc: any, record: any) => {
                 const dateObj = new Date(record.date_time);
-                // Format for CategoryAxis label: "MMM dd, hh:mm a"
-                const label = dateObj.toLocaleString('en-US', { 
-                    month: 'short', 
-                    day: 'numeric', 
-                    hour: 'numeric', 
-                    minute: '2-digit',
-                    hour12: true 
-                });
+                // Format for CategoryAxis label
+                let label = '';
+                if (waterLevelReportType.value === 'Monthly') {
+                    label = dateObj.toLocaleString('en-US', { day: '2-digit' });
+                } else {
+                    label = dateObj.toLocaleString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric', 
+                        hour: 'numeric', 
+                        minute: '2-digit',
+                        hour12: true 
+                    });
+                }
                 
                 if (!acc[label]) acc[label] = { sensors: {}, timestamp: dateObj.getTime() };
                 
@@ -327,6 +1008,7 @@ const generateReport = async () => {
                 });
                 return row;
             });
+             hasSearched.value = false;
             
             // Sort by actual timestamp to ensure chronological order even on CategoryAxis
             chartData.sort((a, b) => a.timestamp - b.timestamp);
@@ -348,13 +1030,29 @@ const generateReport = async () => {
                     to: reportConfig.to
                 }
             });
-
+            
             if (isRain) {
                 rainRecords.value = response.data.records;
+                
+                let chartData = response.data.chartData;
+                // If Monthly, show only the day (e.g., "01", "02")
+                if (rainReportType.value === 'Monthly' && chartData) {
+                    chartData = chartData.map((item: any) => {
+                        // Backend returns "M d" (e.g., "Feb 02")
+                        const parts = item.date.split(' ');
+                        if (parts.length === 2) {
+                            return { ...item, date: parts[1] };
+                        }
+                        return item;
+                    });
+                   
+                }
+                hasSearched.value = false;
                 // Use aggregated daily totals for the Rain chart
-                await renderChart(response.data.chartData, response.data.stationNames);
+                await renderChart(chartData, response.data.stationNames);
             } else {
                 heatIndexRecords.value = response.data.records;
+                hasSearched.value = false;
                 await renderChart();
             }
         } else {
@@ -369,7 +1067,14 @@ const generateReport = async () => {
 };
 
 watch(selectedReport, () => {
-    renderChart();
+    // Clear display when switching reports
+    rainRecords.value = [];
+    heatIndexRecords.value = [];
+    waterLevelRecords.value = [];
+    if (activeChartRoot) {
+        activeChartRoot.dispose();
+        activeChartRoot = null;
+    }
     currentPage.value = 1; // Reset to first page
 });
 
@@ -384,8 +1089,6 @@ onMounted(() => {
     if (props.waterLevelYears.includes(currentYear)) {
         waterLevelReport.value.year = currentYear.toString();
     }
-
-    renderChart();
 });
 
 onUnmounted(() => {
@@ -484,6 +1187,72 @@ const exportToExcel = () => {
     XLSX.writeFile(workbook, filename);
 };
 
+const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
+    console.log("Download chart clicked. Active root:", activeChartRoot);
+    if (activeChartRoot) {
+        try {
+            // Generate filename suffix based on report type/date
+            let suffix = '';
+            if (selectedReport.value === 'Water Level') {
+                if (waterLevelReportType.value === 'Monthly') {
+                    suffix = `${waterLevelReport.value.month}_${waterLevelReport.value.year}`;
+                } else {
+                    suffix = `${waterLevelReport.value.from}_to_${waterLevelReport.value.to}`;
+                }
+            } else if (selectedReport.value === 'Rain') {
+                if (rainReportType.value === 'Monthly') {
+                    suffix = `${detailRainReport.value.month}_${detailRainReport.value.year}`;
+                } else {
+                    suffix = `${detailRainReport.value.from}_to_${detailRainReport.value.to}`;
+                }
+            } else if (selectedReport.value === 'Heat Index') {
+                if (heatIndexReportType.value === 'Monthly') {
+                    suffix = `${heatIndexReport.value.month}_${heatIndexReport.value.year}`;
+                } else {
+                    suffix = `${heatIndexReport.value.from}_to_${heatIndexReport.value.to}`;
+                }
+            }
+
+            let filePrefix = `${selectedReport.value.replace(/[\s()]+/g, '_')}_Chart_${suffix}`;
+            if (selectedReport.value === 'Rain') {
+                filePrefix = `24-Hour_Daily_Accumulated_Rain_Chart_${suffix}`;
+            }
+
+            const exporting = Exporting.new(activeChartRoot, {
+                filePrefix: filePrefix,
+                pdfOptions: {
+                    includeData: true
+                },
+                pngOptions: {
+                    quality: 0.8,
+                    maintainPixelRatio: true
+                }
+            });
+            console.log("Exporting instance created:", exporting);
+            
+            // Export to PNG with high quality
+            exporting.export("png").then((response: any) => {
+                console.log("Export successful, initiating download...");
+                const link = document.createElement("a");
+                link.href = response;
+                link.download = `${exporting.get("filePrefix")}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }).catch((error: any) => {
+                console.error("Export failed:", error);
+                alert("Failed to export chart. Please check console for details.");
+            });
+        } catch (e: any) {
+            console.error("Error creating Exporting instance:", e);
+            alert("Error creating chart export component.");
+        }
+    } else {
+        console.warn("No active chart root found.");
+        alert("Chart is not ready for export yet.");
+    }
+};
+
 </script>
 
 <template>
@@ -499,12 +1268,12 @@ const exportToExcel = () => {
             </div>
         </template>
 
-        <div class="py-12">
-            <div class="max-w-9xl mx-auto sm:px-6 lg:px-8 space-y-12">
-                <div class="bg-white p-8 mb-6 rounded-md shadow-md">
+        <div class="pt-0 mb-12">
+            <div class="w-full space-y-12">
+                <div class="bg-gray-200/[0.25] p-8 pt-2 mb-6 h-dvh">
                     <!-- Report Selection Header -->
-                     <div class="flex justify-between items-center mb-8 border-b border-gray-100 pb-2">
-                        <div class="space-y-1">
+                     <div class="flex justify-between items-center mb-4 border-b border-gray-100 pb-2">
+                        <div class="flex items-center space-x-4">
                             <h3 class="text-xl font-bold text-gray-800 uppercase">
                                 Select Report
                             </h3>
@@ -512,7 +1281,7 @@ const exportToExcel = () => {
                                 Choose which report you would like to generate
                             </p>
                         </div>
-                        <select v-model="selectedReport" class="w-72 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+                        <select v-model="selectedReport" class="w-80 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
                             <option v-for="type in reportTypes" :key="type" :value="type">{{ type }}</option>
                         </select>
                     </div>
@@ -520,30 +1289,24 @@ const exportToExcel = () => {
                 <!-- Rain Report -->
                     <div v-if="selectedReport === 'Rain'" class="space-y-4">
                         <h3 class="text-xl font-bold text-gray-800 uppercase flex items-center gap-4">
-                            Rain
-                            <span class="text-sm font-normal italic text-gray-600 opacity-50 capitalize">Default interval is 24 Hours and Observation datan with 0s for both rate & total are ommitted</span>
+                            Weather Observation (<span class="italic">Rain</span>)
+                            <span class="text-sm font-normal italic text-gray-600 opacity-50 capitalize">Default interval is 24 Hours and Observation data with 0s for both rate & total are ommitted</span>
                         </h3>
                         <div class="flex flex-wrap gap-4 items-center">
-                            <select v-model="detailRainReport.station" class="w-64 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
-                                <option value="" disabled selected>SELECT STATION</option>
-                                <option v-for="station in stations" :key="station.id" :value="station.name">{{ station.name }}</option>
-                                <option value="All">All Stations</option>
-                            </select>
-
                             <select v-model="rainReportType" class="w-48 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
                                 <option value="Monthly">Monthly</option>
                                 <option value="Date Range">Date Range</option>
                             </select>
 
                             <template v-if="rainReportType === 'Monthly'">
-                                <select v-model="detailRainReport.year" class="w-48 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
-                                    <option value="" disabled selected>SELECT YEAR</option>
-                                    <option v-for="y in weatherStationYears" :key="y" :value="y">{{ y }}</option>
-                                </select>
-
                                 <select v-model="detailRainReport.month" class="w-48 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
                                     <option value="" disabled selected>SELECT MONTH</option>
                                     <option v-for="m in months" :key="m" :value="m">{{ m }}</option>
+                                </select>
+
+                                <select v-model="detailRainReport.year" class="w-48 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+                                    <option value="" disabled selected>SELECT YEAR</option>
+                                    <option v-for="y in weatherStationYears" :key="y" :value="y">{{ y }}</option>
                                 </select>
                             </template>
                             
@@ -564,11 +1327,16 @@ const exportToExcel = () => {
                                     </div>
                                 </div>
                             </template>
+                            <select v-model="detailRainReport.station" class="w-64 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+                                <option value="" disabled selected>SELECT STATION</option>
+                                <option v-for="station in stations" :key="station.id" :value="station.name">{{ station.name }}</option>
+                                <option value="All">All Stations</option>
+                            </select>
 
                             <button 
                                 @click="generateReport" 
                                 :disabled="isGenerating"
-                                class="ml-auto bg-blue-900 hover:bg-blue-800 disabled:bg-gray-400 text-white px-8 py-2.5 rounded-sm font-bold uppercase tracking-wider text-sm transition-colors flex items-center gap-2"
+                                class="bg-blue-900 hover:bg-blue-800 disabled:bg-gray-400 text-white px-8 py-2.5 rounded-sm font-bold uppercase tracking-wider text-sm transition-colors flex items-center gap-2"
                             >
                                 <span v-if="isGenerating" class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
                                 {{ isGenerating ? 'Generating...' : 'Generate' }}
@@ -579,30 +1347,24 @@ const exportToExcel = () => {
                     <!-- Heat Index Report -->
                     <div v-if="selectedReport === 'Heat Index'" class="space-y-4">
                         <h3 class="text-xl font-bold text-gray-800 uppercase flex items-center gap-4">
-                            Heat Index
+                            Weather Observation (<span class="italic">Heat Index</span>)
                             <span class="text-sm font-normal italic text-gray-600 opacity-50 capitalize">Data displayed on a daily basis from all devices</span>
                         </h3>
                         <div class="flex flex-wrap gap-4 items-center">
-                            <select v-model="heatIndexReport.station" class="w-64 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
-                                <option value="" disabled selected>SELECT STATION</option>
-                                <option v-for="station in stations" :key="station.id" :value="station.name">{{ station.name }}</option>
-                                <option value="All">All Stations</option>
-                            </select>
-
                             <select v-model="heatIndexReportType" class="w-48 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
                                 <option value="Monthly">Monthly</option>
                                 <option value="Date Range">Date Range</option>
                             </select>
 
                             <template v-if="heatIndexReportType === 'Monthly'">
-                                <select v-model="heatIndexReport.year" class="w-64 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
-                                    <option value="" disabled selected>SELECT YEAR</option>
-                                    <option v-for="y in weatherStationYears" :key="y" :value="y">{{ y }}</option>
-                                </select>
-
                                 <select v-model="heatIndexReport.month" class="w-64 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
                                     <option value="" disabled selected>SELECT MONTH</option>
                                     <option v-for="m in months" :key="m" :value="m">{{ m }}</option>
+                                </select>
+
+                                <select v-model="heatIndexReport.year" class="w-64 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+                                    <option value="" disabled selected>SELECT YEAR</option>
+                                    <option v-for="y in weatherStationYears" :key="y" :value="y">{{ y }}</option>
                                 </select>
                             </template>
 
@@ -624,10 +1386,16 @@ const exportToExcel = () => {
                                 </div>
                             </template>
 
+                            <select v-model="heatIndexReport.station" class="w-64 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+                                <option value="" disabled selected>SELECT STATION</option>
+                                <option v-for="station in stations" :key="station.id" :value="station.name">{{ station.name }}</option>
+                                <option value="All">All Stations</option>
+                            </select>
+
                             <button 
                                 @click="generateReport" 
                                 :disabled="isGenerating"
-                                class="ml-auto bg-blue-900 hover:bg-blue-800 disabled:bg-gray-400 text-white px-8 py-2.5 rounded-sm font-bold uppercase tracking-wider text-sm transition-colors flex items-center gap-2"
+                                class="bg-blue-900 hover:bg-blue-800 disabled:bg-gray-400 text-white px-8 py-2.5 rounded-sm font-bold uppercase tracking-wider text-sm transition-colors flex items-center gap-2"
                             >
                                 <span v-if="isGenerating" class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
                                 {{ isGenerating ? 'Generating...' : 'Generate' }}
@@ -638,16 +1406,10 @@ const exportToExcel = () => {
                     <!-- Water Level Sensor Data Report -->
                     <div v-if="selectedReport === 'Water Level'" class="space-y-4">
                         <h3 class="text-xl font-bold text-gray-800 uppercase flex items-center gap-4">
-                            Water Level
+                            Water Level Sensors
                             <span class="text-sm font-normal italic text-gray-600 opacity-50 capitalize">Select sensor and date range</span>
                         </h3>
                         <div class="flex flex-wrap gap-4 items-center">
-                            <select v-model="waterLevelReport.sensor" class="w-64 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
-                                <option value="" disabled selected>SELECT SENSOR</option>
-                                <option value="All">All Sensors</option>
-                                <option v-for="sensor in sensors" :key="sensor.id" :value="sensor.name">{{ sensor.name }}</option>
-                            </select>
-
                             <select v-model="waterLevelReportType" class="w-48 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
                                 <option value="Monthly">Monthly</option>
                                 <option value="Date Range">Date Range</option>
@@ -682,32 +1444,48 @@ const exportToExcel = () => {
                                     </div>
                                 </div>
                             </template>
+                            
+                            <select v-model="waterLevelReport.sensor" class="w-64 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+                                <option value="" disabled selected>SELECT SENSOR</option>
+                                <option v-for="sensor in sensors" :key="sensor.id" :value="sensor.name">{{ sensor.name }}</option>
+                                <option value="All">All Sensors</option>
+                            </select>
+
 
                             <button 
                                 @click="generateReport" 
                                 :disabled="isGenerating"
-                                class="ml-auto bg-blue-900 hover:bg-blue-800 disabled:bg-gray-400 text-white px-8 py-2.5 rounded-sm font-bold uppercase tracking-wider text-sm transition-colors flex items-center gap-2"
+                                class="bg-blue-900 hover:bg-blue-800 disabled:bg-gray-400 text-white px-8 py-2.5 rounded-sm font-bold uppercase tracking-wider text-sm transition-colors flex items-center gap-2"
                             >
                                 <span v-if="isGenerating" class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
                                 {{ isGenerating ? 'Generating...' : 'Generate' }}
                             </button>
                         </div>
                     </div>
-
+                    
                     <!-- Graphical Reports -->
-                    <div class="space-y-8 pt-8">
+                    <div v-if="rainRecords.length > 0 || heatIndexRecords.length > 0 || waterLevelRecords.length > 0" class="space-y-8 pt-8">
                         <!-- Rain Chart -->
-                        <div v-if="selectedReport === 'Rain'" class="space-y-2">
+                        <div v-show="selectedReport === 'Rain' && rainRecords.length > 0" class="space-y-2">
                             <div class="flex justify-between items-center">
-                                <h4 class="font-bold text-gray-600 uppercase text-sm">Accumulated Rain Graph</h4>
+                                <h4 class="font-bold text-gray-600 uppercase text-sm">24-Hour Daily Accumulated Rain Chart - {{ rainReportType==='Monthly'? detailRainReport.month + ' ' + detailRainReport.year : detailRainReport.from + ' ' + detailRainReport.to }}</h4>
+                                <button 
+                                    @click="downloadChart" 
+                                    class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-sm font-bold uppercase tracking-wider text-[10px] transition-colors flex items-center gap-2"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                    Download Chart
+                                </button>
                             </div>
-                            <div class="bg-white p-4 rounded-sm border border-gray-100 h-[300px] w-full" ref="rainChartDiv"></div>
+                            <div class="bg-white p-2 rounded-sm border border-gray-100 h-[600px] w-full" ref="rainChartDiv"></div>
                             <div class="text-center text-xs font-bold text-gray-400 uppercase">Month</div>
 
                             <!-- Rain Results Table -->
                             <div v-if="rainRecords.length > 0" class="bg-white border border-gray-200 rounded-sm overflow-hidden mt-8">
                                 <div class="flex justify-between items-center py-2 px-4 border-b border-gray-100">
-                                    <h4 class="font-bold text-gray-600 uppercase text-sm">Rain Data Table</h4>
+                                    <h4 class="font-bold text-gray-600 uppercase text-sm">Weather Observation (Rain) Data Table</h4>
                                     <button 
                                         @click="exportToExcel" 
                                         class="bg-green-700 hover:bg-green-600 text-white px-4 py-1.5 rounded-sm font-bold uppercase tracking-wider text-[10px] transition-colors flex items-center gap-2"
@@ -718,6 +1496,34 @@ const exportToExcel = () => {
                                         Export Data
                                     </button>
                                 </div>
+
+                                <!-- Top Pagination Controls -->
+                                <div v-if="rainTotalPages > 1" class="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Page {{ currentPage }} of {{ rainTotalPages }}</span>
+                                        <span class="text-[10px] text-gray-300 font-bold uppercase tracking-widest">({{ rainRecords.length }} records)</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <button 
+                                            @click="currentPage--" 
+                                            :disabled="currentPage === 1"
+                                            class="p-1 rounded-sm bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                                            </svg>
+                                        </button>
+                                        <button 
+                                            @click="currentPage++" 
+                                            :disabled="currentPage === rainTotalPages"
+                                            class="p-1 rounded-sm bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
                                 <table class="w-full text-left">
                                     <thead class="bg-gray-100 border-b border-gray-200">
                                         <tr>
@@ -725,7 +1531,7 @@ const exportToExcel = () => {
                                             <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">Station Name</th>
                                             <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Rate (mm/h)</th>
                                             <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Total (mm)</th>
-                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-right">Date & Time</th>
+                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Date & Time</th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-gray-100">
@@ -734,7 +1540,7 @@ const exportToExcel = () => {
                                             <td class="px-4 py-3 text-sm text-gray-800 font-bold uppercase tracking-wider">{{ record.station_name }}</td>
                                             <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">{{ record.precipitation_rate }}</td>
                                             <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">{{ record.precipitation_total }}</td>
-                                            <td class="px-4 py-3 text-sm text-gray-500 font-bold text-right">
+                                            <td class="px-4 py-3 text-sm text-gray-500 font-bold text-center">
                                                 {{ new Date(record.date_time).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) }}
                                             </td>
                                         </tr>
@@ -772,12 +1578,21 @@ const exportToExcel = () => {
                         </div>
 
                         <!-- Heat Index Chart -->
-                        <div v-if="selectedReport === 'Heat Index'" class="space-y-2">
+                        <div v-show="selectedReport === 'Heat Index' && heatIndexRecords.length > 0" class="space-y-6">
                             <div class="flex justify-between items-center">
-                                <h4 class="font-bold text-gray-600 uppercase text-sm">Heat Index</h4>
+                                <h4 class="font-bold text-gray-600 uppercase text-sm hidden">Heat Index</h4>
+                                <button 
+                                    @click="downloadChart" 
+                                    class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-sm font-bold uppercase tracking-wider text-[10px] transition-colors flex items-center gap-2"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                    Download Chart
+                                </button>
                             </div>
-                            <div class="bg-white p-4 rounded-sm border border-gray-100 h-[300px] w-full" ref="heatIndexChartDiv"></div>
-                            <div class="text-center text-xs font-bold text-gray-400 uppercase">Month</div>
+                            <div class="bg-white p-2 rounded-sm border border-gray-100 w-full" :class="heatIndexReport.station === 'All' ? 'h-[450px]' : 'h-[500px]'" ref="heatIndexChartDiv"></div>
+                            <!-- <div class="text-center text-xs font-bold text-gray-400 uppercase">Month</div> -->
 
                             <!-- Heat Index Results Table -->
                             <div v-if="heatIndexRecords.length > 0" class="bg-white border border-gray-200 rounded-sm overflow-hidden mt-8">
@@ -793,6 +1608,34 @@ const exportToExcel = () => {
                                         Export Data
                                     </button>
                                 </div>
+
+                                <!-- Top Pagination Controls -->
+                                <div v-if="heatIndexTotalPages > 1" class="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Page {{ currentPage }} of {{ heatIndexTotalPages }}</span>
+                                        <span class="text-[10px] text-gray-300 font-bold uppercase tracking-widest">({{ heatIndexRecords.length }} records)</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <button 
+                                            @click="currentPage--" 
+                                            :disabled="currentPage === 1"
+                                            class="p-1 rounded-sm bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                                            </svg>
+                                        </button>
+                                        <button 
+                                            @click="currentPage++" 
+                                            :disabled="currentPage === heatIndexTotalPages"
+                                            class="p-1 rounded-sm bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
                                 <table class="w-full text-left">
                                     <thead class="bg-gray-100 border-b border-gray-200">
                                         <tr>
@@ -801,7 +1644,7 @@ const exportToExcel = () => {
                                             <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Temp (°C)</th>
                                             <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Humidity (%)</th>
                                             <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Heat Index (°C)</th>
-                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-right">Date & Time</th>
+                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Date & Time</th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-gray-100">
@@ -815,7 +1658,7 @@ const exportToExcel = () => {
                                                     {{ record.heat_index }}°C
                                                 </span>
                                             </td>
-                                            <td class="px-4 py-3 text-sm text-gray-500 font-bold text-right">
+                                            <td class="px-4 py-3 text-sm text-gray-500 font-bold text-center">
                                                 {{ new Date(record.date_time).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) }}
                                             </td>
                                         </tr>
@@ -853,12 +1696,21 @@ const exportToExcel = () => {
                         </div>
 
                         <!-- Water Level Chart -->
-                        <div v-if="selectedReport === 'Water Level'" class="space-y-6">
+                        <div v-show="selectedReport === 'Water Level' && waterLevelRecords.length > 0" class="space-y-6">
                             <div class="space-y-2">
                                 <div class="flex justify-between items-center">
-                                    <h4 class="font-bold text-gray-600 uppercase text-sm">Water Level Data Graph</h4>
+                                    <h4 class="font-bold text-gray-600 uppercase text-sm">Water Level Sensor Data Chart</h4>
+                                    <button 
+                                        @click="downloadChart" 
+                                        class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-sm font-bold uppercase tracking-wider text-[10px] transition-colors flex items-center gap-2"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                        </svg>
+                                        Download Chart
+                                    </button>
                                 </div>
-                                <div class="bg-white p-4 rounded-sm border border-gray-100 h-[300px] w-full" ref="waterLevelChartDiv"></div>
+                                <div class="bg-white p-2 rounded-sm border border-gray-100 h-[600px] w-full" ref="waterLevelChartDiv"></div>
                                 <div class="text-center text-xs font-bold text-gray-800 uppercase">Timestamp</div>
                             </div>
 
@@ -876,13 +1728,41 @@ const exportToExcel = () => {
                                         Export Data
                                     </button>
                                 </div>
+
+                                <!-- Top Pagination Controls -->
+                                <div v-if="waterLevelTotalPages > 1" class="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Page {{ currentPage }} of {{ waterLevelTotalPages }}</span>
+                                        <span class="text-[10px] text-gray-300 font-bold uppercase tracking-widest">({{ waterLevelRecords.length }} records)</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <button 
+                                            @click="currentPage--" 
+                                            :disabled="currentPage === 1"
+                                            class="p-1 rounded-sm bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                                            </svg>
+                                        </button>
+                                        <button 
+                                            @click="currentPage++" 
+                                            :disabled="currentPage === waterLevelTotalPages"
+                                            class="p-1 rounded-sm bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
                                 <table class="w-full text-left">
                                     <thead class="bg-gray-100 border-b border-gray-200">
                                         <tr>
                                             <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">No.</th>
                                             <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">Sensor Name</th>
                                             <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Water Level (m)</th>
-                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-right">Date & Time</th>
+                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Date & Time</th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-gray-100">
@@ -894,7 +1774,7 @@ const exportToExcel = () => {
                                                     {{ record.water_level }}m
                                                 </span>
                                             </td>
-                                            <td class="px-4 py-3 text-sm text-gray-500 font-bold text-right">
+                                            <td class="px-4 py-3 text-sm text-gray-500 font-bold text-center">
                                                 {{ new Date(record.date_time).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) }}
                                             </td>
                                         </tr>
@@ -930,10 +1810,39 @@ const exportToExcel = () => {
                                 </div>
                             </div>
                         </div>
+                    </div>
 
+                    <!-- No Report Placeholder -->
+                    <div v-else class="py-20 flex flex-col items-center justify-center space-y-4 border-2 border-dashed border-gray-100 rounded-sm bg-gray-50/50 mt-8">
+                        <div class="relative">
+                            <div v-if="hasSearched && rainRecords.length === 0 && heatIndexRecords.length === 0 && waterLevelRecords.length === 0" class="absolute -inset-1 bg-gradient-to-r from-red-600 to-red-400 rounded-full blur opacity-25 animate-pulse"></div>
+                            <div v-else class="absolute -inset-1 bg-gradient-to-r from-blue-600 to-blue-400 rounded-full blur opacity-25 animate-pulse"></div>
+                            <div v-if="hasSearched && rainRecords.length === 0 && heatIndexRecords.length === 0 && waterLevelRecords.length === 0" class="relative bg-white p-4 rounded-full shadow-sm">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                            </div>
+                            <div v-else class="relative bg-white p-4 rounded-full shadow-sm">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-blue-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                            </div>
+                            
+                        </div>
+                        <div class="text-center space-y-1">
+                            <h3 class="text-lg font-bold text-gray-700 uppercase tracking-wider">{{ hasSearched && rainRecords.length === 0 && heatIndexRecords.length === 0 && waterLevelRecords.length === 0 ? 'No Records found' : 'No Report Generated yet' }}</h3>
+                            <p class="text-sm text-gray-400 font-medium">{{ hasSearched && rainRecords.length === 0 && heatIndexRecords.length === 0 && waterLevelRecords.length === 0 ? 'Try adjusting your filters or date range.' : 'Please select your parameters above and click the "Generate" button.' }}</p>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </AppLayout>
 </template>
+
+<style>
+/* Hide amCharts logo */
+a[href*="amcharts"] {
+    display: none !important;
+}
+</style>
