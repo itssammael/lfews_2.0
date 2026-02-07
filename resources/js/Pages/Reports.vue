@@ -33,7 +33,7 @@ const months = [
 ];
 
 // Form states
-const selectedReport = ref('Water Level');
+const selectedReport = ref('Rain');
 const reportTypes = ['Rain', 'Heat Index', 'Water Level'];
 const rainReportType = ref('Monthly');
 const heatIndexReportType = ref('Monthly');
@@ -89,12 +89,16 @@ const colors = [
     0x13b766, // Complementary Green (for Pink)
 ];
 
-const initChart = (rootElement: HTMLElement, title: string, data: any[], seriesNames: string[] = [], isBar: boolean = false, unit: string = '') => {
-    let root = am5.Root.new(rootElement);
-    
+const setupChartRoot = (element: HTMLElement) => {
+    const root = am5.Root.new(element);
     root.setThemes([am5themes_Animated.new(root)]);
+    return root;
+};
+
+const initChart = (rootElement: HTMLElement, title: string, data: any[], seriesNames: string[] = [], isBar: boolean = false, unit: string = '') => {
+    const root = setupChartRoot(rootElement);
     
-    let chart = root.container.children.push(am5xy.XYChart.new(root, {
+    const chart = root.container.children.push(am5xy.XYChart.new(root, {
         panX: true,
         panY: true,
         wheelX: "panX",
@@ -102,7 +106,20 @@ const initChart = (rootElement: HTMLElement, title: string, data: any[], seriesN
         pinchZoomX: true,
         layout: am5.VerticalLayout.new(root, {})
     }));
+    const labelText = title === 'Rain' 
+        ? `24-Hour Daily Accumulated Rain Chart - ${rainReportType.value === 'Monthly' ? detailRainReport.value.month + ' ' + detailRainReport.value.year : detailRainReport.value.from + ' - ' + detailRainReport.value.to}`
+        : title;
 
+    chart.children.unshift(am5.Label.new(root, {
+        text: labelText,
+        fontSize: 18,
+        fontWeight: "600",
+        textAlign: "center",
+        x: am5.percent(50),
+        centerX: am5.percent(50),
+        paddingTop: 10,
+        paddingBottom: 20
+    }));
     let cursor = chart.set("cursor", am5xy.XYCursor.new(root, {}));
     cursor.lineY.set("visible", false);
 
@@ -275,10 +292,9 @@ const initChart = (rootElement: HTMLElement, title: string, data: any[], seriesN
 }
 
 const initWaterLevelRangeChart = (rootElement: HTMLElement, data: any[], thresholds: any) => {
-    let root = am5.Root.new(rootElement);
-    root.setThemes([am5themes_Animated.new(root)]);
+    const root = setupChartRoot(rootElement);
 
-    let chart = root.container.children.push(am5xy.XYChart.new(root, {
+    const chart = root.container.children.push(am5xy.XYChart.new(root, {
         panX: true,
         panY: true,
         wheelX: "panX",
@@ -404,7 +420,7 @@ const initWaterLevelRangeChart = (rootElement: HTMLElement, data: any[], thresho
 
                 let range = yAxis.createAxisRange(rangeDataItem);
 
-                range.get("grid").setAll({
+                range.get("grid")?.setAll({
                     stroke: am5.color(thresholdColors[index]),
                     strokeOpacity: 1,
                     strokeDasharray: [4, 4],
@@ -412,7 +428,7 @@ const initWaterLevelRangeChart = (rootElement: HTMLElement, data: any[], thresho
                     visible: true
                 });
 
-                range.get("label").setAll({
+                range.get("label")?.setAll({
                     text: thresholdLabels[index] + ": " + thresholds[level] + "m",
                     fill: am5.color(thresholdColors[index]),
                     location: 1,
@@ -520,9 +536,9 @@ const initHeatmapChart = (root: am5.Root, data: any[], numDays: number = 31) => 
         paddingLeft: 60,
         paddingBottom: 0
     }));
-    root.container.set("paddingBottom", 0);
+
     chart.children.unshift(am5.Label.new(root, {
-        text: `Monthly Heat Index Heat Map - ${heatIndexReport.value.station} ${heatIndexReportType.value === 'Monthly'   ? heatIndexReport.value.month+''+heatIndexReport.value.year : heatIndexReport.value.year}`,
+        text: `Monthly Heat Index Heat Map - ${heatIndexReport.value.station} - ${heatIndexReportType.value === 'Monthly' ? heatIndexReport.value.month+' '+heatIndexReport.value.year : heatIndexReport.value.from + ' - ' + heatIndexReport.value.to}`,
         fontSize: 16,
         fontWeight: "bold",
         textAlign: "center",
@@ -684,7 +700,7 @@ const initStationHeatmapChart = (root: am5.Root, data: any[], stations: any[], n
     
     // Add Title
     chart.children.unshift(am5.Label.new(root, {
-        text: `Monthly Heat Index Comparison Across Devices`,
+        text: `Monthly Heat Index Comparison Across Devices - ${heatIndexReportType.value === 'Monthly' ? heatIndexReport.value.month + ' ' + heatIndexReport.value.year : heatIndexReport.value.from + ' - ' + heatIndexReport.value.to }`,
         fontSize: 16,
         fontWeight: "bold",
         textAlign: "center",
@@ -854,7 +870,7 @@ const renderChart = async (chartData?: any[], seriesNames: string[] = []) => {
     
     if (selectedReport.value === 'Rain') {
         chartDiv = rainChartDiv.value;
-        title = 'Rainfall';
+        title = `24-Hour Daily Accumulated Rain Chart - ${rainReportType.value === 'Monthly' ? detailRainReport.value.month + ' ' + detailRainReport.value.year : detailRainReport.value.from + ' - ' + detailRainReport.value.to}`;
         unit = 'mm';
     } else if (selectedReport.value === 'Heat Index') {
         chartDiv = heatIndexChartDiv.value;
@@ -902,10 +918,7 @@ const renderChart = async (chartData?: any[], seriesNames: string[] = []) => {
     }
 };
 
-const generateReport = async () => {
-    console.log(`Generating ${selectedReport.value} report...`);
-    
-    // Dispose existing chart immediately when starting a new search
+const clearCharts = () => {
     if (activeChartRoot) {
         try {
             activeChartRoot.dispose();
@@ -914,147 +927,126 @@ const generateReport = async () => {
         }
         activeChartRoot = null;
     }
+};
 
+const handleWaterLevelReport = async () => {
+    const response = await axios.get('/reports/water-level-data', {
+        params: {
+            sensor: waterLevelReport.value.sensor,
+            reportType: waterLevelReportType.value,
+            year: waterLevelReport.value.year,
+            month: waterLevelReport.value.month,
+            from: waterLevelReport.value.from,
+            to: waterLevelReport.value.to
+        }
+    });
+    
+    waterLevelRecords.value = response.data.records;
+    waterLevelThresholds.value = response.data.thresholds;
+    
+    if (waterLevelReport.value.sensor !== 'All') {
+        const dailyData = waterLevelRecords.value.reduce((acc: any, record: any) => {
+            const dateObj = new Date(record.date_time);
+            const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            
+            if (!acc[dateStr]) {
+                acc[dateStr] = { min: record.water_level, max: record.water_level, sum: 0, count: 0, timestamp: dateObj.getTime() };
+            }
+            
+            acc[dateStr].min = Math.min(acc[dateStr].min, record.water_level);
+            acc[dateStr].max = Math.max(acc[dateStr].max, record.water_level);
+            acc[dateStr].sum += record.water_level;
+            acc[dateStr].count++;
+            return acc;
+        }, {});
+
+        const chartData = Object.entries(dailyData).map(([date, vals]: [string, any]) => ({
+            date,
+            min: vals.min,
+            max: vals.max,
+            avg: parseFloat((vals.sum / vals.count).toFixed(2)),
+            timestamp: vals.timestamp
+        })).sort((a, b) => a.timestamp - b.timestamp);
+
+        await renderChart(chartData);
+        return;
+    }
+
+    // legacy comparison view for "All"
+    const sensorNames = props.sensors.map(s => s.name);
+    const timestampDataRaw = waterLevelRecords.value.reduce((acc: any, record: any) => {
+        const dateObj = new Date(record.date_time);
+        const label = waterLevelReportType.value === 'Monthly' 
+            ? dateObj.toLocaleString('en-US', { day: '2-digit' })
+            : dateObj.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+        
+        if (!acc[label]) acc[label] = { sensors: {}, timestamp: dateObj.getTime() };
+        
+        if (!acc[label].sensors[record.sensor_name]) {
+            acc[label].sensors[record.sensor_name] = { sum: 0, count: 0 };
+        }
+        acc[label].sensors[record.sensor_name].sum += record.water_level;
+        acc[label].sensors[record.sensor_name].count += 1;
+        return acc;
+    }, {});
+
+    const chartData = Object.entries(timestampDataRaw).map(([label, data]: [string, any]) => {
+        const row: any = { date: label, timestamp: data.timestamp };
+        sensorNames.forEach(name => {
+            if (data.sensors[name]) {
+                row[name] = data.sensors[name].sum / data.sensors[name].count;
+            }
+        });
+        return row;
+    }).sort((a, b) => a.timestamp - b.timestamp);
+
+    await renderChart(chartData, sensorNames);
+};
+
+const handleWeatherReport = async () => {
+    const isRain = selectedReport.value === 'Rain';
+    const filters = isRain ? detailRainReport.value : heatIndexReport.value;
+    const reportType = isRain ? rainReportType.value : heatIndexReportType.value;
+
+    const response = await axios.get('/reports/weather-observation-data', {
+        params: {
+            report: selectedReport.value,
+            station: filters.station,
+            reportType: reportType,
+            year: filters.year,
+            month: filters.month,
+            from: filters.from,
+            to: filters.to
+        }
+    });
+    
+    if (isRain) {
+        rainRecords.value = response.data.records;
+        let chartData = response.data.chartData || [];
+        if (rainReportType.value === 'Monthly') {
+            chartData = chartData.map((item: any) => ({
+                ...item,
+                date: item.date.split(' ')[1] || item.date
+            }));
+        }
+        await renderChart(chartData, response.data.stationNames);
+    } else {
+        heatIndexRecords.value = response.data.records;
+        await renderChart();
+    }
+};
+
+const generateReport = async () => {
+    clearCharts();
     isGenerating.value = true;
-    currentPage.value = 1; // Reset to first page
+    currentPage.value = 1;
     hasSearched.value = true;
+
     try {
         if (selectedReport.value === 'Water Level') {
-            
-            const response = await axios.get('/reports/water-level-data', {
-                params: {
-                    sensor: waterLevelReport.value.sensor,
-                    reportType: waterLevelReportType.value,
-                    year: waterLevelReport.value.year,
-                    month: waterLevelReport.value.month,
-                    from: waterLevelReport.value.from,
-                    to: waterLevelReport.value.to
-                }
-            });
-            
-            waterLevelRecords.value = response.data.records;
-            waterLevelThresholds.value = response.data.thresholds;
-            
-            // Special processing for Daily Range chart (only if single sensor)
-            if (waterLevelReport.value.sensor !== 'All') {
-                const dailyData = waterLevelRecords.value.reduce((acc: any, record: any) => {
-                    const dateObj = new Date(record.date_time);
-                    const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                    
-                    if (!acc[dateStr]) {
-                        acc[dateStr] = { min: record.water_level, max: record.water_level, sum: 0, count: 0, timestamp: dateObj.getTime() };
-                    }
-                    
-                    acc[dateStr].min = Math.min(acc[dateStr].min, record.water_level);
-                    acc[dateStr].max = Math.max(acc[dateStr].max, record.water_level);
-                    acc[dateStr].sum += record.water_level;
-                    acc[dateStr].count++;
-                    return acc;
-                }, {});
-
-                const chartData = Object.entries(dailyData).map(([date, vals]: [string, any]) => ({
-                    date,
-                    min: vals.min,
-                    max: vals.max,
-                    avg: parseFloat((vals.sum / vals.count).toFixed(2)),
-                    timestamp: vals.timestamp
-                })).sort((a, b) => a.timestamp - b.timestamp);
-
-                await renderChart(chartData);
-                isGenerating.value = false;
-                return;
-            }
-
-            // Group data by exact timestamp for clustered bars (legacy behavior for "All")
-            const timestampDataRaw = waterLevelRecords.value.reduce((acc: any, record: any) => {
-                const dateObj = new Date(record.date_time);
-                // Format for CategoryAxis label
-                let label = '';
-                if (waterLevelReportType.value === 'Monthly') {
-                    label = dateObj.toLocaleString('en-US', { day: '2-digit' });
-                } else {
-                    label = dateObj.toLocaleString('en-US', { 
-                        month: 'short', 
-                        day: 'numeric', 
-                        hour: 'numeric', 
-                        minute: '2-digit',
-                        hour12: true 
-                    });
-                }
-                
-                if (!acc[label]) acc[label] = { sensors: {}, timestamp: dateObj.getTime() };
-                
-                if (!acc[label].sensors[record.sensor_name]) {
-                    acc[label].sensors[record.sensor_name] = { sum: 0, count: 0 };
-                }
-                acc[label].sensors[record.sensor_name].sum += record.water_level;
-                acc[label].sensors[record.sensor_name].count += 1;
-                return acc;
-            }, {});
-
-            let sensorNames: string[] = [];
-            if (waterLevelReport.value.sensor === 'All') {
-                sensorNames = props.sensors.map(s => s.name);
-            } else {
-                sensorNames = Array.from(new Set(waterLevelRecords.value.map(r => r.sensor_name)));
-            }
-
-            const chartData = Object.entries(timestampDataRaw).map(([label, data]: [string, any]) => {
-                const row: any = { date: label, timestamp: data.timestamp };
-                sensorNames.forEach(name => {
-                    if (data.sensors[name]) {
-                        row[name] = data.sensors[name].sum / data.sensors[name].count;
-                    }
-                });
-                return row;
-            });
-             hasSearched.value = false;
-            
-            // Sort by actual timestamp to ensure chronological order even on CategoryAxis
-            chartData.sort((a, b) => a.timestamp - b.timestamp);
-            
-            await renderChart(chartData, sensorNames);
+            await handleWaterLevelReport();
         } else if (selectedReport.value === 'Rain' || selectedReport.value === 'Heat Index') {
-            const isRain = selectedReport.value === 'Rain';
-            const reportConfig = isRain ? detailRainReport.value : heatIndexReport.value;
-            const reportType = isRain ? rainReportType.value : heatIndexReportType.value;
-
-            const response = await axios.get('/reports/weather-observation-data', {
-                params: {
-                    report: selectedReport.value,
-                    station: reportConfig.station,
-                    reportType: reportType,
-                    year: reportConfig.year,
-                    month: reportConfig.month,
-                    from: reportConfig.from,
-                    to: reportConfig.to
-                }
-            });
-            
-            if (isRain) {
-                rainRecords.value = response.data.records;
-                
-                let chartData = response.data.chartData;
-                // If Monthly, show only the day (e.g., "01", "02")
-                if (rainReportType.value === 'Monthly' && chartData) {
-                    chartData = chartData.map((item: any) => {
-                        // Backend returns "M d" (e.g., "Feb 02")
-                        const parts = item.date.split(' ');
-                        if (parts.length === 2) {
-                            return { ...item, date: parts[1] };
-                        }
-                        return item;
-                    });
-                   
-                }
-                hasSearched.value = false;
-                // Use aggregated daily totals for the Rain chart
-                await renderChart(chartData, response.data.stationNames);
-            } else {
-                heatIndexRecords.value = response.data.records;
-                hasSearched.value = false;
-                await renderChart();
-            }
+            await handleWeatherReport();
         } else {
             await renderChart();
         }
@@ -1072,25 +1064,20 @@ const generateReport = async () => {
 };
 
 watch(selectedReport, () => {
-    // Clear display when switching reports
     rainRecords.value = [];
     heatIndexRecords.value = [];
     waterLevelRecords.value = [];
-    if (activeChartRoot) {
-        activeChartRoot.dispose();
-        activeChartRoot = null;
-    }
-    currentPage.value = 1; // Reset to first page
+    clearCharts();
+    currentPage.value = 1;
+    hasSearched.value = false;
 });
 
 onMounted(() => {
     const currentYear = new Date().getFullYear();
-    
     if (props.weatherStationYears.includes(currentYear)) {
         detailRainReport.value.year = currentYear.toString();
         heatIndexReport.value.year = currentYear.toString();
     }
-    
     if (props.waterLevelYears.includes(currentYear)) {
         waterLevelReport.value.year = currentYear.toString();
     }
@@ -1481,7 +1468,7 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                         <!-- Rain Chart -->
                         <div v-show="selectedReport === 'Rain' && rainRecords.length > 0" class="space-y-2">
                             <div class="flex justify-between items-center">
-                                <h4 class="font-bold text-gray-600 uppercase text-sm">24-Hour Daily Accumulated Rain Chart - {{ rainReportType==='Monthly'? detailRainReport.month + ' ' + detailRainReport.year : detailRainReport.from + ' ' + detailRainReport.to }}</h4>
+                                <h4 class="font-bold text-gray-600 uppercase text-sm hidden">24-Hour Daily Accumulated Rain Chart - {{ rainReportType==='Monthly'? detailRainReport.month + ' ' + detailRainReport.year : detailRainReport.from + ' ' + detailRainReport.to }}</h4>
                                 <button 
                                     @click="downloadChart" 
                                     class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-sm font-bold uppercase tracking-wider text-[10px] transition-colors flex items-center gap-2"
