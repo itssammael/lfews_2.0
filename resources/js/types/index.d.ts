@@ -23,6 +23,11 @@ export type PageProps<T extends Record<string, unknown> = Record<string, unknown
         user: User;
     };
     jetstream: JetstreamProps;
+    flash: {
+        modbusResult?: any;
+        weatherResult?: any;
+        [key: string]: any;
+    };
 };
 
 export interface LocationType {

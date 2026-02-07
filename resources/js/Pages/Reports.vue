@@ -1,214 +1,939 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue';
-import { Link } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import WaterLevelSensorModal from '@/Components/WaterLevelSensorModal.vue';
-import ConfirmationModal from '@/Components/ConfirmationModal.vue';
-import SecondaryButton from '@/Components/SecondaryButton.vue';
-import DangerButton from '@/Components/DangerButton.vue';
-import { router } from '@inertiajs/vue3';
-import { Location } from '@/types';
+import { ref, onMounted, watch, nextTick, onUnmounted, computed } from 'vue';
+import * as am5 from '@amcharts/amcharts5';
+import * as am5xy from '@amcharts/amcharts5/xy';
+import am5themes_Animated from '@amcharts/amcharts5/themes/Animated';
+import axios from 'axios';
+import * as XLSX from 'xlsx';
+
+
 
 interface Sensor {
     id: number;
     name: string;
-    brand: string;
-    mode: string;
-    ip: string;
-    location_id?: number | string;
-    location?: Location;
-    state: number;
-    level_2: number;
-    level_3: number;
-    level_4: number;
-    port: number;
-    slave_id: number;
+}
+
+interface Station {
+    id: number;
+    name: string;
 }
 
 const props = defineProps<{
     sensors: Sensor[];
-    locations?: Location[];
-    showCreateModal?: boolean;
-    editingSensor?: Sensor;
-    activeCount?: number;
-    inactiveCount?: number;
-    maintenanceCount?: number;
+    stations: Station[];
+    waterLevelYears: number[];
+    weatherStationYears: number[];
 }>();
 
-const showingModal = ref(false);
-const activeSensor = ref<Sensor | null>(null);
+const months = [
+    'January', 'February', 'March', 'April', 'May', 'June', 
+    'July', 'August', 'September', 'October', 'November', 'December'
+];
 
-watch(() => props.editingSensor, (newSensor: Sensor | undefined) => {
-    console.log(newSensor)
-    if (newSensor) {
-        activeSensor.value = newSensor;
-        showingModal.value = false;
+// Form states
+const selectedReport = ref('Rain');
+const reportTypes = ['Rain', 'Heat Index', 'Water Level'];
+const rainReportType = ref('Monthly');
+const heatIndexReportType = ref('Monthly');
+const waterLevelReportType = ref('Monthly');
+
+const detailRainReport = ref({ station: '', from: '', to: '', year: '', month: '' });
+const heatIndexReport = ref({ station: '', from: '', to: '', year: '', month: '' });
+const waterLevelReport = ref({ sensor: '', from: '', to: '', year: '', month: '' });
+
+const isGenerating = ref(false);
+
+// Chart Refs
+const rainChartDiv = ref<HTMLElement | null>(null);
+const heatIndexChartDiv = ref<HTMLElement | null>(null);
+const waterLevelChartDiv = ref<HTMLElement | null>(null);
+
+const waterLevelRecords = ref<any[]>([]);
+const rainRecords = ref<any[]>([]);
+const heatIndexRecords = ref<any[]>([]);
+
+// Pagination
+const currentPage = ref(1);
+const itemsPerPage = 17;
+
+const paginatedWaterLevelRecords = computed(() => {
+    const start = (currentPage.value - 1) * itemsPerPage;
+    return waterLevelRecords.value.slice(start, start + itemsPerPage);
+});
+const waterLevelTotalPages = computed(() => Math.ceil(waterLevelRecords.value.length / itemsPerPage));
+
+const paginatedRainRecords = computed(() => {
+    const start = (currentPage.value - 1) * itemsPerPage;
+    return rainRecords.value.slice(start, start + itemsPerPage);
+});
+const rainTotalPages = computed(() => Math.ceil(rainRecords.value.length / itemsPerPage));
+
+const paginatedHeatIndexRecords = computed(() => {
+    const start = (currentPage.value - 1) * itemsPerPage;
+    return heatIndexRecords.value.slice(start, start + itemsPerPage);
+});
+const heatIndexTotalPages = computed(() => Math.ceil(heatIndexRecords.value.length / itemsPerPage));
+
+let activeChartRoot: am5.Root | null = null;
+
+const colors = [
+    0xfd7b38, // Complementary Orange (for Blue)
+    0xef467e, // Complementary Pink/Red (for Green)
+    0x0a61f4, // Complementary Blue (for Amber)
+    0x10bbb5, // Complementary Cyan/Teal (for Red)
+    0x74a309, // Complementary Olive (for Violet)
+    0x13b766, // Complementary Green (for Pink)
+];
+
+const initChart = (rootElement: HTMLElement, title: string, data: any[], seriesNames: string[] = [], isBar: boolean = false, unit: string = '') => {
+    let root = am5.Root.new(rootElement);
+    
+    root.setThemes([am5themes_Animated.new(root)]);
+    
+    let chart = root.container.children.push(am5xy.XYChart.new(root, {
+        panX: true,
+        panY: true,
+        wheelX: "panX",
+        wheelY: "zoomX",
+        pinchZoomX: true,
+        layout: root.verticalLayout
+    }));
+
+    let cursor = chart.set("cursor", am5xy.XYCursor.new(root, {}));
+    cursor.lineY.set("visible", false);
+
+    const isClustered = seriesNames.length > 0;
+
+    let xAxis = chart.xAxes.push(am5xy.CategoryAxis.new(root, {
+        maxDeviation: 0.3,
+        categoryField: "date",
+        renderer: am5xy.AxisRendererX.new(root, { 
+            minGridDistance: 30,
+            minorGridEnabled: true
+        }),
+        tooltip: am5.Tooltip.new(root, {})
+    }));
+
+    // Always rotate and add scrollbar if it's a bar chart or clustered (many items likely)
+    if (isBar || isClustered) {
+        xAxis.get("renderer").labels.template.setAll({
+            rotation: -45,
+            centerY: am5.p50,
+            centerX: am5.p100,
+            paddingRight: 15,
+            fontSize: 10
+        });
+
+        chart.set("scrollbarX", am5.Scrollbar.new(root, {
+            orientation: "horizontal"
+        }));
     }
-}, { immediate: true });
+
+    let yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, {
+        maxDeviation: 0.3,
+        renderer: am5xy.AxisRendererY.new(root, {})
+    }));
+
+    if (isClustered) {
+        const legend = chart.children.push(am5.Legend.new(root, {
+            centerX: am5.p50,
+            x: am5.p50,
+            paddingTop: 15,
+        }));
+
+        // Static mapping based on name to ensure consistency
+        const allPossibleNames = Array.from(new Set([
+            ...props.sensors.map(s => s.name),
+            ...props.stations.map(s => s.name)
+        ]));
+
+        seriesNames.forEach((name) => {
+            const nameIndex = allPossibleNames.indexOf(name);
+            const colorIndex = nameIndex >= 0 ? nameIndex % colors.length : 0;
+            const seriesColor = am5.color(colors[colorIndex]);
+
+            const series = chart.series.push(am5xy.ColumnSeries.new(root, {
+                name: name,
+                xAxis: xAxis,
+                yAxis: yAxis,
+                valueYField: name,
+                categoryXField: "date",
+                fill: seriesColor,
+                stroke: seriesColor,
+                tooltip: am5.Tooltip.new(root, {
+                    labelText: `{name}: {valueY}${unit}`,
+                    getFillFromSprite: false,
+                    autoTextColor: false
+                })
+            }));
+
+            series.columns.template.setAll({
+                tooltipText: `{name}: {valueY}${unit}`,
+                width: am5.percent(90),
+                tooltipY: 0,
+                strokeOpacity: 0
+            });
+
+            series.get("tooltip")!.get("background")!.setAll({
+                fill: am5.color(0xffffff),
+                stroke: seriesColor,
+                strokeOpacity: 0.8,
+                fillOpacity: 0.9
+            });
+
+            series.get("tooltip")!.label.setAll({
+                fill: am5.color(0x000000),
+                fontSize: 11,
+                fontWeight: "600"
+            });
+
+            series.data.setAll(data);
+            series.appear(1000);
+        });
+
+        xAxis.data.setAll(data);
+        legend.data.setAll(chart.series.values);
+    } else {
+        let series: any;
+        if (isBar) {
+            series = chart.series.push(am5xy.ColumnSeries.new(root, {
+                name: title,
+                xAxis: xAxis,
+                yAxis: yAxis,
+                valueYField: "value",
+                categoryXField: "date",
+                fill: am5.color(colors[0]),
+                stroke: am5.color(colors[0]),
+                tooltip: am5.Tooltip.new(root, {
+                    labelText: `{valueY}${unit}`
+                })
+            }));
+            
+            series.columns.template.setAll({
+                tooltipText: `{valueY}${unit}`,
+                width: am5.percent(90),
+                strokeOpacity: 0
+            });
+        } else {
+            series = chart.series.push(am5xy.LineSeries.new(root, {
+                name: title,
+                xAxis: xAxis,
+                yAxis: yAxis,
+                valueYField: "value",
+                categoryXField: "date",
+                stroke: am5.color(colors[0]),
+                fill: am5.color(colors[0]),
+                tooltip: am5.Tooltip.new(root, {
+                    labelText: "{valueY}"
+                })
+            }));
+
+            series.fills.template.setAll({
+                visible: true,
+                fillOpacity: 0.5
+            });
+        }
+
+        xAxis.data.setAll(data);
+        series.data.setAll(data);
+        series.appear(1000);
+    }
+    
+    chart.appear(1000, 100);
+
+    return root;
+}
+
+const renderChart = async (chartData?: any[], seriesNames: string[] = []) => {
+    // Dispose existing chart if any to prevent memory leaks and conflicts
+    if (activeChartRoot) {
+        activeChartRoot.dispose();
+        activeChartRoot = null;
+    }
+
+    await nextTick(); // Wait for v-if DOM updates
+
+    // Fallback/Default Dummy Data if no data provided
+    const defaultData = months.map(m => ({
+        date: m.substring(0, 3),
+        value: Math.floor(Math.random() * 100)
+    }));
+
+    if (selectedReport.value === 'Rain' && rainChartDiv.value) {
+        activeChartRoot = initChart(rainChartDiv.value, "Rain", chartData || defaultData, seriesNames, true, 'mm');
+    } else if (selectedReport.value === 'Heat Index' && heatIndexChartDiv.value) {
+        activeChartRoot = initChart(heatIndexChartDiv.value, "Heat Index", chartData || defaultData);
+    } else if (selectedReport.value === 'Water Level' && waterLevelChartDiv.value) {
+        activeChartRoot = initChart(waterLevelChartDiv.value, "Water Level", chartData || [], seriesNames, true, 'm');
+    }
+};
+
+const generateReport = async () => {
+    console.log(`Generating ${selectedReport.value} report...`);
+    isGenerating.value = true;
+    currentPage.value = 1; // Reset to first page
+    
+    try {
+        if (selectedReport.value === 'Water Level') {
+            const response = await axios.get('/reports/water-level-data', {
+                params: {
+                    sensor: waterLevelReport.value.sensor,
+                    reportType: waterLevelReportType.value,
+                    year: waterLevelReport.value.year,
+                    month: waterLevelReport.value.month,
+                    from: waterLevelReport.value.from,
+                    to: waterLevelReport.value.to
+                }
+            });
+            
+            waterLevelRecords.value = response.data.records;
+            
+            // Group data by exact timestamp for clustered bars
+            const timestampDataRaw = waterLevelRecords.value.reduce((acc: any, record: any) => {
+                const dateObj = new Date(record.date_time);
+                // Format for CategoryAxis label: "MMM dd, hh:mm a"
+                const label = dateObj.toLocaleString('en-US', { 
+                    month: 'short', 
+                    day: 'numeric', 
+                    hour: 'numeric', 
+                    minute: '2-digit',
+                    hour12: true 
+                });
+                
+                if (!acc[label]) acc[label] = { sensors: {}, timestamp: dateObj.getTime() };
+                
+                if (!acc[label].sensors[record.sensor_name]) {
+                    acc[label].sensors[record.sensor_name] = { sum: 0, count: 0 };
+                }
+                acc[label].sensors[record.sensor_name].sum += record.water_level;
+                acc[label].sensors[record.sensor_name].count += 1;
+                return acc;
+            }, {});
+
+            let sensorNames: string[] = [];
+            if (waterLevelReport.value.sensor === 'All') {
+                sensorNames = props.sensors.map(s => s.name);
+            } else {
+                sensorNames = Array.from(new Set(waterLevelRecords.value.map(r => r.sensor_name)));
+            }
+
+            const chartData = Object.entries(timestampDataRaw).map(([label, data]: [string, any]) => {
+                const row: any = { date: label, timestamp: data.timestamp };
+                sensorNames.forEach(name => {
+                    if (data.sensors[name]) {
+                        row[name] = data.sensors[name].sum / data.sensors[name].count;
+                    }
+                });
+                return row;
+            });
+            
+            // Sort by actual timestamp to ensure chronological order even on CategoryAxis
+            chartData.sort((a, b) => a.timestamp - b.timestamp);
+            
+            await renderChart(chartData, sensorNames);
+        } else if (selectedReport.value === 'Rain' || selectedReport.value === 'Heat Index') {
+            const isRain = selectedReport.value === 'Rain';
+            const reportConfig = isRain ? detailRainReport.value : heatIndexReport.value;
+            const reportType = isRain ? rainReportType.value : heatIndexReportType.value;
+
+            const response = await axios.get('/reports/weather-observation-data', {
+                params: {
+                    report: selectedReport.value,
+                    station: reportConfig.station,
+                    reportType: reportType,
+                    year: reportConfig.year,
+                    month: reportConfig.month,
+                    from: reportConfig.from,
+                    to: reportConfig.to
+                }
+            });
+
+            if (isRain) {
+                rainRecords.value = response.data.records;
+                // Use aggregated daily totals for the Rain chart
+                await renderChart(response.data.chartData, response.data.stationNames);
+            } else {
+                heatIndexRecords.value = response.data.records;
+                await renderChart();
+            }
+        } else {
+            await renderChart();
+        }
+    } catch (error) {
+        console.error(`Error generating ${selectedReport.value} report:`, error);
+        alert(`Failed to generate ${selectedReport.value} report. Please try again.`);
+    } finally {
+        isGenerating.value = false;
+    }
+};
+
+watch(selectedReport, () => {
+    renderChart();
+    currentPage.value = 1; // Reset to first page
+});
 
 onMounted(() => {
-    if (props.showCreateModal && !props.editingSensor) {
-        activeSensor.value = null;
-        showingModal.value = true;
-    } else if (props.editingSensor) {
-        activeSensor.value = props.editingSensor;
-        showingModal.value = true;
+    const currentYear = new Date().getFullYear();
+    
+    if (props.weatherStationYears.includes(currentYear)) {
+        detailRainReport.value.year = currentYear.toString();
+        heatIndexReport.value.year = currentYear.toString();
+    }
+    
+    if (props.waterLevelYears.includes(currentYear)) {
+        waterLevelReport.value.year = currentYear.toString();
+    }
+
+    renderChart();
+});
+
+onUnmounted(() => {
+    if (activeChartRoot) {
+        activeChartRoot.dispose();
     }
 });
 
-const closeModal = () => {
-    showingModal.value = false;
-    activeSensor.value = null;
-};
+const currentDate = new Date().toLocaleDateString('en-US', { 
+    weekday: 'long', 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+});
 
-const confirmingSensorDeletion = ref(false);
-const sensorToDelete = ref<Sensor | null>(null);
+const exportToExcel = () => {
+    let records: any[] = [];
+    let filenamePrefix = '';
+    let sheetName = '';
+    let headers: any = {};
 
-const confirmSensorDeletion = (sensor: Sensor) => {
-    sensorToDelete.value = sensor;
-    confirmingSensorDeletion.value = true;
-};
-
-const deleteSensor = () => {
-    if (sensorToDelete.value) {
-        router.delete(route('water-level-sensors.destroy', sensorToDelete.value.id), {
-            preserveScroll: true,
-            onSuccess: () => {
-                confirmingSensorDeletion.value = false;
-                sensorToDelete.value = null;
-            },
+    if (selectedReport.value === 'Water Level') {
+        records = waterLevelRecords.value;
+        filenamePrefix = 'Water_Level_Data_Report';
+        sheetName = 'Water Level Data';
+        headers = (record: any, index: number) => ({
+            'No.': index + 1,
+            'Sensor Name': record.sensor_name,
+            'Water Level (m)': record.water_level,
+            'Date & Time': new Date(record.date_time).toLocaleString('en-US', { 
+                month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' 
+            })
+        });
+    } else if (selectedReport.value === 'Rain') {
+        records = rainRecords.value;
+        filenamePrefix = 'Rain_Data_Report';
+        sheetName = 'Rain Data';
+        headers = (record: any, index: number) => ({
+            'No.': index + 1,
+            'Station Name': record.station_name,
+            'Precipitation Rate (mm/h)': record.precipitation_rate,
+            'Precipitation Total (mm)': record.precipitation_total,
+            'Date & Time': new Date(record.date_time).toLocaleString('en-US', { 
+                month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' 
+            })
+        });
+    } else if (selectedReport.value === 'Heat Index') {
+        records = heatIndexRecords.value;
+        filenamePrefix = 'Heat_Index_Data_Report';
+        sheetName = 'Heat Index Data';
+        headers = (record: any, index: number) => ({
+            'No.': index + 1,
+            'Station Name': record.station_name,
+            'Temperature (°C)': record.temperature,
+            'Humidity (%)': record.humidity,
+            'Dewpoint (°C)': record.dewpoint,
+            'Heat Index (°C)': record.heat_index,
+            'Date & Time': new Date(record.date_time).toLocaleString('en-US', { 
+                month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' 
+            })
         });
     }
+
+    if (records.length === 0) return;
+
+    const exportData = records.map((record, index) => headers(record, index));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+
+    // Dynamic Suffix based on selection
+    let suffix = '';
+    if (selectedReport.value === 'Water Level') {
+        if (waterLevelReportType.value === 'Monthly') {
+            suffix = `${waterLevelReport.value.month}_${waterLevelReport.value.year}`;
+        } else {
+            suffix = `${waterLevelReport.value.from}_to_${waterLevelReport.value.to}`;
+        }
+    } else if (selectedReport.value === 'Rain') {
+        if (rainReportType.value === 'Monthly') {
+            suffix = `${detailRainReport.value.month}_${detailRainReport.value.year}`;
+        } else {
+            suffix = `${detailRainReport.value.from}_to_${detailRainReport.value.to}`;
+        }
+    } else if (selectedReport.value === 'Heat Index') {
+        if (heatIndexReportType.value === 'Monthly') {
+            suffix = `${heatIndexReport.value.month}_${heatIndexReport.value.year}`;
+        } else {
+            suffix = `${heatIndexReport.value.from}_to_${heatIndexReport.value.to}`;
+        }
+    }
+
+    const filename = `${filenamePrefix}_${suffix}.xlsx`;
+
+    XLSX.writeFile(workbook, filename);
 };
 
-const closeDeleteModal = () => {
-    confirmingSensorDeletion.value = false;
-    sensorToDelete.value = null;
-};
 </script>
 
 <template>
     <AppLayout title="Reports">
         <template #header>
             <div class="flex justify-between items-center">
-                <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
+                <h2 class="font-bold text-3xl text-gray-800 uppercase tracking-wide">
                     Reports
                 </h2>
+                <div class="text-gray-400 text-sm">
+                    Today is {{ currentDate }}
+                </div>
             </div>
         </template>
 
-        <div class="py-6 h-[85%]">
-            <div class="max-w-9xl mx-auto px-8 h-full">
-                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-xl sm:rounded-lg h-full">
-                    <div class="p-6 h-full">
-                        <div class="flex">
-                            <div class="w-1/3 flex space-x-8 items-center py-2">
-                                <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight uppercase">
-                                    Water Level Sensor List
-                                </h2>
-                                <Link
-                                    :href="route('water-level-sensors.create')"
-                                    class="inline-flex items-center px-4 py-2 bg-gray-800 dark:bg-gray-200 border border-transparent rounded-md font-semibold text-xs text-white dark:text-gray-800 uppercase tracking-widest hover:bg-gray-700 dark:hover:bg-white focus:bg-gray-700 dark:focus:bg-white active:bg-gray-900 dark:active:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150"
-                                >
-                                    Add Sensor
-                                </Link>
-                            </div>
-                            <div class="w-2/3 py-2 flex space-x-6 items-center justify-center">
-                                <div class="flex items-center justify-center w-fit space-x-1.5">
-                                    <div class="w-[20px] h-[20px] bg-green-500 rounded-full">&nbsp;</div>
-                                    <span class="text-lg uppercase">Active (<span class="font-bold">{{ activeCount }}</span>)</span>
-                                </div>
-                                <div class="flex items-center justify-center w-fit space-x-1.5">
-                                    <div class="w-[20px] h-[20px] bg-red-500 rounded-full">&nbsp;</div>
-                                    <span class="text-lg uppercase">inactive (<span class="font-bold">{{ inactiveCount }}</span>)</span>
-                                </div>
-                                <div class="flex items-center justify-center w-fit space-x-1.5">
-                                    <div class="w-[20px] h-[20px] bg-gray-500 rounded-full">&nbsp;</div>
-                                    <span class="text-lg uppercase">maintenance (<span class="font-bold">{{ maintenanceCount }}</span>)</span>
-                                </div>
-                            </div>
+        <div class="py-12">
+            <div class="max-w-9xl mx-auto sm:px-6 lg:px-8 space-y-12">
+                <div class="bg-white p-8 mb-6 rounded-md shadow-md">
+                    <!-- Report Selection Header -->
+                     <div class="flex justify-between items-center mb-8 border-b border-gray-100 pb-2">
+                        <div class="space-y-1">
+                            <h3 class="text-xl font-bold text-gray-800 uppercase">
+                                Select Report
+                            </h3>
+                            <p class="text-sm text-gray-400 italic opacity-70">
+                                Choose which report you would like to generate
+                            </p>
                         </div>
-                        <div class="w-full grid grid-cols-7 gap-4 bg-gray-200 text-xl text-center font-bold">
-                            <div>Name</div>
-                            <div>Brand</div>
-                            <div>Mode</div>
-                            <div>IP</div>
-                            <div>Location</div>
-                            <div>State</div>
-                            <div>Action</div>
+                        <select v-model="selectedReport" class="w-72 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+                            <option v-for="type in reportTypes" :key="type" :value="type">{{ type }}</option>
+                        </select>
+                    </div>
+
+                <!-- Rain Report -->
+                    <div v-if="selectedReport === 'Rain'" class="space-y-4">
+                        <h3 class="text-xl font-bold text-gray-800 uppercase flex items-center gap-4">
+                            Rain
+                            <span class="text-sm font-normal italic text-gray-600 opacity-50 capitalize">Default interval is 24 Hours and Observation datan with 0s for both rate & total are ommitted</span>
+                        </h3>
+                        <div class="flex flex-wrap gap-4 items-center">
+                            <select v-model="detailRainReport.station" class="w-64 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+                                <option value="" disabled selected>SELECT STATION</option>
+                                <option v-for="station in stations" :key="station.id" :value="station.name">{{ station.name }}</option>
+                                <option value="All">All Stations</option>
+                            </select>
+
+                            <select v-model="rainReportType" class="w-48 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+                                <option value="Monthly">Monthly</option>
+                                <option value="Date Range">Date Range</option>
+                            </select>
+
+                            <template v-if="rainReportType === 'Monthly'">
+                                <select v-model="detailRainReport.year" class="w-48 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+                                    <option value="" disabled selected>SELECT YEAR</option>
+                                    <option v-for="y in weatherStationYears" :key="y" :value="y">{{ y }}</option>
+                                </select>
+
+                                <select v-model="detailRainReport.month" class="w-48 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+                                    <option value="" disabled selected>SELECT MONTH</option>
+                                    <option v-for="m in months" :key="m" :value="m">{{ m }}</option>
+                                </select>
+                            </template>
+                            
+                            <template v-else>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-gray-400 font-bold text-sm uppercase">FROM</span>
+                                    <div class="relative w-48 h-[50px] bg-white border border-gray-200 rounded-sm">
+                                        <span class="absolute left-3 top-1 text-black font-bold text-[10px] uppercase pointer-events-none z-10">DATE</span>
+                                        <input type="date" v-model="detailRainReport.from" class="w-full h-full bg-transparent border-none text-gray-500 text-sm focus:ring-0 block px-2.5 pt-4 font-bold" />
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center gap-2">
+                                    <span class="text-gray-400 font-bold text-sm uppercase">TO</span>
+                                    <div class="relative w-48 h-[50px] bg-white border border-gray-200 rounded-sm">
+                                        <span class="absolute left-3 top-1 text-black font-bold text-[10px] uppercase pointer-events-none z-10">DATE</span>
+                                        <input type="date" v-model="detailRainReport.to" class="w-full h-full bg-transparent border-none text-gray-500 text-sm focus:ring-0 block px-2.5 pt-4 font-bold" />
+                                    </div>
+                                </div>
+                            </template>
+
+                            <button 
+                                @click="generateReport" 
+                                :disabled="isGenerating"
+                                class="ml-auto bg-blue-900 hover:bg-blue-800 disabled:bg-gray-400 text-white px-8 py-2.5 rounded-sm font-bold uppercase tracking-wider text-sm transition-colors flex items-center gap-2"
+                            >
+                                <span v-if="isGenerating" class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
+                                {{ isGenerating ? 'Generating...' : 'Generate' }}
+                            </button>
                         </div>
-                        
-                        <div v-for="sensor in props.sensors" :key="sensor.id" class="w-full grid grid-cols-7 gap-4 border-b border-gray-200 dark:border-gray-700 py-3 text-lg text-center items-center odd:bg-gray-100/[0.6] hover:bg-gray-100 dark:hover:bg-gray-700 transition duration-150 ease-in-out">
-                            <div class="font-medium text-gray-900 dark:text-gray-100">{{ sensor.name }}</div>
-                            <div class="text-gray-600 dark:text-gray-400">{{ sensor.brand }}</div>
-                            <div class="text-gray-600 dark:text-gray-400">{{ sensor.mode }}</div>
-                            <div class="text-gray-600 dark:text-gray-400 font-mono text-sm">{{ sensor.ip }}</div>
-                            <div class="text-gray-600 dark:text-gray-400">
-                                {{ sensor.location?.location_type?.description || 'N/A' }} 
-                                <span v-if="sensor.location" class="text-xs text-gray-500 block">({{ sensor.location.latitude }}, {{ sensor.location.longitude }})</span>
+                    </div>
+
+                    <!-- Heat Index Report -->
+                    <div v-if="selectedReport === 'Heat Index'" class="space-y-4">
+                        <h3 class="text-xl font-bold text-gray-800 uppercase flex items-center gap-4">
+                            Heat Index
+                            <span class="text-sm font-normal italic text-gray-600 opacity-50 capitalize">Data displayed on a daily basis from all devices</span>
+                        </h3>
+                        <div class="flex flex-wrap gap-4 items-center">
+                            <select v-model="heatIndexReport.station" class="w-64 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+                                <option value="" disabled selected>SELECT STATION</option>
+                                <option v-for="station in stations" :key="station.id" :value="station.name">{{ station.name }}</option>
+                                <option value="All">All Stations</option>
+                            </select>
+
+                            <select v-model="heatIndexReportType" class="w-48 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+                                <option value="Monthly">Monthly</option>
+                                <option value="Date Range">Date Range</option>
+                            </select>
+
+                            <template v-if="heatIndexReportType === 'Monthly'">
+                                <select v-model="heatIndexReport.year" class="w-64 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+                                    <option value="" disabled selected>SELECT YEAR</option>
+                                    <option v-for="y in weatherStationYears" :key="y" :value="y">{{ y }}</option>
+                                </select>
+
+                                <select v-model="heatIndexReport.month" class="w-64 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+                                    <option value="" disabled selected>SELECT MONTH</option>
+                                    <option v-for="m in months" :key="m" :value="m">{{ m }}</option>
+                                </select>
+                            </template>
+
+                            <template v-else>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-gray-400 font-bold text-sm uppercase">FROM</span>
+                                    <div class="relative w-48 h-[50px] bg-white border border-gray-200 rounded-sm">
+                                        <span class="absolute left-3 top-1 text-black font-bold text-[10px] uppercase pointer-events-none z-10">DATE</span>
+                                        <input type="date" v-model="heatIndexReport.from" class="w-full h-full bg-transparent border-none text-gray-500 text-sm focus:ring-0 block px-2.5 pt-4 font-bold" />
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center gap-2">
+                                    <span class="text-gray-400 font-bold text-sm uppercase">TO</span>
+                                    <div class="relative w-48 h-[50px] bg-white border border-gray-200 rounded-sm">
+                                        <span class="absolute left-3 top-1 text-black font-bold text-[10px] uppercase pointer-events-none z-10">DATE</span>
+                                        <input type="date" v-model="heatIndexReport.to" class="w-full h-full bg-transparent border-none text-gray-500 text-sm focus:ring-0 block px-2.5 pt-4 font-bold" />
+                                    </div>
+                                </div>
+                            </template>
+
+                            <button 
+                                @click="generateReport" 
+                                :disabled="isGenerating"
+                                class="ml-auto bg-blue-900 hover:bg-blue-800 disabled:bg-gray-400 text-white px-8 py-2.5 rounded-sm font-bold uppercase tracking-wider text-sm transition-colors flex items-center gap-2"
+                            >
+                                <span v-if="isGenerating" class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
+                                {{ isGenerating ? 'Generating...' : 'Generate' }}
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Water Level Sensor Data Report -->
+                    <div v-if="selectedReport === 'Water Level'" class="space-y-4">
+                        <h3 class="text-xl font-bold text-gray-800 uppercase flex items-center gap-4">
+                            Water Level
+                            <span class="text-sm font-normal italic text-gray-600 opacity-50 capitalize">Select sensor and date range</span>
+                        </h3>
+                        <div class="flex flex-wrap gap-4 items-center">
+                            <select v-model="waterLevelReport.sensor" class="w-64 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+                                <option value="" disabled selected>SELECT SENSOR</option>
+                                <option value="All">All Sensors</option>
+                                <option v-for="sensor in sensors" :key="sensor.id" :value="sensor.name">{{ sensor.name }}</option>
+                            </select>
+
+                            <select v-model="waterLevelReportType" class="w-48 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+                                <option value="Monthly">Monthly</option>
+                                <option value="Date Range">Date Range</option>
+                            </select>
+
+                            <template v-if="waterLevelReportType === 'Monthly'">
+                                <select v-model="waterLevelReport.month" class="w-48 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+                                    <option value="" disabled selected>SELECT MONTH</option>
+                                    <option v-for="m in months" :key="m" :value="m">{{ m }}</option>
+                                </select>
+
+                                  <select v-model="waterLevelReport.year" class="w-48 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+                                    <option value="" disabled selected>SELECT YEAR</option>
+                                    <option v-for="y in waterLevelYears" :key="y" :value="y">{{ y }}</option>
+                                </select>
+                            </template>
+
+                            <template v-else>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-gray-400 font-bold text-sm uppercase">FROM</span>
+                                    <div class="relative w-48 h-[50px] bg-white border border-gray-200 rounded-sm">
+                                        <span class="absolute left-3 top-1 text-black font-bold text-[10px] uppercase pointer-events-none z-10">DATE</span>
+                                        <input type="date" v-model="waterLevelReport.from" class="w-full h-full bg-transparent border-none text-gray-500 text-sm focus:ring-0 block px-2.5 pt-4 font-bold" />
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center gap-2">
+                                    <span class="text-gray-400 font-bold text-sm uppercase">TO</span>
+                                    <div class="relative w-48 h-[50px] bg-white border border-gray-200 rounded-sm">
+                                        <span class="absolute left-3 top-1 text-black font-bold text-[10px] uppercase pointer-events-none z-10">DATE</span>
+                                        <input type="date" v-model="waterLevelReport.to" class="w-full h-full bg-transparent border-none text-gray-500 text-sm focus:ring-0 block px-2.5 pt-4 font-bold" />
+                                    </div>
+                                </div>
+                            </template>
+
+                            <button 
+                                @click="generateReport" 
+                                :disabled="isGenerating"
+                                class="ml-auto bg-blue-900 hover:bg-blue-800 disabled:bg-gray-400 text-white px-8 py-2.5 rounded-sm font-bold uppercase tracking-wider text-sm transition-colors flex items-center gap-2"
+                            >
+                                <span v-if="isGenerating" class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
+                                {{ isGenerating ? 'Generating...' : 'Generate' }}
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Graphical Reports -->
+                    <div class="space-y-8 pt-8">
+                        <!-- Rain Chart -->
+                        <div v-if="selectedReport === 'Rain'" class="space-y-2">
+                            <div class="flex justify-between items-center">
+                                <h4 class="font-bold text-gray-600 uppercase text-sm">Accumulated Rain Graph</h4>
                             </div>
-                            <div class="text-gray-600 dark:text-gray-400">
-                                <span :class="{
-                                    'px-2 py-1 text-xs font-semibold rounded-full': true,
-                                    'bg-green-100 text-green-800': sensor.state === 1,
-                                    'bg-red-100 text-red-800': sensor.state === 0,
-                                    'bg-gray-100 text-gray-800': sensor.state !== 1 && sensor.state !== 0
-                                }">
-                                    {{ sensor.state === 1 ? 'Active' : (sensor.state === 0 ? 'Inactive' : sensor.state) }}
-                                </span>
-                            </div>
-                            <div class="flex justify-center space-x-2">
-                                <Link 
-                                    :href="route('water-level-sensors.edit', sensor.id)"
-                                    class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
-                                >
-                                    Edit
-                                </Link>
-                                <button
-                                    @click="confirmSensorDeletion(sensor)"
-                                    class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                                >
-                                    Delete
-                                </button>
+                            <div class="bg-white p-4 rounded-sm border border-gray-100 h-[300px] w-full" ref="rainChartDiv"></div>
+                            <div class="text-center text-xs font-bold text-gray-400 uppercase">Month</div>
+
+                            <!-- Rain Results Table -->
+                            <div v-if="rainRecords.length > 0" class="bg-white border border-gray-200 rounded-sm overflow-hidden mt-8">
+                                <div class="flex justify-between items-center py-2 px-4 border-b border-gray-100">
+                                    <h4 class="font-bold text-gray-600 uppercase text-sm">Rain Data Table</h4>
+                                    <button 
+                                        @click="exportToExcel" 
+                                        class="bg-green-700 hover:bg-green-600 text-white px-4 py-1.5 rounded-sm font-bold uppercase tracking-wider text-[10px] transition-colors flex items-center gap-2"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        Export Data
+                                    </button>
+                                </div>
+                                <table class="w-full text-left">
+                                    <thead class="bg-gray-100 border-b border-gray-200">
+                                        <tr>
+                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">No.</th>
+                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">Station Name</th>
+                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Rate (mm/h)</th>
+                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Total (mm)</th>
+                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-right">Date & Time</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-100">
+                                        <tr v-for="(record, index) in paginatedRainRecords" :key="index" class="hover:bg-gray-50 transition-colors">
+                                            <td class="px-4 py-3 text-sm text-gray-500 font-bold font-mono">{{ (currentPage - 1) * itemsPerPage + index + 1 }}</td>
+                                            <td class="px-4 py-3 text-sm text-gray-800 font-bold uppercase tracking-wider">{{ record.station_name }}</td>
+                                            <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">{{ record.precipitation_rate }}</td>
+                                            <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">{{ record.precipitation_total }}</td>
+                                            <td class="px-4 py-3 text-sm text-gray-500 font-bold text-right">
+                                                {{ new Date(record.date_time).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) }}
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+
+                                <!-- Pagination Controls -->
+                                <div v-if="rainTotalPages > 1" class="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-100">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Page {{ currentPage }} of {{ rainTotalPages }}</span>
+                                        <span class="text-[10px] text-gray-300 font-bold uppercase tracking-widest">({{ rainRecords.length }} records)</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <button 
+                                            @click="currentPage--" 
+                                            :disabled="currentPage === 1"
+                                            class="p-1 rounded-sm bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                                            </svg>
+                                        </button>
+                                        <button 
+                                            @click="currentPage++" 
+                                            :disabled="currentPage === rainTotalPages"
+                                            class="p-1 rounded-sm bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
-                        <div v-if="props.sensors.length === 0" class="w-full py-10 text-center text-gray-500 dark:text-gray-400 text-xl font-medium">
-                            No sensors found. <Link :href="route('water-level-sensors.create')" class="text-indigo-600 hover:text-indigo-500 underline">Add one now</Link>.
+                        <!-- Heat Index Chart -->
+                        <div v-if="selectedReport === 'Heat Index'" class="space-y-2">
+                            <div class="flex justify-between items-center">
+                                <h4 class="font-bold text-gray-600 uppercase text-sm">Heat Index</h4>
+                            </div>
+                            <div class="bg-white p-4 rounded-sm border border-gray-100 h-[300px] w-full" ref="heatIndexChartDiv"></div>
+                            <div class="text-center text-xs font-bold text-gray-400 uppercase">Month</div>
+
+                            <!-- Heat Index Results Table -->
+                            <div v-if="heatIndexRecords.length > 0" class="bg-white border border-gray-200 rounded-sm overflow-hidden mt-8">
+                                <div class="flex justify-between items-center py-2 px-4 border-b border-gray-100">
+                                    <h4 class="font-bold text-gray-600 uppercase text-sm">Heat Index Data Table</h4>
+                                    <button 
+                                        @click="exportToExcel" 
+                                        class="bg-green-700 hover:bg-green-600 text-white px-4 py-1.5 rounded-sm font-bold uppercase tracking-wider text-[10px] transition-colors flex items-center gap-2"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        Export Data
+                                    </button>
+                                </div>
+                                <table class="w-full text-left">
+                                    <thead class="bg-gray-100 border-b border-gray-200">
+                                        <tr>
+                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">No.</th>
+                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">Station Name</th>
+                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Temp (°C)</th>
+                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Humidity (%)</th>
+                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Heat Index (°C)</th>
+                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-right">Date & Time</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-100">
+                                        <tr v-for="(record, index) in paginatedHeatIndexRecords" :key="index" class="hover:bg-gray-50 transition-colors">
+                                            <td class="px-4 py-3 text-sm text-gray-500 font-bold font-mono">{{ (currentPage - 1) * itemsPerPage + index + 1 }}</td>
+                                            <td class="px-4 py-3 text-sm text-gray-800 font-bold uppercase tracking-wider">{{ record.station_name }}</td>
+                                            <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">{{ record.temperature }}</td>
+                                            <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">{{ record.humidity }}%</td>
+                                            <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">
+                                                <span class="bg-orange-50 text-orange-700 px-2 py-1 rounded text-xs font-bold">
+                                                    {{ record.heat_index }}°C
+                                                </span>
+                                            </td>
+                                            <td class="px-4 py-3 text-sm text-gray-500 font-bold text-right">
+                                                {{ new Date(record.date_time).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) }}
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+
+                                <!-- Pagination Controls -->
+                                <div v-if="heatIndexTotalPages > 1" class="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-100">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Page {{ currentPage }} of {{ heatIndexTotalPages }}</span>
+                                        <span class="text-[10px] text-gray-300 font-bold uppercase tracking-widest">({{ heatIndexRecords.length }} records)</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <button 
+                                            @click="currentPage--" 
+                                            :disabled="currentPage === 1"
+                                            class="p-1 rounded-sm bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                                            </svg>
+                                        </button>
+                                        <button 
+                                            @click="currentPage++" 
+                                            :disabled="currentPage === heatIndexTotalPages"
+                                            class="p-1 rounded-sm bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
+
+                        <!-- Water Level Chart -->
+                        <div v-if="selectedReport === 'Water Level'" class="space-y-6">
+                            <div class="space-y-2">
+                                <div class="flex justify-between items-center">
+                                    <h4 class="font-bold text-gray-600 uppercase text-sm">Water Level Data Graph</h4>
+                                </div>
+                                <div class="bg-white p-4 rounded-sm border border-gray-100 h-[300px] w-full" ref="waterLevelChartDiv"></div>
+                                <div class="text-center text-xs font-bold text-gray-800 uppercase">Timestamp</div>
+                            </div>
+
+                            <!-- Results Table -->
+                            <div v-if="waterLevelRecords.length > 0" class="bg-white border border-gray-200 rounded-sm overflow-hidden">
+                                <div class="flex justify-between items-center py-2 px-4">
+                                    <h4 class="font-bold text-gray-600 uppercase text-sm">Water Level Data Table</h4>
+                                    <button 
+                                        @click="exportToExcel" 
+                                        class="bg-green-700 hover:bg-green-600 text-white px-4 py-1.5 rounded-sm font-bold uppercase tracking-wider text-[10px] transition-colors flex items-center gap-2"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        Export Data
+                                    </button>
+                                </div>
+                                <table class="w-full text-left">
+                                    <thead class="bg-gray-100 border-b border-gray-200">
+                                        <tr>
+                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">No.</th>
+                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">Sensor Name</th>
+                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Water Level (m)</th>
+                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-right">Date & Time</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-100">
+                                        <tr v-for="(record, index) in paginatedWaterLevelRecords" :key="index" class="hover:bg-gray-50 transition-colors">
+                                            <td class="px-4 py-3 text-sm text-gray-500 font-bold font-mono">{{ (currentPage - 1) * itemsPerPage + index + 1 }}</td>
+                                            <td class="px-4 py-3 text-sm text-gray-800 font-bold uppercase tracking-wider">{{ record.sensor_name }}</td>
+                                            <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">
+                                                <span class="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs">
+                                                    {{ record.water_level }}m
+                                                </span>
+                                            </td>
+                                            <td class="px-4 py-3 text-sm text-gray-500 font-bold text-right">
+                                                {{ new Date(record.date_time).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) }}
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+
+                                <!-- Pagination Controls -->
+                                <div v-if="waterLevelTotalPages > 1" class="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-100">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Page {{ currentPage }} of {{ waterLevelTotalPages }}</span>
+                                        <span class="text-[10px] text-gray-300 font-bold uppercase tracking-widest">({{ waterLevelRecords.length }} records)</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <button 
+                                            @click="currentPage--" 
+                                            :disabled="currentPage === 1"
+                                            class="p-1 rounded-sm bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                                            </svg>
+                                        </button>
+                                        <button 
+                                            @click="currentPage++" 
+                                            :disabled="currentPage === waterLevelTotalPages"
+                                            class="p-1 rounded-sm bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             </div>
         </div>
-
-        <WaterLevelSensorModal
-            :show="showingModal"
-            :sensor="activeSensor"
-            :locations="props.locations || []"
-            @close="closeModal"
-        />
-
-        <ConfirmationModal :show="confirmingSensorDeletion" @close="closeDeleteModal">
-            <template #title>
-                Delete Water Level Sensor
-            </template>
-
-            <template #content>
-                Are you sure you want to delete this water level sensor? This action cannot be undone.
-            </template>
-
-            <template #footer>
-                <SecondaryButton @click="closeDeleteModal">
-                    Cancel
-                </SecondaryButton>
-
-                <DangerButton
-                    class="ms-3"
-                    @click="deleteSensor"
-                >
-                    Delete Sensor
-                </DangerButton>
-            </template>
-        </ConfirmationModal>
     </AppLayout>
 </template>
