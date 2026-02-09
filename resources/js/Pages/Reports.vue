@@ -56,27 +56,75 @@ const waterLevelThresholds = ref<any>(null);
 const rainRecords = ref<any[]>([]);
 const heatIndexRecords = ref<any[]>([]);
 
+// Tab States
+const waterLevelActiveTab = ref('');
+const rainActiveTab = ref('');
+const heatIndexActiveTab = ref('');
+
+// Tab Lists
+const waterLevelTabs = computed(() => {
+    const sensors = [...new Set(waterLevelRecords.value.map(r => r.sensor_name))];
+    return sensors.sort();
+});
+
+const rainTabs = computed(() => {
+    const stations = [...new Set(rainRecords.value.map(r => r.station_name))];
+    return stations.sort();
+});
+
+const heatIndexTabs = computed(() => {
+    const stations = [...new Set(heatIndexRecords.value.map(r => r.station_name))];
+    return stations.sort();
+});
+
+// Filtered Records (based on tab)
+const filteredWaterLevelRecords = computed(() => {
+    if (waterLevelReport.value.sensor !== 'All') return waterLevelRecords.value;
+    if (!waterLevelActiveTab.value && waterLevelTabs.value.length > 0) {
+        // We can't set ref value inside computed directly without causing side effects or infinite loops in some setups,
+        // but Vue 3 usually handles it if it's a simple assignment. However, to be safe:
+        return waterLevelRecords.value.filter(r => r.sensor_name === (waterLevelActiveTab.value || waterLevelTabs.value[0]));
+    }
+    return waterLevelRecords.value.filter(r => r.sensor_name === waterLevelActiveTab.value);
+});
+
+const filteredRainRecords = computed(() => {
+    if (detailRainReport.value.station !== 'All') return rainRecords.value;
+    if (!rainActiveTab.value && rainTabs.value.length > 0) {
+        return rainRecords.value.filter(r => r.station_name === (rainActiveTab.value || rainTabs.value[0]));
+    }
+    return rainRecords.value.filter(r => r.station_name === rainActiveTab.value);
+});
+
+const filteredHeatIndexRecords = computed(() => {
+    if (heatIndexReport.value.station !== 'All') return heatIndexRecords.value;
+    if (!heatIndexActiveTab.value && heatIndexTabs.value.length > 0) {
+        return heatIndexRecords.value.filter(r => r.station_name === (heatIndexActiveTab.value || heatIndexTabs.value[0]));
+    }
+    return heatIndexRecords.value.filter(r => r.station_name === heatIndexActiveTab.value);
+});
+
 // Pagination
 const currentPage = ref(1);
 const itemsPerPage = 17;
 
 const paginatedWaterLevelRecords = computed(() => {
     const start = (currentPage.value - 1) * itemsPerPage;
-    return waterLevelRecords.value.slice(start, start + itemsPerPage);
+    return filteredWaterLevelRecords.value.slice(start, start + itemsPerPage);
 });
-const waterLevelTotalPages = computed(() => Math.ceil(waterLevelRecords.value.length / itemsPerPage));
+const waterLevelTotalPages = computed(() => Math.ceil(filteredWaterLevelRecords.value.length / itemsPerPage));
 
 const paginatedRainRecords = computed(() => {
     const start = (currentPage.value - 1) * itemsPerPage;
-    return rainRecords.value.slice(start, start + itemsPerPage);
+    return filteredRainRecords.value.slice(start, start + itemsPerPage);
 });
-const rainTotalPages = computed(() => Math.ceil(rainRecords.value.length / itemsPerPage));
+const rainTotalPages = computed(() => Math.ceil(filteredRainRecords.value.length / itemsPerPage));
 
 const paginatedHeatIndexRecords = computed(() => {
     const start = (currentPage.value - 1) * itemsPerPage;
-    return heatIndexRecords.value.slice(start, start + itemsPerPage);
+    return filteredHeatIndexRecords.value.slice(start, start + itemsPerPage);
 });
-const heatIndexTotalPages = computed(() => Math.ceil(heatIndexRecords.value.length / itemsPerPage));
+const heatIndexTotalPages = computed(() => Math.ceil(filteredHeatIndexRecords.value.length / itemsPerPage));
 
 let activeChartRoot: am5.Root | null = null;
 
@@ -407,8 +455,8 @@ const initWaterLevelRangeChart = (rootElement: HTMLElement, data: any[], thresho
 
     // 3. Threshold Lines
     if (thresholds) {
-        const thresholdColors = [0xff5b5b, 0xffa500, 0xffff00]; // Red, Orange, Yellow
-        const thresholdLabels = ["Critical (Level 2)", "Warning (Level 3)", "Notice (Level 4)"];
+        const thresholdColors = [0xffff00, 0xffa500, 0xff5b5b]; // Yellow, Orange, Red
+        const thresholdLabels = ["Notice (Level 2)", "Warning (Level 3)", "Critical (Level 4)"];
         const levels = ["level_2", "level_3", "level_4"];
 
         levels.forEach((level, index) => {
@@ -1039,6 +1087,9 @@ const handleWeatherReport = async () => {
 const generateReport = async () => {
     clearCharts();
     isGenerating.value = true;
+    rainActiveTab.value = '';
+    heatIndexActiveTab.value = '';
+    waterLevelActiveTab.value = '';
     currentPage.value = 1;
     hasSearched.value = true;
 
@@ -1070,6 +1121,9 @@ watch(selectedReport, () => {
     clearCharts();
     currentPage.value = 1;
     hasSearched.value = false;
+    rainActiveTab.value = '';
+    heatIndexActiveTab.value = '';
+    waterLevelActiveTab.value = '';
 });
 
 onMounted(() => {
@@ -1146,11 +1200,33 @@ const exportToExcel = () => {
 
     if (records.length === 0) return;
 
-    const exportData = records.map((record, index) => headers(record, index));
-
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+
+    const isAll = (selectedReport.value === 'Water Level' && waterLevelReport.value.sensor === 'All') ||
+                  (selectedReport.value === 'Rain' && detailRainReport.value.station === 'All') ||
+                  (selectedReport.value === 'Heat Index' && heatIndexReport.value.station === 'All');
+
+    if (isAll) {
+        const groupKey = selectedReport.value === 'Water Level' ? 'sensor_name' : 'station_name';
+        const groups = records.reduce((acc: any, record: any) => {
+            const key = record[groupKey] || 'Unknown';
+            if (!acc[key]) acc[key] = [];
+            acc[key].push(record);
+            return acc;
+        }, {});
+
+        Object.entries(groups).forEach(([name, groupRecords]: [string, any]) => {
+            const exportData = groupRecords.map((record: any, index: number) => headers(record, index));
+            const worksheet = XLSX.utils.json_to_sheet(exportData);
+            // Excel sheet names: max 31 chars, no invalid chars: \ / ? * [ ]
+            const safeName = name.substring(0, 31).replace(/[\[\]\*\?\/\\]/g, '');
+            XLSX.utils.book_append_sheet(workbook, worksheet, safeName || 'Data');
+        });
+    } else {
+        const exportData = records.map((record, index) => headers(record, index));
+        const worksheet = XLSX.utils.json_to_sheet(exportData);
+        XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+    }
 
     // Dynamic Suffix based on selection
     let suffix = '';
@@ -1268,9 +1344,9 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
             </div>
         </template>
 
-        <div class="pt-0 mb-12">
+        <div class="pt-0 mb-16">
             <div class="w-full space-y-12">
-                <div class="bg-gray-200/[0.25] p-8 pt-2 mb-6 h-dvh">
+                <div class="bg-gray-200/[0.25] p-8 pt-2 mb-6 h-full">
                     <!-- Report Selection Header -->
                      <div class="flex justify-between items-center mb-4 border-b border-gray-100 pb-2">
                         <div class="flex items-center space-x-4">
@@ -1464,7 +1540,7 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                     </div>
                     
                     <!-- Graphical Reports -->
-                    <div v-if="rainRecords.length > 0 || heatIndexRecords.length > 0 || waterLevelRecords.length > 0" class="space-y-8 pt-8">
+                    <div v-if="rainRecords.length > 0 || heatIndexRecords.length > 0 || waterLevelRecords.length > 0" class="space-y-8 pt-8 mb-12">
                         <!-- Rain Chart -->
                         <div v-show="selectedReport === 'Rain' && rainRecords.length > 0" class="space-y-2">
                             <div class="flex justify-between items-center">
@@ -1497,11 +1573,29 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                                     </button>
                                 </div>
 
+                                <!-- Rain Tab Navigation -->
+                                <div v-if="detailRainReport.station === 'All' && rainTabs.length > 1" class="flex flex-wrap gap-2 border-b border-gray-100 px-4 pt-2 bg-gray-50/30">
+                                    <button 
+                                        v-for="tab in rainTabs" 
+                                        :key="tab"
+                                        @click="rainActiveTab = tab; currentPage = 1"
+                                        :class="[
+                                            'px-6 py-2.5 text-[10px] font-bold uppercase tracking-widest transition-all relative',
+                                            (rainActiveTab || rainTabs[0]) === tab 
+                                                ? 'text-blue-600' 
+                                                : 'text-gray-400 hover:text-gray-600'
+                                        ]"
+                                    >
+                                        {{ tab }}
+                                        <div v-if="(rainActiveTab || rainTabs[0]) === tab" class="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600"></div>
+                                    </button>
+                                </div>
+
                                 <!-- Top Pagination Controls -->
                                 <div v-if="rainTotalPages > 1" class="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
                                     <div class="flex items-center gap-2">
                                         <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Page {{ currentPage }} of {{ rainTotalPages }}</span>
-                                        <span class="text-[10px] text-gray-300 font-bold uppercase tracking-widest">({{ rainRecords.length }} records)</span>
+                                        <span class="text-[10px] text-gray-300 font-bold uppercase tracking-widest">({{ filteredRainRecords.length }} records)</span>
                                     </div>
                                     <div class="flex items-center gap-2">
                                         <button 
@@ -1551,7 +1645,7 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                                 <div v-if="rainTotalPages > 1" class="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-100">
                                     <div class="flex items-center gap-2">
                                         <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Page {{ currentPage }} of {{ rainTotalPages }}</span>
-                                        <span class="text-[10px] text-gray-300 font-bold uppercase tracking-widest">({{ rainRecords.length }} records)</span>
+                                        <span class="text-[10px] text-gray-300 font-bold uppercase tracking-widest">({{ filteredRainRecords.length }} records)</span>
                                     </div>
                                     <div class="flex items-center gap-2">
                                         <button 
@@ -1609,11 +1703,29 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                                     </button>
                                 </div>
 
+                                <!-- Heat Index Tab Navigation -->
+                                <div v-if="heatIndexReport.station === 'All' && heatIndexTabs.length > 1" class="flex flex-wrap gap-2 border-b border-gray-100 px-4 pt-2 bg-gray-50/30">
+                                    <button 
+                                        v-for="tab in heatIndexTabs" 
+                                        :key="tab"
+                                        @click="heatIndexActiveTab = tab; currentPage = 1"
+                                        :class="[
+                                            'px-6 py-2.5 text-[10px] font-bold uppercase tracking-widest transition-all relative',
+                                            (heatIndexActiveTab || heatIndexTabs[0]) === tab 
+                                                ? 'text-blue-600' 
+                                                : 'text-gray-400 hover:text-gray-600'
+                                        ]"
+                                    >
+                                        {{ tab }}
+                                        <div v-if="(heatIndexActiveTab || heatIndexTabs[0]) === tab" class="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600"></div>
+                                    </button>
+                                </div>
+
                                 <!-- Top Pagination Controls -->
                                 <div v-if="heatIndexTotalPages > 1" class="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
                                     <div class="flex items-center gap-2">
                                         <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Page {{ currentPage }} of {{ heatIndexTotalPages }}</span>
-                                        <span class="text-[10px] text-gray-300 font-bold uppercase tracking-widest">({{ heatIndexRecords.length }} records)</span>
+                                        <span class="text-[10px] text-gray-300 font-bold uppercase tracking-widest">({{ filteredHeatIndexRecords.length }} records)</span>
                                     </div>
                                     <div class="flex items-center gap-2">
                                         <button 
@@ -1669,7 +1781,7 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                                 <div v-if="heatIndexTotalPages > 1" class="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-100">
                                     <div class="flex items-center gap-2">
                                         <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Page {{ currentPage }} of {{ heatIndexTotalPages }}</span>
-                                        <span class="text-[10px] text-gray-300 font-bold uppercase tracking-widest">({{ heatIndexRecords.length }} records)</span>
+                                        <span class="text-[10px] text-gray-300 font-bold uppercase tracking-widest">({{ filteredHeatIndexRecords.length }} records)</span>
                                     </div>
                                     <div class="flex items-center gap-2">
                                         <button 
@@ -1729,11 +1841,29 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                                     </button>
                                 </div>
 
+                                <!-- Water Level Tab Navigation -->
+                                <div v-if="waterLevelReport.sensor === 'All' && waterLevelTabs.length > 1" class="flex flex-wrap gap-2 border-b border-gray-100 px-4 pt-2 bg-gray-50/30">
+                                    <button 
+                                        v-for="tab in waterLevelTabs" 
+                                        :key="tab"
+                                        @click="waterLevelActiveTab = tab; currentPage = 1"
+                                        :class="[
+                                            'px-6 py-2.5 text-[10px] font-bold uppercase tracking-widest transition-all relative',
+                                            (waterLevelActiveTab || waterLevelTabs[0]) === tab 
+                                                ? 'text-blue-600' 
+                                                : 'text-gray-400 hover:text-gray-600'
+                                        ]"
+                                    >
+                                        {{ tab }}
+                                        <div v-if="(waterLevelActiveTab || waterLevelTabs[0]) === tab" class="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600"></div>
+                                    </button>
+                                </div>
+
                                 <!-- Top Pagination Controls -->
                                 <div v-if="waterLevelTotalPages > 1" class="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
                                     <div class="flex items-center gap-2">
                                         <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Page {{ currentPage }} of {{ waterLevelTotalPages }}</span>
-                                        <span class="text-[10px] text-gray-300 font-bold uppercase tracking-widest">({{ waterLevelRecords.length }} records)</span>
+                                        <span class="text-[10px] text-gray-300 font-bold uppercase tracking-widest">({{ filteredWaterLevelRecords.length }} records)</span>
                                     </div>
                                     <div class="flex items-center gap-2">
                                         <button 
@@ -1785,7 +1915,7 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                                 <div v-if="waterLevelTotalPages > 1" class="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-100">
                                     <div class="flex items-center gap-2">
                                         <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Page {{ currentPage }} of {{ waterLevelTotalPages }}</span>
-                                        <span class="text-[10px] text-gray-300 font-bold uppercase tracking-widest">({{ waterLevelRecords.length }} records)</span>
+                                        <span class="text-[10px] text-gray-300 font-bold uppercase tracking-widest">({{ filteredWaterLevelRecords.length }} records)</span>
                                     </div>
                                     <div class="flex items-center gap-2">
                                         <button 
