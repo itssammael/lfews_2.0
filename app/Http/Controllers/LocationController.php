@@ -14,8 +14,9 @@ class LocationController extends Controller
      */
     public function create()
     {
+        \Illuminate\Support\Facades\Gate::authorize('manage-data');
         $locationTypes = LocationType::all();
-        
+
         return Inertia::render('Locations/Create', [
             'locationTypes' => $locationTypes,
         ]);
@@ -26,6 +27,7 @@ class LocationController extends Controller
      */
     public function store(Request $request)
     {
+        \Illuminate\Support\Facades\Gate::authorize('manage-data');
         $validated = $request->validate([
             'latitude' => 'required|numeric',
             'longitude' => 'required|numeric',

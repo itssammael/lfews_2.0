@@ -19,6 +19,16 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        \Illuminate\Support\Facades\Gate::define('admin-only', function ($user) {
+            return $user->roles->contains('name', 'admin');
+        });
+
+        \Illuminate\Support\Facades\Gate::define('manage-data', function ($user) {
+            return $user->roles->contains('name', 'admin') || $user->roles->contains('name', 'cmdcenter');
+        });
+
+        \Illuminate\Support\Facades\Gate::define('view-only', function ($user) {
+            return true; // All authenticated users can view
+        });
     }
 }

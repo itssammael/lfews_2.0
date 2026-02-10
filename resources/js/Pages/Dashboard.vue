@@ -198,7 +198,7 @@ onUnmounted(() => {
                                 Water Level Sensors Data
                             </h3>
                             
-                            <div class="flex items-center space-x-4">
+                            <div v-if="$page.props.auth.can.admin" class="flex items-center space-x-4">
                                 <div class="flex items-center">
                                     <Checkbox 
                                         id="auto-pull" 
@@ -270,7 +270,7 @@ onUnmounted(() => {
                                     Weather Stations Observation Data
                                 </h3>
                                 
-                                <div class="flex items-center space-x-4">
+                                <div v-if="$page.props.auth.can.manage" class="flex items-center space-x-4">
                                     <div class="flex items-center">
                                         <Checkbox 
                                             id="auto-weather-pull" 

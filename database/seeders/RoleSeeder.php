@@ -15,8 +15,8 @@ class RoleSeeder extends Seeder
     {
         $roles = [
             ['name' => 'admin', 'description' => 'Administrator with full access'],
-            ['name' => 'editor', 'description' => 'Editor with content management access'],
-            ['name' => 'user', 'description' => 'Regular user'],
+            ['name' => 'cmdcenter', 'description' => 'CMD Center with view/edit but not delete access and download access'],
+            ['name' => 'user', 'description' => 'Regular user with view and download access'],
         ];
 
         foreach ($roles as $role) {

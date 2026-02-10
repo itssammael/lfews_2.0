@@ -54,7 +54,10 @@ const deleteRiver = (river: any) => {
                         <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
                             Rivers List
                         </h3>
-                        <PrimaryButton @click="openCreateModal">
+                        <PrimaryButton 
+                            v-if="$page.props.auth.can.manage"
+                            @click="openCreateModal"
+                        >
                             Add River
                         </PrimaryButton>
                     </div>
@@ -83,10 +86,17 @@ const deleteRiver = (river: any) => {
                                         <pre class="text-xs overflow-auto max-w-xs max-h-20">{{ JSON.stringify(river.properties, null, 2) }}</pre>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <SecondaryButton @click="openEditModal(river)" class="mr-2">
+                                        <SecondaryButton 
+                                            v-if="$page.props.auth.can.manage"
+                                            @click="openEditModal(river)" 
+                                            class="mr-2"
+                                        >
                                             Edit
                                         </SecondaryButton>
-                                        <DangerButton @click="deleteRiver(river)">
+                                        <DangerButton 
+                                            v-if="$page.props.auth.can.admin"
+                                            @click="deleteRiver(river)"
+                                        >
                                             Delete
                                         </DangerButton>
                                     </td>

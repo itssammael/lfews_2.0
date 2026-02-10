@@ -20,6 +20,8 @@ const form = useForm({
     photo: null,
 });
 
+const userRoles = props.user.roles ? props.user.roles.map(r => r.toUpperCase()).join(', ') : '';
+
 const verificationLinkSent = ref(null);
 const photoPreview = ref(null);
 const photoInput = ref(null);
@@ -112,12 +114,12 @@ const clearPhotoFileInput = () => {
                     />
                 </div>
 
-                <SecondaryButton class="mt-2 me-2" type="button" @click.prevent="selectNewPhoto">
+                <SecondaryButton v-if="$page.props.auth.can.admin" class="mt-2 me-2" type="button" @click.prevent="selectNewPhoto">
                     Select A New Photo
                 </SecondaryButton>
 
                 <SecondaryButton
-                    v-if="user.profile_photo_path"
+                    v-if="$page.props.auth.can.admin && user.profile_photo_path"
                     type="button"
                     class="mt-2"
                     @click.prevent="deletePhoto"
@@ -136,6 +138,8 @@ const clearPhotoFileInput = () => {
                     v-model="form.name"
                     type="text"
                     class="mt-1 block w-full"
+                    :class="{ 'bg-gray-100 dark:bg-gray-700 opacity-75 cursor-not-allowed': !$page.props.auth.can.admin }"
+                    :readonly="!$page.props.auth.can.admin"
                     required
                     autocomplete="name"
                 />
@@ -150,6 +154,8 @@ const clearPhotoFileInput = () => {
                     v-model="form.email"
                     type="email"
                     class="mt-1 block w-full"
+                    :class="{ 'bg-gray-100 dark:bg-gray-700 opacity-75 cursor-not-allowed': !$page.props.auth.can.admin }"
+                    :readonly="!$page.props.auth.can.admin"
                     required
                     autocomplete="username"
                 />
@@ -175,9 +181,21 @@ const clearPhotoFileInput = () => {
                     </div>
                 </div>
             </div>
+
+            <!-- Role -->
+            <div class="col-span-6 sm:col-span-4">
+                <InputLabel for="role" value="Role" />
+                <TextInput
+                    id="role"
+                    v-model="userRoles"
+                    type="text"
+                    class="mt-1 block w-full bg-gray-100 dark:bg-gray-700 opacity-75 cursor-not-allowed uppercase"
+                    readonly
+                />
+            </div>
         </template>
 
-        <template #actions>
+        <template v-if="$page.props.auth.can.admin" #actions>
             <ActionMessage :on="form.recentlySuccessful" class="me-3">
                 Saved.
             </ActionMessage>

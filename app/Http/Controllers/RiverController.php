@@ -20,6 +20,7 @@ class RiverController extends Controller
 
     public function store(Request $request)
     {
+        \Illuminate\Support\Facades\Gate::authorize('manage-data');
         $request->validate([
             'name' => 'required|string',
             'properties' => 'nullable|array',
@@ -33,6 +34,7 @@ class RiverController extends Controller
 
     public function update(Request $request, River $river)
     {
+        \Illuminate\Support\Facades\Gate::authorize('manage-data');
         $request->validate([
             'name' => 'required|string',
             'properties' => 'nullable|array',
@@ -46,6 +48,7 @@ class RiverController extends Controller
 
     public function destroy(River $river)
     {
+        \Illuminate\Support\Facades\Gate::authorize('admin-only');
         $river->delete();
         return redirect()->route('rivers.index')->with('success', 'River deleted successfully.');
     }

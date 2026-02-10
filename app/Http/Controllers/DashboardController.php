@@ -10,7 +10,7 @@ class DashboardController extends Controller
 {
     public function index()
     {
-      
+
         return Inertia::render('Dashboard', [
             'sensors' => \App\Models\WaterLevelSensor::all(),
             'stations' => \App\Models\WeatherStation::all(),
@@ -23,7 +23,8 @@ class DashboardController extends Controller
 
     public function pullWeatherData()
     {
-       
+        \Illuminate\Support\Facades\Gate::authorize('manage-data');
+
         $weatherStationController = new WeatherStationController();
         $results = $weatherStationController->pullObservationData();
 
@@ -32,6 +33,7 @@ class DashboardController extends Controller
 
     public function pullWaterData(ModbusService $modbusService)
     {
+        \Illuminate\Support\Facades\Gate::authorize('manage-data');
         $waterLevelSensorController = new WaterLevelSensorController();
         $results = $waterLevelSensorController->pullWaterData($modbusService);
 

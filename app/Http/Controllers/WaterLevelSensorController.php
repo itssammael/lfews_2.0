@@ -19,7 +19,7 @@ class WaterLevelSensorController extends Controller
     {
         $sensors = WaterLevelSensor::with(['location', 'location.locationType'])->get();
         // Assuming we want to show location description in the table, we fetch it with relation.
-        
+
         return \Inertia\Inertia::render('WaterLevelSensors', [
             'sensors' => $sensors,
             'showCreateModal' => false,
@@ -35,6 +35,7 @@ class WaterLevelSensorController extends Controller
      */
     public function create()
     {
+        \Illuminate\Support\Facades\Gate::authorize('manage-data');
         $sensors = WaterLevelSensor::with(['location', 'location.locationType'])->get();
         $locations = Location::with('locationType')->get(); // Fetch locations for dropdown if needed or just for data
 
@@ -54,6 +55,7 @@ class WaterLevelSensorController extends Controller
      */
     public function store(Request $request)
     {
+        \Illuminate\Support\Facades\Gate::authorize('manage-data');
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'brand' => 'required|string|max:255',
@@ -75,7 +77,7 @@ class WaterLevelSensorController extends Controller
                 'longitude' => $validated['long'],
                 'location_type_id' => 2, // location_type_id = 2 for Device Sensors
             ]);
-            
+
             WaterLevelSensor::create([
                 'name' => $validated['name'],
                 'brand' => $validated['brand'],
@@ -105,6 +107,7 @@ class WaterLevelSensorController extends Controller
 
     public function edit(string $id)
     {
+        \Illuminate\Support\Facades\Gate::authorize('manage-data');
         $sensor = WaterLevelSensor::find($id);
 
         if (!$sensor) {
@@ -114,7 +117,7 @@ class WaterLevelSensorController extends Controller
         // Attach location coords to sensor object for edit form
         $location = Location::find($sensor->location_id);
         if ($location) {
-             $sensor->location = ['latitude' => $location->latitude, 'longitude' => $location->longitude];
+            $sensor->location = ['latitude' => $location->latitude, 'longitude' => $location->longitude];
         }
 
         $sensors = WaterLevelSensor::with(['location', 'location.locationType'])->get();
@@ -136,6 +139,7 @@ class WaterLevelSensorController extends Controller
      */
     public function update(Request $request, WaterLevelSensor $waterLevelSensor)
     {
+        \Illuminate\Support\Facades\Gate::authorize('manage-data');
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'brand' => 'required|string|max:255',
@@ -162,7 +166,7 @@ class WaterLevelSensorController extends Controller
             }
 
             $waterLevelSensor->update([
-                 'name' => $validated['name'],
+                'name' => $validated['name'],
                 'brand' => $validated['brand'],
                 'mode' => $validated['mode'],
                 'level_2' => $validated['level_2'],
@@ -172,7 +176,7 @@ class WaterLevelSensorController extends Controller
                 'ip' => $validated['ip'],
                 'port' => $validated['port'],
                 'slave_id' => $validated['slave_id'],
-            
+
             ]);
             return redirect()->route('water-level-sensors')->with('success', 'Water level sensor updated successfully.');
         } catch (\Exception $e) {
@@ -185,6 +189,7 @@ class WaterLevelSensorController extends Controller
      */
     public function destroy(WaterLevelSensor $waterLevelSensor)
     {
+        \Illuminate\Support\Facades\Gate::authorize('admin-only');
         try {
             $waterLevelSensor->delete();
             return redirect()->route('water-level-sensors')->with('success', 'Water level sensor deleted successfully.');
@@ -196,6 +201,7 @@ class WaterLevelSensorController extends Controller
 
     public function pullWaterData(ModbusService $modbusService)
     {
+        \Illuminate\Support\Facades\Gate::authorize('manage-data');
         // Simple lock to prevent concurrent Modbus pulls
         $lockKey = 'modbus_pull_lock';
         if (\Illuminate\Support\Facades\Cache::has($lockKey)) {
@@ -208,7 +214,7 @@ class WaterLevelSensorController extends Controller
 
         try {
             \Illuminate\Support\Facades\Cache::put($lockKey, true, 30); // 30 second lock
-            
+
             // Releasing session lock allows other requests to proceed while we wait for I/O (Modbus)
             if (session_id()) {
                 session_write_close();
@@ -222,10 +228,10 @@ class WaterLevelSensorController extends Controller
                 try {
                     $data = $modbusService->readModbusData(
                         $sensor->ip,
-                        (int)$sensor->port,
+                        (int) $sensor->port,
                         1,
                         6,
-                        (int)$sensor->slave_id,
+                        (int) $sensor->slave_id,
                         1.5
                     );
 
@@ -233,10 +239,10 @@ class WaterLevelSensorController extends Controller
                         'sensor_id' => $sensor->id,
                         'name' => $sensor->name,
                         'success' => true,
-                        'data' => $data[5]/ 10,
+                        'data' => $data[5] / 10,
                         'timestamp' => now()->toDateTimeString(),
                     ];
-                   
+
                 } catch (\Exception $e) {
                     $results[$sensor->id] = [
                         'sensor_id' => $sensor->id,
@@ -253,7 +259,7 @@ class WaterLevelSensorController extends Controller
 
             // Update history
             $history = \Illuminate\Support\Facades\Cache::get('modbus_history', []);
-            
+
             if (empty($history)) {
                 $todayData = WaterLevelSensorData::whereDate('date', Carbon::today())
                     ->orderBy('date_time', 'asc')
@@ -268,29 +274,29 @@ class WaterLevelSensorController extends Controller
                         'value' => $entry->sensor_data,
                         'timestamp' => $entry->date,
                     ];
-                    
+
                 }
             }
 
             foreach ($results as $sensorId => $result) {
-                
+
                 if ($result['success']) {
                     if (!isset($history[$sensorId])) {
                         $history[$sensorId] = [];
                     }
-                    
+
                     $history[$sensorId][] = [
                         'value' => $result['data'],
                         'timestamp' => $result['timestamp']
                     ];
-                    
+
                     // Keep only last 50 points per sensor
                     if (count($history[$sensorId]) > 50) {
                         array_shift($history[$sensorId]);
                     }
                 }
             }
-            
+
             \Illuminate\Support\Facades\Cache::put('modbus_history', $history, 1440); // 24 hours
 
             \Illuminate\Support\Facades\Cache::forget($lockKey);

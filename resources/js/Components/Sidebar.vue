@@ -100,6 +100,7 @@ const showSidebar = ref(false);
              <span :class="{'block': showSidebar, 'hidden': ! showSidebar}">Rivers</span>
         </div>
       </ResponsiveNavLink>
+
       <!-- Add more sidebar links here -->
     </div>
   </aside>

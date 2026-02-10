@@ -4,18 +4,15 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     /**
      * Run the migrations.
      */
     public function up(): void
     {
-        if (!Schema::hasColumn('weather_stations', 'location_id')) {
-            Schema::table('weather_stations', function (Blueprint $table) {
-                $table->foreignId('location_id')->constrained('locations')->onDelete('cascade');
-            });
-        }
+        Schema::table('weather_stations', function (Blueprint $table) {
+            $table->foreignId('location_id')->constrained('locations')->onDelete('cascade');
+        });
     }
 
     /**

@@ -5,6 +5,7 @@ export interface User {
     email_verified_at: string;
     profile_photo_url?: string;
     profile_photo_path?: string;
+    roles?: string[];
 }
 
 export interface JetstreamProps {
@@ -21,6 +22,10 @@ export interface JetstreamProps {
 export type PageProps<T extends Record<string, unknown> = Record<string, unknown>> = T & {
     auth: {
         user: User;
+        can: {
+            admin: boolean;
+            manage: boolean;
+        };
     };
     jetstream: JetstreamProps;
     flash: {

@@ -32,7 +32,7 @@ class HandleInertiaRequests extends Middleware
     {
         return [
             ...parent::share($request),
-            'ziggy' => fn () => [
+            'ziggy' => fn() => [
                 ...(new Ziggy)->toArray(),
                 'location' => $request->url(),
             ],
@@ -42,6 +42,18 @@ class HandleInertiaRequests extends Middleware
                 'warning' => $request->session()->get('warning'),
                 'modbusResult' => $request->session()->get('modbusResult'),
                 'weatherResult' => $request->session()->get('weatherResult'),
+            ],
+            'auth' => [
+                'user' => $request->user() ? [
+                    'id' => $request->user()->id,
+                    'name' => $request->user()->name,
+                    'email' => $request->user()->email,
+                    'roles' => $request->user()->roles->pluck('name'),
+                ] : null,
+                'can' => $request->user() ? [
+                    'admin' => $request->user()->can('admin-only'),
+                    'manage' => $request->user()->can('manage-data'),
+                ] : [],
             ],
         ];
     }
