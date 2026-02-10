@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { router } from '@inertiajs/vue3';
+import { ref } from 'vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import DangerButton from '@/Components/DangerButton.vue';
+import RiverModal from '@/Pages/Rivers/RiverModal.vue';
 
 defineProps({
     rivers: {
@@ -11,6 +13,24 @@ defineProps({
         default: () => [],
     },
 });
+
+const showingRiverModal = ref(false);
+const riverToEdit = ref<any>(null);
+
+const openCreateModal = () => {
+    riverToEdit.value = null;
+    showingRiverModal.value = true;
+};
+
+const openEditModal = (river: any) => {
+    riverToEdit.value = river;
+    showingRiverModal.value = true;
+};
+
+const closeRiverModal = () => {
+    showingRiverModal.value = false;
+    riverToEdit.value = null;
+};
 
 const deleteRiver = (river: any) => {
     if (confirm(`Are you sure you want to delete ${river.name}?`)) {
@@ -34,7 +54,7 @@ const deleteRiver = (river: any) => {
                         <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
                             Rivers List
                         </h3>
-                        <PrimaryButton @click="router.visit(route('rivers.create'))">
+                        <PrimaryButton @click="openCreateModal">
                             Add River
                         </PrimaryButton>
                     </div>
@@ -63,7 +83,7 @@ const deleteRiver = (river: any) => {
                                         <pre class="text-xs overflow-auto max-w-xs max-h-20">{{ JSON.stringify(river.properties, null, 2) }}</pre>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <SecondaryButton @click="router.visit(route('rivers.edit', river.id))" class="mr-2">
+                                        <SecondaryButton @click="openEditModal(river)" class="mr-2">
                                             Edit
                                         </SecondaryButton>
                                         <DangerButton @click="deleteRiver(river)">
@@ -82,5 +102,11 @@ const deleteRiver = (river: any) => {
                 </div>
             </div>
         </div>
+
+        <RiverModal
+            :show="showingRiverModal"
+            :river="riverToEdit"
+            @close="closeRiverModal"
+        />
     </AppLayout>
 </template>
