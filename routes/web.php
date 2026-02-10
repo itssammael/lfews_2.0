@@ -41,4 +41,7 @@ Route::middleware([
     Route::post('/locations', [\App\Http\Controllers\LocationController::class, 'store'])->name('locations.store');
 
     Route::resource('users', \App\Http\Controllers\UserController::class);
+    Route::resource('rivers', \App\Http\Controllers\RiverController::class);
+
+    Route::get('/locator', [\App\Http\Controllers\LocatorController::class, 'index'])->name('locator');
 });

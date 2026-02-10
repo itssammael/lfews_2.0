@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Models\WaterLevelSensorData;
+use Illuminate\Support\Carbon;
 
 class PullModbusData extends Command
 {
@@ -75,7 +76,7 @@ class PullModbusData extends Command
             $history = \Illuminate\Support\Facades\Cache::get('modbus_history', []);
             if (empty($history)) {
                 $todayData = WaterLevelSensorData::whereDate('date', Carbon::today())
-                    ->orderBy('date_time', 'asc')
+                    ->orderBy('date', 'asc')
                     ->limit(50)
                     ->get();
 

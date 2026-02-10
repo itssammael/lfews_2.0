@@ -1,7 +1,6 @@
 <script setup lang="ts">
   import { ref } from 'vue';
 import { Link } from "@inertiajs/vue3";
-import ApplicationMark from "@/Components/ApplicationMark.vue";
 import ResponsiveNavLink from "@/Components/ResponsiveNavLink.vue";
 
 defineProps({
@@ -12,7 +11,7 @@ const showSidebar = ref(false);
 
 <template>
   <aside
-  :class="{'w-64 lg:w-48': showSidebar, 'w-16 lg:w-12': ! showSidebar }"
+  :class="{'w-64 lg:w-48': showSidebar, 'w-24 lg:w-16': ! showSidebar }"
     class="flex flex-col bg-white dark:bg-gray-800 border-r border-gray-100 dark:border-gray-700 min-h-screen"
   >
       <div class="flex items-center justify-center">
@@ -49,26 +48,57 @@ const showSidebar = ref(false);
         :href="route('dashboard')"
         :active="route().current('dashboard')"
       >
-        <span :class="{'inline-block': showSidebar, 'hidden': ! showSidebar}">Dashboard</span><span :class="{'hidden': showSidebar, 'inline-block': ! showSidebar}">  <img src="/images/dashboard.png" alt="Logo" class="w-8" /></span>
+        <div class="flex items-center">
+             <img src="/images/dashboard.png" alt="Dashboard" class="w-8 h-8 mr-2" />
+             <span :class="{'block': showSidebar, 'hidden': ! showSidebar}">Dashboard</span>
+        </div>
       </ResponsiveNavLink>
 
+     
       <ResponsiveNavLink
+        :href="route('reports')"
+        :active="route().current('reports')"
+      >
+        <div class="flex items-center">
+             <img src="/images/report.png" alt="Reports" class="w-8 h-8 mr-2" />
+             <span :class="{'block': showSidebar, 'hidden': ! showSidebar}">Reports</span>
+        </div>
+      </ResponsiveNavLink>
+      <ResponsiveNavLink
+        :href="route('locator')"
+        :active="route().current('locator')"
+      >
+        <div class="flex items-center">
+             <img src="/images/maps.png" alt="Locator" class="w-8 h-8 mr-2" />
+             <span :class="{'block': showSidebar, 'hidden': ! showSidebar}">Locator</span>
+        </div>
+      </ResponsiveNavLink>
+       <ResponsiveNavLink
         :href="route('water-level-sensors')"
         :active="route().current('water-level-sensors')"
       >
-        <span :class="{'inline-block': showSidebar, 'hidden': ! showSidebar}">Water Level Sensors</span><span :class="{'hidden': showSidebar, 'inline-block': ! showSidebar}"><img src="/images/water-level.png" alt="Logo" class="w-8" /></span>
+        <div class="flex items-center">
+             <img src="/images/water-level.png" alt="Water Level" class="w-8 h-8 mr-2" />
+             <span :class="{'block': showSidebar, 'hidden': ! showSidebar}">Water Level Sensors</span>
+        </div>
       </ResponsiveNavLink>
       <ResponsiveNavLink
         :href="route('weather-stations')"
         :active="route().current('weather-stations')"
       >
-        <span :class="{'inline-block': showSidebar, 'hidden': ! showSidebar}">Weather Stations</span><span :class="{'hidden': showSidebar, 'inline-block': ! showSidebar}"><img src="/images/weather-station.png" alt="Logo" class="w-8" /></span>
+        <div class="flex items-center">
+             <img src="/images/weather-station.png" alt="Weather Station" class="w-8 h-8 mr-2" />
+             <span :class="{'block': showSidebar, 'hidden': ! showSidebar}">Weather Stations</span>
+        </div>
       </ResponsiveNavLink>
       <ResponsiveNavLink
-        :href="route('reports')"
-        :active="route().current('reports')"
+        :href="route('rivers.index')"
+        :active="route().current('rivers.*')"
       >
-        <span :class="{'inline-block': showSidebar, 'hidden': ! showSidebar}">Reports</span><span :class="{'hidden': showSidebar, 'inline-block': ! showSidebar}"><img src="/images/dashboard.png" alt="Logo" class="w-8" /></span>
+        <div class="flex items-center">
+             <img src="/images/landscape.png" alt="Rivers" class="w-8 h-8 mr-2" />
+             <span :class="{'block': showSidebar, 'hidden': ! showSidebar}">Rivers</span>
+        </div>
       </ResponsiveNavLink>
       <!-- Add more sidebar links here -->
     </div>

@@ -117,7 +117,7 @@ onMounted(() => {
         am5xy.ValueAxis.new(root, {
             renderer: yRenderer,
             min: 0,
-            max: 1500
+            // max: 1500
         })
     );
 

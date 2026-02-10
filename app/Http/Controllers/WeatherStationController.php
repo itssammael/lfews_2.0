@@ -355,7 +355,7 @@ class WeatherStationController extends Controller
                 // Scaling and "No Data" handling
                 // Davis sentinel values: 32767 or 65535 for words, 255 for bytes
                 $weather = [
-                    'temperature'               => ($temp_out == 32767) ? 0 : $temp_out / 10,
+                    'temperature'        => ($temp_out == 32767) ? 0 : $temp_out / 10,
                     'dewpoint'           => ($dewpoint == 255) ? 0 : $dewpoint,
                     'heat_index'         => ($heat_index == 255) ? 0 : $heat_index,
                     'humidity'           => ($humidity == 255) ? 0 : $humidity,
