@@ -10,9 +10,14 @@ class RiverController extends Controller
 {
     public function index()
     {
-        $rivers = River::all();
         return Inertia::render('Rivers/Index', [
-            'rivers' => $rivers
+            'rivers' => River::query()
+                ->when(request('search'), function ($query, $search) {
+                    $query->where('name', 'like', "%{$search}%");
+                })
+                ->paginate(5)
+                ->withQueryString(),
+            'filters' => request()->only(['search'])
         ]);
     }
 

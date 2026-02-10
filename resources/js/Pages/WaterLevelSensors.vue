@@ -6,8 +6,11 @@ import WaterLevelSensorModal from '@/Components/WaterLevelSensorModal.vue';
 import ConfirmationModal from '@/Components/ConfirmationModal.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import DangerButton from '@/Components/DangerButton.vue';
+import TextInput from '@/Components/TextInput.vue';
+import Pagination from '@/Components/Pagination.vue';
 import { router } from '@inertiajs/vue3';
 import { Location } from '@/types';
+import debounce from 'lodash/debounce';
 
 interface Sensor {
     id: number;
@@ -26,7 +29,13 @@ interface Sensor {
 }
 
 const props = defineProps<{
-    sensors: Sensor[];
+    sensors: {
+        data: Sensor[];
+        links: any[];
+    };
+    filters?: {
+        search: string;
+    };
     locations?: Location[];
     showCreateModal?: boolean;
     editingSensor?: Sensor;
@@ -34,6 +43,15 @@ const props = defineProps<{
     inactiveCount?: number;
     maintenanceCount?: number;
 }>();
+
+const search = ref(props.filters?.search || '');
+
+watch(search, debounce((value) => {
+    router.get(route('water-level-sensors'), { search: value }, {
+        preserveState: true,
+        replace: true,
+    });
+}, 300));
 
 const showingModal = ref(false);
 const activeSensor = ref<Sensor | null>(null);
@@ -97,9 +115,9 @@ const closeDeleteModal = () => {
             </div>
         </template>
 
-        <div class="py-6 h-[85%]">
-            <div class="max-w-9xl mx-auto px-8 h-full">
-                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-xl sm:rounded-lg h-full">
+        <div class="pt-6 mb-16 min-h-[calc(100vh-220px)]">
+            <div class="w-full mx-auto px-8 h-full">
+                <div class="bg-white border-2 border-blue-600 rounded-2xl shadow-md overflow-hidden sm:rounded-lg h-full min-h-[calc(100vh-280px)]">
                     <div class="p-6 h-full">
                         <div class="flex">
                             <div class="w-1/3 flex space-x-8 items-center py-2">
@@ -114,7 +132,15 @@ const closeDeleteModal = () => {
                                     Add Sensor
                                 </Link>
                             </div>
-                            <div class="w-2/3 py-2 flex space-x-6 items-center justify-center">
+                            <div class="w-1/3 py-2 flex items-center justify-center">
+                                <TextInput
+                                    v-model="search"
+                                    type="text"
+                                    placeholder="Search sensors..."
+                                    class="w-full"
+                                />
+                            </div>
+                            <div class="w-1/3 py-2 flex space-x-6 items-center justify-center ">
                                 <div class="flex items-center justify-center w-fit space-x-1.5">
                                     <div class="w-[20px] h-[20px] bg-green-500 rounded-full">&nbsp;</div>
                                     <span class="text-lg uppercase">Active (<span class="font-bold">{{ activeCount }}</span>)</span>
@@ -129,7 +155,7 @@ const closeDeleteModal = () => {
                                 </div>
                             </div>
                         </div>
-                        <div class="w-full grid grid-cols-7 gap-4 bg-gray-200 text-xl text-center font-bold">
+                        <div class="w-full grid grid-cols-7 gap-4 bg-gray-200 text-xl text-center font-bold ">
                             <div>Name</div>
                             <div>Brand</div>
                             <div>Mode</div>
@@ -139,7 +165,7 @@ const closeDeleteModal = () => {
                             <div>Action</div>
                         </div>
                         
-                        <div v-for="sensor in props.sensors" :key="sensor.id" class="w-full grid grid-cols-7 gap-4 border-b border-gray-200 dark:border-gray-700 py-3 text-lg text-center items-center odd:bg-gray-100/[0.6] hover:bg-gray-100 dark:hover:bg-gray-700 transition duration-150 ease-in-out">
+                        <div v-for="sensor in props.sensors.data" :key="sensor.id" class="w-full grid grid-cols-7 gap-4 border-b border-gray-200 dark:border-gray-700 py-3 text-lg text-center items-center odd:bg-gray-100/[0.6] hover:bg-gray-100 dark:hover:bg-gray-700 transition duration-150 ease-in-out">
                             <div class="font-medium text-gray-900 dark:text-gray-100">{{ sensor.name }}</div>
                             <div class="text-gray-600 dark:text-gray-400">{{ sensor.brand }}</div>
                             <div class="text-gray-600 dark:text-gray-400">{{ sensor.mode }}</div>
@@ -177,9 +203,11 @@ const closeDeleteModal = () => {
                             </div>
                         </div>
 
-                        <div v-if="props.sensors.length === 0" class="w-full py-10 text-center text-gray-500 dark:text-gray-400 text-xl font-medium">
+                        <div v-if="props.sensors.data.length === 0" class="w-full py-10 text-center text-gray-500 dark:text-gray-400 text-xl font-medium">
                             No sensors found. <Link v-if="$page.props.auth.can.manage" :href="route('water-level-sensors.create')" class="text-indigo-600 hover:text-indigo-500 underline">Add one now</Link>.
                         </div>
+
+                        <Pagination :links="props.sensors.links" />
                     </div>
                 </div>
             </div>

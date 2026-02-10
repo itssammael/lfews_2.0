@@ -1,21 +1,37 @@
 <script setup lang="ts">
-import AppLayout from '@/Layouts/AppLayout.vue';
+import { ref, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import DangerButton from '@/Components/DangerButton.vue';
+import TextInput from '@/Components/TextInput.vue';
 import RiverModal from '@/Pages/Rivers/RiverModal.vue';
+import Pagination from '@/Components/Pagination.vue';
+import debounce from 'lodash/debounce';
 
-defineProps({
+const props = defineProps({
     rivers: {
-        type: Array as () => Array<any>,
-        default: () => [],
+        type: Object as () => any,
+        default: () => ({ data: [], links: [] }),
+    },
+    filters: {
+        type: Object as () => any,
+        default: () => ({ search: '' }),
     },
 });
 
+const search = ref(props.filters.search);
+
 const showingRiverModal = ref(false);
 const riverToEdit = ref<any>(null);
+
+watch(search, debounce((value) => {
+    router.get(route('rivers.index'), { search: value }, {
+        preserveState: true,
+        replace: true,
+    });
+}, 300));
 
 const openCreateModal = () => {
     riverToEdit.value = null;
@@ -47,11 +63,11 @@ const deleteRiver = (river: any) => {
             </h2>
         </template>
 
-        <div class="py-12">
-            <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-xl sm:rounded-lg p-6">
-                    <div class="flex justify-between items-center mb-6">
-                        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
+        <div class="pt-6 mb-16">
+            <div class="w-full mx-auto px-8 h-full">
+                <div class="bg-white border-2 border-blue-600 rounded-2xl shadow-md overflow-hidden sm:rounded-lg h-full p-6">
+                    <div class="flex space-x-8 items-center mb-6">
+                        <h3 class="text-xl font-semibold text-gray-900 dark:text-gray-100 uppercase">
                             Rivers List
                         </h3>
                         <PrimaryButton 
@@ -60,25 +76,34 @@ const deleteRiver = (river: any) => {
                         >
                             Add River
                         </PrimaryButton>
+                        <div class="flex-grow"></div>
+                        <div class="w-64">
+                            <TextInput
+                                v-model="search"
+                                type="text"
+                                placeholder="Search rivers..."
+                                class="w-full"
+                            />
+                        </div>
                     </div>
 
                     <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                            <thead class="bg-gray-50 dark:bg-gray-700">
+                            <thead class="bg-gray-200 ">
                                 <tr>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-widest">
+                                    <th scope="col" class="px-6 py-1.5 text-left text-md font-bold text-gray-700 dark:text-gray-300 uppercase tracking-widest">
                                         Name
                                     </th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-widest">
+                                    <th scope="col" class="px-6 py-1.5 text-left text-md font-bold text-gray-700 dark:text-gray-300 uppercase tracking-widest">
                                         Properties
                                     </th>
-                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-widest">
+                                    <th scope="col" class="px-6 py-1.5 text-right text-md font-bold text-gray-700 dark:text-gray-300 uppercase tracking-widest">
                                         Actions
                                     </th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                                <tr v-for="river in rivers" :key="river.id">
+                                <tr v-for="river in rivers.data" :key="river.id" class="odd:bg-gray-100/[0.6]">
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
                                         {{ river.name }}
                                     </td>
@@ -101,7 +126,7 @@ const deleteRiver = (river: any) => {
                                         </DangerButton>
                                     </td>
                                 </tr>
-                                <tr v-if="rivers.length === 0">
+                                <tr v-if="rivers.data.length === 0">
                                     <td colspan="3" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                                         No rivers found.
                                     </td>
@@ -109,6 +134,8 @@ const deleteRiver = (river: any) => {
                             </tbody>
                         </table>
                     </div>
+
+                    <Pagination :links="rivers.links" />
                 </div>
             </div>
         </div>

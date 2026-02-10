@@ -238,10 +238,10 @@ onMounted(() => {
             </h2>
         </template>
 
-        <div class="py-12">
-            <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-xl sm:rounded-lg">
-                    <div class="p-6 lg:p-8 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <div class="pt-0 mb-12">
+            <div class="w-full ">
+                <div class=" bg-gray-200/[0.25] overflow-hidden shadow-xl sm:rounded-lg">
+                    <div class="p-6 lg:p-8 bg-transparent border-b border-gray-200 dark:border-gray-700">
                         
                         <!-- Filtering Menu -->
                         <div class="mb-6">
@@ -259,7 +259,7 @@ onMounted(() => {
                             </div>
                         </div>
 
-                        <div ref="mapContainer" class="w-full h-[600px] z-0 rounded-lg border border-gray-200 dark:border-gray-700"></div>
+                        <div ref="mapContainer" class="w-full h-[600px] z-0  border-2 border-blue-600 rounded-2xl shadow-md"></div>
                     </div>
                 </div>
             </div>

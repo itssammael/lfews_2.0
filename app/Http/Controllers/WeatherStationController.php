@@ -15,16 +15,27 @@ class WeatherStationController extends Controller
      */
     public function index()
     {
-        $stations = WeatherStation::with(['location', 'location.locationType'])->get();
-        // Assuming we want to show location description in the table, we fetch it with relation.
+        $allStations = WeatherStation::all();
+        $paginatedStations = WeatherStation::query()
+            ->with(['location', 'location.locationType'])
+            ->when(request('search'), function ($query, $search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('station_id', 'like', "%{$search}%")
+                        ->orWhere('ip', 'like', "%{$search}%");
+                });
+            })
+            ->paginate(6)
+            ->withQueryString();
 
         return Inertia::render('WeatherStations', [
-            'stations' => $stations,
+            'stations' => $paginatedStations,
+            'filters' => request()->only(['search']),
             'showCreateModal' => false,
             'showEditModal' => false,
-            'activeCount' => $stations->where('state', 1)->count(), // Changed to integer check
-            'inactiveCount' => $stations->where('state', 0)->count(), // Changed to integer check
-            'maintenanceCount' => $stations->where('state', 2)->count(),
+            'activeCount' => $allStations->where('state', 1)->count(),
+            'inactiveCount' => $allStations->where('state', 0)->count(),
+            'maintenanceCount' => $allStations->where('state', 2)->count(),
         ]);
     }
 
@@ -34,17 +45,29 @@ class WeatherStationController extends Controller
     public function create()
     {
         \Illuminate\Support\Facades\Gate::authorize('manage-data');
-        $stations = WeatherStation::with(['location', 'location.locationType'])->get();
-        $locations = Location::with('locationType')->get(); // Fetch locations for dropdown
+        $allStations = WeatherStation::all();
+        $paginatedStations = WeatherStation::query()
+            ->with(['location', 'location.locationType'])
+            ->when(request('search'), function ($query, $search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('station_id', 'like', "%{$search}%")
+                        ->orWhere('ip', 'like', "%{$search}%");
+                });
+            })
+            ->paginate(6)
+            ->withQueryString();
+        $locations = Location::with('locationType')->get();
 
         return Inertia::render('WeatherStations', [
-            'stations' => $stations,
-            'locations' => $locations, // Pass locations
+            'stations' => $paginatedStations,
+            'filters' => request()->only(['search']),
+            'locations' => $locations,
             'showCreateModal' => true,
             'showEditModal' => false,
-            'activeCount' => $stations->where('state', 1)->count(),
-            'inactiveCount' => $stations->where('state', 0)->count(),
-            'maintenanceCount' => $stations->where('state', 2)->count(),
+            'activeCount' => $allStations->where('state', 1)->count(),
+            'inactiveCount' => $allStations->where('state', 0)->count(),
+            'maintenanceCount' => $allStations->where('state', 2)->count(),
         ]);
     }
 
@@ -107,17 +130,30 @@ class WeatherStationController extends Controller
         }
         $location = Location::find($station->location_id);
         $station->location = ['latitude' => $location->latitude, 'longitude' => $location->longitude];
-        $stations = WeatherStation::with(['location', 'location.locationType'])->get();
+
+        $allStations = WeatherStation::all();
+        $paginatedStations = WeatherStation::query()
+            ->with(['location', 'location.locationType'])
+            ->when(request('search'), function ($query, $search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('station_id', 'like', "%{$search}%")
+                        ->orWhere('ip', 'like', "%{$search}%");
+                });
+            })
+            ->paginate(6)
+            ->withQueryString();
         $locations = Location::with('locationType')->get();
 
         return Inertia::render('WeatherStations', [
-            'stations' => $stations,
+            'stations' => $paginatedStations,
+            'filters' => request()->only(['search']),
             'locations' => $locations,
             'editingStation' => $station,
             'showCreateModal' => false,
-            'activeCount' => $stations->where('state', 1)->count(),
-            'inactiveCount' => $stations->where('state', 0)->count(),
-            'maintenanceCount' => $stations->where('state', 2)->count(),
+            'activeCount' => $allStations->where('state', 1)->count(),
+            'inactiveCount' => $allStations->where('state', 0)->count(),
+            'maintenanceCount' => $allStations->where('state', 2)->count(),
         ]);
     }
 

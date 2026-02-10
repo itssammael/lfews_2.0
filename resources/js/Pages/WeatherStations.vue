@@ -1,18 +1,21 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
-import { Link } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import WeatherStationModal from '@/Components/WeatherStationModal.vue';
 import ConfirmationModal from '@/Components/ConfirmationModal.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import DangerButton from '@/Components/DangerButton.vue';
-import { router } from '@inertiajs/vue3';
+import TextInput from '@/Components/TextInput.vue';
+import Pagination from '@/Components/Pagination.vue';
+import debounce from 'lodash/debounce';
 
 interface Station {
     id: number;
     name: string;
     station_id: string;
     mode: string;
+    ip?: string;
     state: number; // Changed to number
     location_id: number;
     location?: {
@@ -26,7 +29,13 @@ interface Station {
 }
 
 const props = defineProps<{
-    stations: Station[];
+    stations: {
+        data: Station[];
+        links: any[];
+    };
+    filters?: {
+        search: string;
+    };
     locations?: any[]; // Allow locations prop
     showCreateModal?: boolean;
     editingStation?: Station;
@@ -34,6 +43,15 @@ const props = defineProps<{
     inactiveCount?: number;
     maintenanceCount?: number;
 }>();
+
+const search = ref(props.filters?.search || '');
+
+watch(search, debounce((value) => {
+    router.get(route('weather-stations'), { search: value }, {
+        preserveState: true,
+        replace: true,
+    });
+}, 300));
 
 const showingModal = ref(false);
 const activeStation = ref<Station | null>(null);
@@ -97,9 +115,9 @@ const closeDeleteModal = () => {
             </div>
         </template>
 
-        <div class="py-6 h-[85%]">
-            <div class="max-w-9xl mx-auto px-8 h-full">
-                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-xl sm:rounded-lg h-full">
+        <div class="pt-6 mb-16 min-h-[calc(100vh-220px)]">
+            <div class="w-full mx-auto px-8 h-full">
+                <div class="bg-white border-2 border-blue-600 rounded-2xl shadow-md overflow-hidden sm:rounded-lg h-full min-h-[calc(100vh-280px)]">
                     <div class="p-6 h-full">
                         <div class="flex">
                             <div class="w-1/3 flex space-x-8 items-center py-2">
@@ -115,7 +133,15 @@ const closeDeleteModal = () => {
                                 </Link>
                                 
                             </div>
-                            <div class="w-2/3 py-2 flex space-x-6 items-center justify-center">
+                            <div class="w-1/3 py-2 flex items-center justify-center">
+                                <TextInput
+                                    v-model="search"
+                                    type="text"
+                                    placeholder="Search stations..."
+                                    class="w-full"
+                                />
+                            </div>
+                            <div class="w-1/3 py-2 flex space-x-6 items-center justify-center">
                                 <div class="flex items-center justify-center w-fit space-x-1.5">
                                     <div class="w-[20px] h-[20px] bg-green-500 rounded-full">&nbsp;</div>
                                     <span class="text-lg uppercase">Active (<span class="font-bold">{{ activeCount }}</span>)</span>
@@ -130,19 +156,21 @@ const closeDeleteModal = () => {
                                 </div>
                             </div>
                         </div>
-                        <div class="w-full grid grid-cols-6 gap-4 bg-gray-200 text-xl text-center font-bold">
+                        <div class="w-full grid grid-cols-7 gap-4 bg-gray-200 text-xl text-center font-bold">
                             <div>Name</div>
                             <div>Station ID</div>
                             <div>Mode</div>
+                            <div>IP</div>
                             <div>Location</div>
                             <div>State</div>
                             <div>Action</div>
                         </div>
                         
-                        <div v-for="station in props.stations" :key="station.id" class="w-full grid grid-cols-6 gap-4 border-b border-gray-200 dark:border-gray-700 py-3 text-lg text-center items-center odd:bg-gray-100/[0.6] hover:bg-gray-100 dark:hover:bg-gray-700 transition duration-150 ease-in-out">
+                        <div v-for="station in props.stations.data" :key="station.id" class="w-full grid grid-cols-7 gap-4 border-b border-gray-200 dark:border-gray-700 py-3 text-lg text-center items-center odd:bg-gray-100/[0.6] hover:bg-gray-100 dark:hover:bg-gray-700 transition duration-150 ease-in-out">
                             <div class="font-medium text-gray-900 dark:text-gray-100">{{ station.name }}</div>
                             <div class="text-gray-600 dark:text-gray-400 font-mono">{{ station.station_id }}</div>
                             <div class="text-gray-600 dark:text-gray-400">{{ station.mode }}</div>
+                            <div class="text-gray-600 dark:text-gray-400 font-mono text-sm">{{ station.ip || 'N/A' }}</div>
                             <div class="text-gray-600 dark:text-gray-400">
                                 {{ station.location?.location_type?.description || 'N/A' }} 
                                 <span v-if="station.location" class="text-xs text-gray-500 block">({{ station.location.latitude }}, {{ station.location.longitude }})</span>
@@ -176,9 +204,11 @@ const closeDeleteModal = () => {
                             </div>
                         </div>
 
-                        <div v-if="props.stations.length === 0" class="w-full py-10 text-center text-gray-500 dark:text-gray-400 text-xl font-medium">
+                        <div v-if="props.stations.data.length === 0" class="w-full py-10 text-center text-gray-500 dark:text-gray-400 text-xl font-medium">
                             No stations found. <Link v-if="$page.props.auth.can.manage" :href="route('weather-stations.create')" class="text-indigo-600 hover:text-indigo-500 underline">Add one now</Link>.
                         </div>
+
+                        <Pagination :links="props.stations.links" />
                     </div>
                 </div>
             </div>

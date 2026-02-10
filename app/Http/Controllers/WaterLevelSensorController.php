@@ -17,16 +17,26 @@ class WaterLevelSensorController extends Controller
      */
     public function index()
     {
-        $sensors = WaterLevelSensor::with(['location', 'location.locationType'])->get();
-        // Assuming we want to show location description in the table, we fetch it with relation.
+        $allSensors = WaterLevelSensor::all();
+        $paginatedSensors = WaterLevelSensor::query()
+            ->with(['location', 'location.locationType'])
+            ->when(request('search'), function ($query, $search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('ip', 'like', "%{$search}%");
+                });
+            })
+            ->paginate(6)
+            ->withQueryString();
 
         return \Inertia\Inertia::render('WaterLevelSensors', [
-            'sensors' => $sensors,
+            'sensors' => $paginatedSensors,
+            'filters' => request()->only(['search']),
             'showCreateModal' => false,
             'showEditModal' => false,
-            'activeCount' => $sensors->where('state', 1)->count(),
-            'inactiveCount' => $sensors->where('state', 0)->count(),
-            'maintenanceCount' => $sensors->where('state', 2)->count(),
+            'activeCount' => $allSensors->where('state', 1)->count(),
+            'inactiveCount' => $allSensors->where('state', 0)->count(),
+            'maintenanceCount' => $allSensors->where('state', 2)->count(),
         ]);
     }
 
@@ -36,17 +46,28 @@ class WaterLevelSensorController extends Controller
     public function create()
     {
         \Illuminate\Support\Facades\Gate::authorize('manage-data');
-        $sensors = WaterLevelSensor::with(['location', 'location.locationType'])->get();
-        $locations = Location::with('locationType')->get(); // Fetch locations for dropdown if needed or just for data
+        $allSensors = WaterLevelSensor::all();
+        $paginatedSensors = WaterLevelSensor::query()
+            ->with(['location', 'location.locationType'])
+            ->when(request('search'), function ($query, $search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('ip', 'like', "%{$search}%");
+                });
+            })
+            ->paginate(6)
+            ->withQueryString();
+        $locations = Location::with('locationType')->get();
 
         return \Inertia\Inertia::render('WaterLevelSensors', [
-            'sensors' => $sensors,
+            'sensors' => $paginatedSensors,
+            'filters' => request()->only(['search']),
             'locations' => $locations,
             'showCreateModal' => true,
             'showEditModal' => false,
-            'activeCount' => $sensors->where('state', 1)->count(),
-            'inactiveCount' => $sensors->where('state', 0)->count(),
-            'maintenanceCount' => $sensors->where('state', 2)->count(),
+            'activeCount' => $allSensors->where('state', 1)->count(),
+            'inactiveCount' => $allSensors->where('state', 0)->count(),
+            'maintenanceCount' => $allSensors->where('state', 2)->count(),
         ]);
     }
 
@@ -114,23 +135,33 @@ class WaterLevelSensorController extends Controller
             return redirect()->back()->with('error', 'Water level sensor not found.');
         }
 
-        // Attach location coords to sensor object for edit form
         $location = Location::find($sensor->location_id);
         if ($location) {
             $sensor->location = ['latitude' => $location->latitude, 'longitude' => $location->longitude];
         }
 
-        $sensors = WaterLevelSensor::with(['location', 'location.locationType'])->get();
+        $allSensors = WaterLevelSensor::all();
+        $paginatedSensors = WaterLevelSensor::query()
+            ->with(['location', 'location.locationType'])
+            ->when(request('search'), function ($query, $search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('ip', 'like', "%{$search}%");
+                });
+            })
+            ->paginate(6)
+            ->withQueryString();
         $locations = Location::with('locationType')->get();
 
         return \Inertia\Inertia::render('WaterLevelSensors', [
-            'sensors' => $sensors,
+            'sensors' => $paginatedSensors,
+            'filters' => request()->only(['search']),
             'locations' => $locations,
             'editingSensor' => $sensor,
             'showCreateModal' => false,
-            'activeCount' => $sensors->where('state', 1)->count(),
-            'inactiveCount' => $sensors->where('state', 0)->count(),
-            'maintenanceCount' => $sensors->where('state', 2)->count(),
+            'activeCount' => $allSensors->where('state', 1)->count(),
+            'inactiveCount' => $allSensors->where('state', 0)->count(),
+            'maintenanceCount' => $allSensors->where('state', 2)->count(),
         ]);
     }
 

@@ -1555,11 +1555,11 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                                     Download Chart
                                 </button>
                             </div>
-                            <div class="bg-white p-2 rounded-sm border border-gray-100 h-[600px] w-full" ref="rainChartDiv"></div>
-                            <div class="text-center text-xs font-bold text-gray-400 uppercase">Month</div>
+                            <div class="bg-white p-2 border-2 border-blue-600 rounded-2xl shadow-md h-[600px] w-full" ref="rainChartDiv"></div>
+                            <!-- <div class="text-center text-xs font-bold text-gray-400 uppercase">Month</div> -->
 
                             <!-- Rain Results Table -->
-                            <div v-if="rainRecords.length > 0" class="bg-white border border-gray-200 rounded-sm overflow-hidden mt-8">
+                            <div v-if="rainRecords.length > 0" class="bg-white  border-2 border-blue-600 rounded-2xl shadow-md overflow-hidden mt-8">
                                 <div class="flex justify-between items-center py-2 px-4 border-b border-gray-100">
                                     <h4 class="font-bold text-gray-600 uppercase text-sm">Weather Observation (Rain) Data Table</h4>
                                     <button 
