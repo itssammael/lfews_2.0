@@ -52,9 +52,12 @@ const heatIndexChartDiv = ref<HTMLElement | null>(null);
 const waterLevelChartDiv = ref<HTMLElement | null>(null);
 
 const waterLevelRecords = ref<any[]>([]);
+const waterLevelSummaryRecords = ref<any[]>([]);
 const waterLevelThresholds = ref<any>(null);
 const rainRecords = ref<any[]>([]);
+const rainSummaryRecords = ref<any[]>([]);
 const heatIndexRecords = ref<any[]>([]);
+const heatIndexSummaryRecords = ref<any[]>([]);
 
 // Tab States
 const waterLevelActiveTab = ref('');
@@ -64,44 +67,51 @@ const heatIndexActiveTab = ref('');
 // Tab Lists
 const waterLevelTabs = computed(() => {
     const sensors = [...new Set(waterLevelRecords.value.map(r => r.sensor_name))];
-    return sensors.sort();
+    const tabs = sensors.sort();
+    if (waterLevelReport.value.sensor === 'All' && waterLevelSummaryRecords.value.length > 0) {
+        return ['Summary', ...tabs];
+    }
+    return tabs;
 });
 
 const rainTabs = computed(() => {
     const stations = [...new Set(rainRecords.value.map(r => r.station_name))];
-    return stations.sort();
+    const tabs = stations.sort();
+    if (detailRainReport.value.station === 'All' && rainSummaryRecords.value.length > 0) {
+        return ['Summary', ...tabs];
+    }
+    return tabs;
 });
 
 const heatIndexTabs = computed(() => {
     const stations = [...new Set(heatIndexRecords.value.map(r => r.station_name))];
-    return stations.sort();
+    const tabs = stations.sort();
+    if (heatIndexReport.value.station === 'All' && heatIndexSummaryRecords.value.length > 0) {
+        return ['Summary', ...tabs];
+    }
+    return tabs;
 });
 
 // Filtered Records (based on tab)
 const filteredWaterLevelRecords = computed(() => {
     if (waterLevelReport.value.sensor !== 'All') return waterLevelRecords.value;
-    if (!waterLevelActiveTab.value && waterLevelTabs.value.length > 0) {
-        // We can't set ref value inside computed directly without causing side effects or infinite loops in some setups,
-        // but Vue 3 usually handles it if it's a simple assignment. However, to be safe:
-        return waterLevelRecords.value.filter(r => r.sensor_name === (waterLevelActiveTab.value || waterLevelTabs.value[0]));
-    }
-    return waterLevelRecords.value.filter(r => r.sensor_name === waterLevelActiveTab.value);
+    const activeTab = waterLevelActiveTab.value || (waterLevelTabs.value.length > 0 ? waterLevelTabs.value[0] : '');
+    if (activeTab === 'Summary') return waterLevelSummaryRecords.value;
+    return waterLevelRecords.value.filter(r => r.sensor_name === activeTab);
 });
 
 const filteredRainRecords = computed(() => {
     if (detailRainReport.value.station !== 'All') return rainRecords.value;
-    if (!rainActiveTab.value && rainTabs.value.length > 0) {
-        return rainRecords.value.filter(r => r.station_name === (rainActiveTab.value || rainTabs.value[0]));
-    }
-    return rainRecords.value.filter(r => r.station_name === rainActiveTab.value);
+    const activeTab = rainActiveTab.value || (rainTabs.value.length > 0 ? rainTabs.value[0] : '');
+    if (activeTab === 'Summary') return rainSummaryRecords.value;
+    return rainRecords.value.filter(r => r.station_name === activeTab);
 });
 
 const filteredHeatIndexRecords = computed(() => {
     if (heatIndexReport.value.station !== 'All') return heatIndexRecords.value;
-    if (!heatIndexActiveTab.value && heatIndexTabs.value.length > 0) {
-        return heatIndexRecords.value.filter(r => r.station_name === (heatIndexActiveTab.value || heatIndexTabs.value[0]));
-    }
-    return heatIndexRecords.value.filter(r => r.station_name === heatIndexActiveTab.value);
+    const activeTab = heatIndexActiveTab.value || (heatIndexTabs.value.length > 0 ? heatIndexTabs.value[0] : '');
+    if (activeTab === 'Summary') return heatIndexSummaryRecords.value;
+    return heatIndexRecords.value.filter(r => r.station_name === activeTab);
 });
 
 // Pagination
@@ -125,6 +135,131 @@ const paginatedHeatIndexRecords = computed(() => {
     return filteredHeatIndexRecords.value.slice(start, start + itemsPerPage);
 });
 const heatIndexTotalPages = computed(() => Math.ceil(filteredHeatIndexRecords.value.length / itemsPerPage));
+
+// Matrix Summary Logic
+const getDaysInMonth = (monthNameOrIndex: string | number, year: number) => {
+    let monthIndex;
+    if (typeof monthNameOrIndex === 'string') {
+        monthIndex = months.indexOf(monthNameOrIndex);
+    } else {
+        monthIndex = (monthNameOrIndex as number) - 1;
+    }
+    if (monthIndex === -1) return 31;
+    return new Date(year, monthIndex + 1, 0).getDate();
+};
+
+const rainSummaryMatrix = computed(() => {
+    if (detailRainReport.value.station !== 'All' || rainSummaryRecords.value.length === 0) return null;
+    const stations = [...new Set(rainRecords.value.map(r => r.station_name))].sort();
+    let days: any[] = [];
+    if (rainReportType.value === 'Monthly') {
+        const year = parseInt(detailRainReport.value.year);
+        const numDays = getDaysInMonth(detailRainReport.value.month, year);
+        for (let i = 1; i <= numDays; i++) days.push({ label: i.toString(), day: i });
+    } else {
+        const start = new Date(detailRainReport.value.from);
+        const end = new Date(detailRainReport.value.to);
+        let curr = new Date(start);
+        while (curr <= end) {
+            days.push({ label: curr.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), dateStr: curr.toISOString().split('T')[0] });
+            curr.setDate(curr.getDate() + 1);
+        }
+    }
+    const rows = days.map(day => {
+        const row: any = { dateLabel: day.label };
+        stations.forEach(station => {
+            const record = rainSummaryRecords.value.find(r => {
+                const rDate = new Date(r.date_time);
+                return r.station_name === station && (rainReportType.value === 'Monthly' ? rDate.getDate() === day.day : r.date_time.startsWith(day.dateStr));
+            });
+            row[station] = record ? record.precipitation_total : '-';
+        });
+        return row;
+    });
+    const totals = stations.reduce((acc: any, s) => {
+        const vals = rows.map(r => r[s]).filter(v => typeof v === 'number');
+        acc[s] = vals.reduce((sum, v) => sum + v, 0).toFixed(2);
+        return acc;
+    }, {});
+    const averages = stations.reduce((acc: any, s) => {
+        const vals = rows.map(r => r[s]).filter(v => typeof v === 'number');
+        acc[s] = vals.length > 0 ? (vals.reduce((sum, v) => sum + v, 0) / vals.length).toFixed(2) : '0.00';
+        return acc;
+    }, {});
+    return { stations, rows, totals, averages };
+});
+
+const heatIndexSummaryMatrix = computed(() => {
+    if (heatIndexReport.value.station !== 'All' || heatIndexSummaryRecords.value.length === 0) return null;
+    const stations = [...new Set(heatIndexRecords.value.map(r => r.station_name))].sort();
+    let days: any[] = [];
+    if (heatIndexReportType.value === 'Monthly') {
+        const year = parseInt(heatIndexReport.value.year);
+        const numDays = getDaysInMonth(heatIndexReport.value.month, year);
+        for (let i = 1; i <= numDays; i++) days.push({ label: i.toString(), day: i });
+    } else {
+        const start = new Date(heatIndexReport.value.from);
+        const end = new Date(heatIndexReport.value.to);
+        let curr = new Date(start);
+        while (curr <= end) {
+            days.push({ label: curr.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), dateStr: curr.toISOString().split('T')[0] });
+            curr.setDate(curr.getDate() + 1);
+        }
+    }
+    const rows = days.map(day => {
+        const row: any = { dateLabel: day.label };
+        stations.forEach(station => {
+            const record = heatIndexSummaryRecords.value.find(r => {
+                const rDate = new Date(r.date_time);
+                return r.station_name === station && (heatIndexReportType.value === 'Monthly' ? rDate.getDate() === day.day : r.date_time.startsWith(day.dateStr));
+            });
+            row[station] = record ? record.heat_index : '-';
+        });
+        return row;
+    });
+    const averages = stations.reduce((acc: any, s) => {
+        const vals = rows.map(r => r[s]).filter(v => typeof v === 'number');
+        acc[s] = vals.length > 0 ? (vals.reduce((sum, v) => sum + v, 0) / vals.length).toFixed(2) : '0.00';
+        return acc;
+    }, {});
+    return { stations, rows, averages };
+});
+
+const waterLevelSummaryMatrix = computed(() => {
+    if (waterLevelReport.value.sensor !== 'All' || waterLevelSummaryRecords.value.length === 0) return null;
+    const sensors = [...new Set(waterLevelRecords.value.map(r => r.sensor_name))].sort();
+    let days: any[] = [];
+    if (waterLevelReportType.value === 'Monthly') {
+        const year = parseInt(waterLevelReport.value.year);
+        const numDays = getDaysInMonth(waterLevelReport.value.month, year);
+        for (let i = 1; i <= numDays; i++) days.push({ label: i.toString(), day: i });
+    } else {
+        const start = new Date(waterLevelReport.value.from);
+        const end = new Date(waterLevelReport.value.to);
+        let curr = new Date(start);
+        while (curr <= end) {
+            days.push({ label: curr.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), dateStr: curr.toISOString().split('T')[0] });
+            curr.setDate(curr.getDate() + 1);
+        }
+    }
+    const rows = days.map(day => {
+        const row: any = { dateLabel: day.label };
+        sensors.forEach(sensor => {
+            const record = waterLevelSummaryRecords.value.find(r => {
+                const rDate = new Date(r.date_time);
+                return r.sensor_name === sensor && (waterLevelReportType.value === 'Monthly' ? rDate.getDate() === day.day : r.date_time.startsWith(day.dateStr));
+            });
+            row[sensor] = record ? record.water_level : '-';
+        });
+        return row;
+    });
+    const averages = sensors.reduce((acc: any, s) => {
+        const vals = rows.map(r => r[s]).filter(v => typeof v === 'number');
+        acc[s] = vals.length > 0 ? (vals.reduce((sum, v) => sum + v, 0) / vals.length).toFixed(2) : '0.00';
+        return acc;
+    }, {});
+    return { sensors, rows, averages };
+});
 
 let activeChartRoot: am5.Root | null = null;
 
@@ -567,11 +702,6 @@ const processHeatmapData = (records: any[]) => {
     return data;
 };
 
-const getDaysInMonth = (monthName: string, year: number) => {
-    const monthIndex = months.indexOf(monthName);
-    if (monthIndex === -1) return 31; // Fallback
-    return new Date(year, monthIndex + 1, 0).getDate();
-};
 
 const initHeatmapChart = (root: am5.Root, data: any[], numDays: number = 31) => {
     const chart = root.container.children.push(am5xy.XYChart.new(root, {
@@ -990,7 +1120,9 @@ const handleWaterLevelReport = async () => {
     });
     
     waterLevelRecords.value = response.data.records;
+    waterLevelSummaryRecords.value = response.data.summaryRecords || [];
     waterLevelThresholds.value = response.data.thresholds;
+    waterLevelActiveTab.value = waterLevelReport.value.sensor === 'All' ? 'Summary' : '';
     
     if (waterLevelReport.value.sensor !== 'All') {
         const dailyData = waterLevelRecords.value.reduce((acc: any, record: any) => {
@@ -1070,6 +1202,9 @@ const handleWeatherReport = async () => {
     
     if (isRain) {
         rainRecords.value = response.data.records;
+        rainSummaryRecords.value = response.data.summaryRecords || [];
+        rainActiveTab.value = detailRainReport.value.station === 'All' ? 'Summary' : '';
+        
         let chartData = response.data.chartData || [];
         if (rainReportType.value === 'Monthly') {
             chartData = chartData.map((item: any) => ({
@@ -1080,6 +1215,8 @@ const handleWeatherReport = async () => {
         await renderChart(chartData, response.data.stationNames);
     } else {
         heatIndexRecords.value = response.data.records;
+        heatIndexSummaryRecords.value = response.data.summaryRecords || [];
+        heatIndexActiveTab.value = heatIndexReport.value.station === 'All' ? 'Summary' : '';
         await renderChart();
     }
 };
@@ -1252,6 +1389,76 @@ const exportToExcel = () => {
 
     const filename = `${filenamePrefix}_${suffix}.xlsx`;
 
+    XLSX.writeFile(workbook, filename);
+};
+
+const exportSummaryToExcel = () => {
+    let matrix: any = null;
+    let filenamePrefix = '';
+    let sheetName = '';
+    let suffix = '';
+
+    if (selectedReport.value === 'Rain') {
+        matrix = rainSummaryMatrix.value;
+        filenamePrefix = 'Rain_Summary_Report';
+        sheetName = 'Rain Summary';
+        suffix = rainReportType.value === 'Monthly' 
+            ? `${detailRainReport.value.month}_${detailRainReport.value.year}` 
+            : `${detailRainReport.value.from}_to_${detailRainReport.value.to}`;
+    } else if (selectedReport.value === 'Heat Index') {
+        matrix = heatIndexSummaryMatrix.value;
+        filenamePrefix = 'Heat_Index_Summary_Report';
+        sheetName = 'Heat Index Summary';
+        suffix = heatIndexReportType.value === 'Monthly' 
+            ? `${heatIndexReport.value.month}_${heatIndexReport.value.year}` 
+            : `${heatIndexReport.value.from}_to_${heatIndexReport.value.to}`;
+    } else if (selectedReport.value === 'Water Level') {
+        matrix = waterLevelSummaryMatrix.value;
+        filenamePrefix = 'Water_Level_Summary_Report';
+        sheetName = 'Water Level Summary';
+        suffix = waterLevelReportType.value === 'Monthly' 
+            ? `${waterLevelReport.value.month}_${waterLevelReport.value.year}` 
+            : `${waterLevelReport.value.from}_to_${waterLevelReport.value.to}`;
+    }
+
+    if (!matrix) return;
+
+    const devices = matrix.stations || matrix.sensors;
+    const rows = matrix.rows.map((row: any) => {
+        const rowData: any = { 'Date': row.dateLabel };
+        devices.forEach((device: string) => {
+            rowData[device] = row[device];
+        });
+        return rowData;
+    });
+
+    // Add Totals/Averages for Rain
+    if (selectedReport.value === 'Rain') {
+        const totalRow: any = { 'Date': 'Total rainfall (mm)' };
+        const averageRow: any = { 'Date': 'Ave. rainfall/day' };
+        devices.forEach((device: string) => {
+            totalRow[device] = matrix.totals[device];
+            averageRow[device] = matrix.averages[device];
+        });
+        rows.push({}); // Empty row
+        rows.push(totalRow);
+        rows.push(averageRow);
+    } else {
+        // Averages for Heat Index and Water Level
+        const label = selectedReport.value === 'Heat Index' ? 'Ave. Heat Index/day' : 'Ave. Water Level/day';
+        const averageRow: any = { 'Date': label };
+        devices.forEach((device: string) => {
+            averageRow[device] = matrix.averages[device];
+        });
+        rows.push({}); // Empty row
+        rows.push(averageRow);
+    }
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+
+    const filename = `${filenamePrefix}_${suffix}.xlsx`;
     XLSX.writeFile(workbook, filename);
 };
 
@@ -1562,15 +1769,28 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                             <div v-if="rainRecords.length > 0" class="bg-white  border-2 border-blue-600 rounded-2xl shadow-md overflow-hidden mt-8">
                                 <div class="flex justify-between items-center py-2 px-4 border-b border-gray-100">
                                     <h4 class="font-bold text-gray-600 uppercase text-sm">Weather Observation (Rain) Data Table</h4>
-                                    <button 
-                                        @click="exportToExcel" 
-                                        class="bg-green-700 hover:bg-green-600 text-white px-4 py-1.5 rounded-sm font-bold uppercase tracking-wider text-[10px] transition-colors flex items-center gap-2"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                        </svg>
-                                        Export Data
-                                    </button>
+                                    <div class="flex gap-2">
+                                        <button 
+                                            v-if="(rainActiveTab || rainTabs[0]) === 'Summary'"
+                                            @click="exportSummaryToExcel" 
+                                            class="bg-green-700 hover:bg-green-600 text-white px-4 py-1.5 rounded-sm font-bold uppercase tracking-wider text-[10px] transition-colors flex items-center gap-2"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
+                                            Export Summary
+                                        </button>
+                                        <button 
+                                            v-else
+                                            @click="exportToExcel" 
+                                            class="bg-green-700 hover:bg-green-600 text-white px-4 py-1.5 rounded-sm font-bold uppercase tracking-wider text-[10px] transition-colors flex items-center gap-2"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
+                                            Export Data
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <!-- Rain Tab Navigation -->
@@ -1618,7 +1838,43 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                                         </button>
                                     </div>
                                 </div>
-                                <table class="w-full text-left">
+                                <!-- Rain Matrix View for Summary -->
+                                <div v-if="(rainActiveTab || rainTabs[0]) === 'Summary' && rainSummaryMatrix" class="overflow-x-auto">
+                                    <table class="w-full text-left border-collapse">
+                                        <thead class="bg-gray-100 border-b border-gray-200">
+                                            <tr>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase border-r border-gray-200">Date</th>
+                                                <th v-for="station in rainSummaryMatrix.stations" :key="station" class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center border-r border-gray-200">
+                                                    {{ station }}
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-100">
+                                            <tr v-for="(row, idx) in rainSummaryMatrix.rows" :key="idx" class="hover:bg-gray-50 transition-colors">
+                                                <td class="px-4 py-2 text-sm text-gray-500 font-bold border-r border-gray-200">{{ row.dateLabel }}</td>
+                                                <td v-for="station in rainSummaryMatrix.stations" :key="station" class="px-4 py-2 text-sm text-gray-800 font-bold text-center border-r border-gray-200">
+                                                    {{ row[station] }}
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                        <tfoot class="bg-gray-50 border-t-2 border-gray-200">
+                                            <tr class="font-bold">
+                                                <td class="px-4 py-3 text-[10px] text-gray-600 uppercase border-r border-gray-200">Total rainfall (mm)</td>
+                                                <td v-for="station in rainSummaryMatrix.stations" :key="station" class="px-4 py-3 text-sm text-blue-700 text-center border-r border-gray-200">
+                                                    {{ rainSummaryMatrix.totals[station] }}
+                                                </td>
+                                            </tr>
+                                            <tr class="font-bold">
+                                                <td class="px-4 py-3 text-[10px] text-gray-600 uppercase border-r border-gray-200">Ave. rainfall/day</td>
+                                                <td v-for="station in rainSummaryMatrix.stations" :key="station" class="px-4 py-3 text-sm text-green-700 text-center border-r border-gray-200">
+                                                    {{ rainSummaryMatrix.averages[station] }}
+                                                </td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+
+                                <table v-else class="w-full text-left">
                                     <thead class="bg-gray-100 border-b border-gray-200">
                                         <tr>
                                             <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">No.</th>
@@ -1642,7 +1898,7 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                                 </table>
 
                                 <!-- Pagination Controls -->
-                                <div v-if="rainTotalPages > 1" class="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-100">
+                                <div v-if="(rainActiveTab || rainTabs[0]) !== 'Summary' && rainTotalPages > 1" class="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-100">
                                     <div class="flex items-center gap-2">
                                         <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Page {{ currentPage }} of {{ rainTotalPages }}</span>
                                         <span class="text-[10px] text-gray-300 font-bold uppercase tracking-widest">({{ filteredRainRecords.length }} records)</span>
@@ -1692,15 +1948,28 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                             <div v-if="heatIndexRecords.length > 0" class="bg-white border border-gray-200 rounded-sm overflow-hidden mt-8">
                                 <div class="flex justify-between items-center py-2 px-4 border-b border-gray-100">
                                     <h4 class="font-bold text-gray-600 uppercase text-sm">Heat Index Data Table</h4>
-                                    <button 
-                                        @click="exportToExcel" 
-                                        class="bg-green-700 hover:bg-green-600 text-white px-4 py-1.5 rounded-sm font-bold uppercase tracking-wider text-[10px] transition-colors flex items-center gap-2"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                        </svg>
-                                        Export Data
-                                    </button>
+                                    <div class="flex gap-2">
+                                        <button 
+                                            v-if="(heatIndexActiveTab || heatIndexTabs[0]) === 'Summary'"
+                                            @click="exportSummaryToExcel" 
+                                            class="bg-green-700 hover:bg-green-600 text-white px-4 py-1.5 rounded-sm font-bold uppercase tracking-wider text-[10px] transition-colors flex items-center gap-2"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
+                                            Export Summary
+                                        </button>
+                                        <button 
+                                            v-else
+                                            @click="exportToExcel" 
+                                            class="bg-green-700 hover:bg-green-600 text-white px-4 py-1.5 rounded-sm font-bold uppercase tracking-wider text-[10px] transition-colors flex items-center gap-2"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
+                                            Export Data
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <!-- Heat Index Tab Navigation -->
@@ -1748,7 +2017,37 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                                         </button>
                                     </div>
                                 </div>
-                                <table class="w-full text-left">
+                                <!-- Heat Index Matrix View for Summary -->
+                                <div v-if="(heatIndexActiveTab || heatIndexTabs[0]) === 'Summary' && heatIndexSummaryMatrix" class="overflow-x-auto">
+                                    <table class="w-full text-left border-collapse">
+                                        <thead class="bg-gray-100 border-b border-gray-200">
+                                            <tr>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase border-r border-gray-200">Date</th>
+                                                <th v-for="station in heatIndexSummaryMatrix.stations" :key="station" class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center border-r border-gray-200">
+                                                    {{ station }} (°C)
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-100">
+                                            <tr v-for="(row, idx) in heatIndexSummaryMatrix.rows" :key="idx" class="hover:bg-gray-50 transition-colors">
+                                                <td class="px-4 py-2 text-sm text-gray-500 font-bold border-r border-gray-200">{{ row.dateLabel }}</td>
+                                                <td v-for="station in heatIndexSummaryMatrix.stations" :key="station" class="px-4 py-2 text-sm text-gray-800 font-bold text-center border-r border-gray-200">
+                                                    {{ row[station] }}
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                        <tfoot class="bg-gray-50 border-t-2 border-gray-200">
+                                            <tr class="font-bold">
+                                                <td class="px-4 py-3 text-[10px] text-gray-600 uppercase border-r border-gray-200">Ave. Heat Index/day</td>
+                                                <td v-for="station in heatIndexSummaryMatrix.stations" :key="station" class="px-4 py-3 text-sm text-green-700 text-center border-r border-gray-200">
+                                                    {{ heatIndexSummaryMatrix.averages[station] }}
+                                                </td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+
+                                <table v-else class="w-full text-left">
                                     <thead class="bg-gray-100 border-b border-gray-200">
                                         <tr>
                                             <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">No.</th>
@@ -1778,7 +2077,7 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                                 </table>
 
                                 <!-- Pagination Controls -->
-                                <div v-if="heatIndexTotalPages > 1" class="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-100">
+                                <div v-if="(heatIndexActiveTab || heatIndexTabs[0]) !== 'Summary' && heatIndexTotalPages > 1" class="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-100">
                                     <div class="flex items-center gap-2">
                                         <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Page {{ currentPage }} of {{ heatIndexTotalPages }}</span>
                                         <span class="text-[10px] text-gray-300 font-bold uppercase tracking-widest">({{ filteredHeatIndexRecords.length }} records)</span>
@@ -1811,7 +2110,7 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                         <div v-show="selectedReport === 'Water Level' && waterLevelRecords.length > 0" class="space-y-6">
                             <div class="space-y-2">
                                 <div class="flex justify-between items-center">
-                                    <h4 class="font-bold text-gray-600 uppercase text-sm">Water Level Sensor Data Chart</h4>
+                                    <h4 class="font-bold text-gray-600 uppercase text-sm hidden">Water Level Sensor Data Chart</h4>
                                     <button 
                                         @click="downloadChart" 
                                         class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-sm font-bold uppercase tracking-wider text-[10px] transition-colors flex items-center gap-2"
@@ -1830,15 +2129,28 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                             <div v-if="waterLevelRecords.length > 0" class="bg-white border border-gray-200 rounded-sm overflow-hidden">
                                 <div class="flex justify-between items-center py-2 px-4">
                                     <h4 class="font-bold text-gray-600 uppercase text-sm">Water Level Data Table</h4>
-                                    <button 
-                                        @click="exportToExcel" 
-                                        class="bg-green-700 hover:bg-green-600 text-white px-4 py-1.5 rounded-sm font-bold uppercase tracking-wider text-[10px] transition-colors flex items-center gap-2"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                        </svg>
-                                        Export Data
-                                    </button>
+                                    <div class="flex gap-2">
+                                        <button 
+                                            v-if="(waterLevelActiveTab || waterLevelTabs[0]) === 'Summary'"
+                                            @click="exportSummaryToExcel" 
+                                            class="bg-green-700 hover:bg-green-600 text-white px-4 py-1.5 rounded-sm font-bold uppercase tracking-wider text-[10px] transition-colors flex items-center gap-2"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
+                                            Export Summary
+                                        </button>
+                                        <button 
+                                            v-else
+                                            @click="exportToExcel" 
+                                            class="bg-green-700 hover:bg-green-600 text-white px-4 py-1.5 rounded-sm font-bold uppercase tracking-wider text-[10px] transition-colors flex items-center gap-2"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
+                                            Export Data
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <!-- Water Level Tab Navigation -->
@@ -1886,7 +2198,37 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                                         </button>
                                     </div>
                                 </div>
-                                <table class="w-full text-left">
+                                <!-- Water Level Matrix View for Summary -->
+                                <div v-if="(waterLevelActiveTab || waterLevelTabs[0]) === 'Summary' && waterLevelSummaryMatrix" class="overflow-x-auto">
+                                    <table class="w-full text-left border-collapse">
+                                        <thead class="bg-gray-100 border-b border-gray-200">
+                                            <tr>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase border-r border-gray-200">Date</th>
+                                                <th v-for="sensor in waterLevelSummaryMatrix.sensors" :key="sensor" class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center border-r border-gray-200">
+                                                    {{ sensor }} (m)
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-100">
+                                            <tr v-for="(row, idx) in waterLevelSummaryMatrix.rows" :key="idx" class="hover:bg-gray-50 transition-colors">
+                                                <td class="px-4 py-2 text-sm text-gray-500 font-bold border-r border-gray-200">{{ row.dateLabel }}</td>
+                                                <td v-for="sensor in waterLevelSummaryMatrix.sensors" :key="sensor" class="px-4 py-2 text-sm text-gray-800 font-bold text-center border-r border-gray-200">
+                                                    {{ row[sensor] }}
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                        <tfoot class="bg-gray-50 border-t-2 border-gray-200">
+                                            <tr class="font-bold">
+                                                <td class="px-4 py-3 text-[10px] text-gray-600 uppercase border-r border-gray-200">Ave. Water Level/day</td>
+                                                <td v-for="sensor in waterLevelSummaryMatrix.sensors" :key="sensor" class="px-4 py-3 text-sm text-green-700 text-center border-r border-gray-200">
+                                                    {{ waterLevelSummaryMatrix.averages[sensor] }}
+                                                </td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+
+                                <table v-else class="w-full text-left">
                                     <thead class="bg-gray-100 border-b border-gray-200">
                                         <tr>
                                             <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">No.</th>
@@ -1912,7 +2254,7 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                                 </table>
 
                                 <!-- Pagination Controls -->
-                                <div v-if="waterLevelTotalPages > 1" class="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-100">
+                                <div v-if="(waterLevelActiveTab || waterLevelTabs[0]) !== 'Summary' && waterLevelTotalPages > 1" class="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-100">
                                     <div class="flex items-center gap-2">
                                         <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Page {{ currentPage }} of {{ waterLevelTotalPages }}</span>
                                         <span class="text-[10px] text-gray-300 font-bold uppercase tracking-widest">({{ filteredWaterLevelRecords.length }} records)</span>
