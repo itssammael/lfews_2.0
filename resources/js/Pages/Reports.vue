@@ -39,9 +39,32 @@ const rainReportType = ref('Monthly');
 const heatIndexReportType = ref('Monthly');
 const waterLevelReportType = ref('Monthly');
 
-const detailRainReport = ref({ station: '', from: '', to: '', year: '', month: '' });
-const heatIndexReport = ref({ station: '', from: '', to: '', year: '', month: '' });
-const waterLevelReport = ref({ sensor: '', from: '', to: '', year: '', month: '' });
+const currentMonth = new Date().toLocaleString('default', { month: 'long' });
+const currentYear = new Date().getFullYear();
+
+const detailRainReport = ref({
+    month: currentMonth,
+    year: currentYear,
+    from: '',
+    to: '',
+    station: 'All'
+});
+
+const heatIndexReport = ref({
+    month: currentMonth, // Default Month
+    year: currentYear,
+    from: '',
+    to: '',
+    station: 'All'
+});
+
+const waterLevelReport = ref({
+    sensor: 'All',
+    year: currentYear,
+    month: currentMonth,
+    from: '',
+    to: ''
+});
 
 const isGenerating = ref(false);
 const hasSearched = ref(false);

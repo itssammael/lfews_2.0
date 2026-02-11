@@ -122,7 +122,7 @@ onMounted(() => {
         if (props.historyData?.[sensor.id]) {
             const data = props.historyData[sensor.id].map((p: { value: number; timestamp: string }) => ({
                 date: new Date(p.timestamp).getTime(),
-                value: p.value
+                value: Number(p.value)
             }));
             series.data.setAll(data);
         }
@@ -158,7 +158,7 @@ watch(() => props.latestData, (newData) => {
 
             series.data.push({
                 date: time,
-                value: result.data
+                value: Number(result.data)
             });
 
             if (series.data.length > 100) {

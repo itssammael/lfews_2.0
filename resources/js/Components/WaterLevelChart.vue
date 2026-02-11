@@ -236,14 +236,14 @@ onMounted(() => {
     if (props.history && props.history.length > 0) {
         const historyData = props.history.map((point: { value: number; timestamp: string }) => ({
             date: new Date(point.timestamp).getTime(),
-            value: point.value
+            value: Number(point.value)
         }));
         series.data.setAll(historyData);
     } else if (props.value !== undefined && props.value !== null) {
         const time = new Date(props.timestamp).getTime();
         series.data.push({
             date: time,
-            value: props.value
+            value: Number(props.value)
         });
     }
 
@@ -284,7 +284,7 @@ const addDataPoint = (value: number, timestamp: string) => {
 
     series.data.push({
         date: time,
-        value: value
+        value: Number(value)
     });
 
     // Keep only last 60 points
@@ -298,7 +298,7 @@ const addDataPoint = (value: number, timestamp: string) => {
 
 watch(() => props.value, (newValue: number | undefined) => {
     if (newValue !== undefined && newValue !== null) {
-        addDataPoint(newValue, props.timestamp);
+        addDataPoint(Number(newValue), props.timestamp);
     }
 });
 </script>
