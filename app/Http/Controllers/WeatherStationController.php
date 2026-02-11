@@ -447,20 +447,30 @@ class WeatherStationController extends Controller
 
 
     // metric_calculations
-    public function convertFahrenheitToCelsius(float $fahrenheit, int $precision = 2): float
+    public function convertFahrenheitToCelsius($fahrenheit, int $precision = 2)
     {
+        if (is_null($fahrenheit)) {
+            return 0;
+        }
         $celsius = ($fahrenheit - 32) * (5 / 9);
         return round($celsius, $precision);
     }
 
-    public function convertMphToKph(float $mph, int $precision = 2): float
+    public function convertMphToKph($mph, int $precision = 2)
     {
+        if (is_null($mph)) {
+            return 0;
+        }
         $kph = $mph * 1.609344;
         return round($kph, $precision);
     }
 
     public function calculateHeatIndex($tempF, $rh)
     {
+        if (is_null($tempF) || is_null($rh)) {
+            return 0;
+        }
+
         // Heat Index is only applicable for temps >= 80°F
         if ($tempF < 80) {
             return $tempF;
