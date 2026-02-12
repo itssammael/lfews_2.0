@@ -336,12 +336,12 @@ class WeatherStationController extends Controller
     {
         $response = Http::get('https://api.weather.com/v2/pws/observations/current', [
             'stationId' => $station->station_id,
-
             'format' => 'json',
             'units' => 'm',
             'numericPrecision' => 'decimal',
             'apiKey' => 'cb0c2dc0f7e84bdd8c2dc0f7e8ebdd4d',
         ]);
+        dd($response);
         return $response;
     }
 
@@ -443,7 +443,6 @@ class WeatherStationController extends Controller
 
         return $weatherData;
     }
-
 
 
     // metric_calculations
