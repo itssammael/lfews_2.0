@@ -334,15 +334,21 @@ class WeatherStationController extends Controller
 
     public function fetchWundergroundData($station)
     {
-        $response = Http::get('https://api.weather.com/v2/pws/observations/current', [
-            'stationId' => $station->station_id,
-            'format' => 'json',
-            'units' => 'm',
-            'numericPrecision' => 'decimal',
-            'apiKey' => 'cb0c2dc0f7e84bdd8c2dc0f7e8ebdd4d',
-        ]);
-        dd($response);
-        return $response;
+        return Http::timeout(30)
+            ->connectTimeout(15)
+            ->withOptions([
+                'curl' => [
+                    CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
+                ],
+            ])
+            ->retry(3, 2000)
+            ->get('https://api.weather.com/v2/pws/observations/current', [
+                'stationId' => $station->station_id,
+                'format' => 'json',
+                'units' => 'm',
+                'numericPrecision' => 'decimal',
+                'apiKey' => 'cb0c2dc0f7e84bdd8c2dc0f7e8ebdd4d',
+            ]);
     }
 
     public function davisWeatherStation($station)
