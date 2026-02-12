@@ -336,11 +336,7 @@ class WeatherStationController extends Controller
     {
         return Http::timeout(30)
             ->connectTimeout(15)
-            ->withOptions([
-                'curl' => [
-                    CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
-                ],
-            ])
+            ->withoutVerifying()
             ->retry(3, 2000)
             ->get('https://api.weather.com/v2/pws/observations/current', [
                 'stationId' => $station->station_id,
@@ -403,6 +399,7 @@ class WeatherStationController extends Controller
                 //    $rain_storm     = unpack("v", substr($packet, 46, 2))[1] / 100; // Offset 46
                 // Scaling and "No Data" handling
                 // Davis sentinel values: 32767 or 65535 for words, 255 for bytes
+                dd($wind_speed);
                 $weather = [
                     'temperature' => ($temp_out == 32767) ? 0 : $temp_out / 10,
                     'dewpoint' => ($dewpoint == 255) ? 0 : $dewpoint,
@@ -423,6 +420,7 @@ class WeatherStationController extends Controller
             $weather['heat_index'] = $this->calculateHeatIndex($weather['temperature'], $weather['humidity']);
             $weather['dewpoint'] = $this->calculateDewPoint($weather['temperature'], $weather['humidity']);
 
+            
 
             fclose($fp);
             $result = $this->formatResult($weather);

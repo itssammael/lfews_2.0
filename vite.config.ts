@@ -21,7 +21,7 @@ export default defineConfig({
     server: {
         host: '0.0.0.0', // Allows access from other devices
         hmr: {
-            host: 'lfews.bayawancity.gov.ph',
+            host: 'dev.lfews-bayawan',
         },
         cors: true,
     },
