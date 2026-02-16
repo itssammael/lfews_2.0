@@ -25,6 +25,10 @@ export type PageProps<T extends Record<string, unknown> = Record<string, unknown
         can: {
             admin: boolean;
             manage: boolean;
+            create: boolean;
+            read: boolean;
+            update: boolean;
+            delete: boolean;
         };
     };
     jetstream: JetstreamProps;

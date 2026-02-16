@@ -45,7 +45,7 @@ class WaterLevelSensorController extends Controller
      */
     public function create()
     {
-        \Illuminate\Support\Facades\Gate::authorize('manage-data');
+        \Illuminate\Support\Facades\Gate::authorize('can-create');
         $allSensors = WaterLevelSensor::all();
         $paginatedSensors = WaterLevelSensor::query()
             ->with(['location', 'location.locationType'])
@@ -76,7 +76,7 @@ class WaterLevelSensorController extends Controller
      */
     public function store(Request $request)
     {
-        \Illuminate\Support\Facades\Gate::authorize('manage-data');
+        \Illuminate\Support\Facades\Gate::authorize('can-create');
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'brand' => 'required|string|max:255',
@@ -128,7 +128,7 @@ class WaterLevelSensorController extends Controller
 
     public function edit(string $id)
     {
-        \Illuminate\Support\Facades\Gate::authorize('manage-data');
+        \Illuminate\Support\Facades\Gate::authorize('can-update');
         $sensor = WaterLevelSensor::find($id);
 
         if (!$sensor) {
@@ -170,7 +170,7 @@ class WaterLevelSensorController extends Controller
      */
     public function update(Request $request, WaterLevelSensor $waterLevelSensor)
     {
-        \Illuminate\Support\Facades\Gate::authorize('manage-data');
+        \Illuminate\Support\Facades\Gate::authorize('can-update');
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'brand' => 'required|string|max:255',
@@ -220,7 +220,7 @@ class WaterLevelSensorController extends Controller
      */
     public function destroy(WaterLevelSensor $waterLevelSensor)
     {
-        \Illuminate\Support\Facades\Gate::authorize('admin-only');
+        \Illuminate\Support\Facades\Gate::authorize('can-delete');
         try {
             $waterLevelSensor->delete();
             return redirect()->route('water-level-sensors')->with('success', 'Water level sensor deleted successfully.');
@@ -232,7 +232,7 @@ class WaterLevelSensorController extends Controller
 
     public function pullWaterData(ModbusService $modbusService)
     {
-        \Illuminate\Support\Facades\Gate::authorize('manage-data');
+        \Illuminate\Support\Facades\Gate::authorize('can-create');
         // Simple lock to prevent concurrent Modbus pulls
         $lockKey = 'modbus_pull_lock';
         if (\Illuminate\Support\Facades\Cache::has($lockKey)) {
@@ -286,7 +286,7 @@ class WaterLevelSensorController extends Controller
             }
 
             // Update latest data
-            \Illuminate\Support\Facades\Cache::put('latest_modbus_data', $results, 1440);
+            \Illuminate\Support\Facades\Cache::put('latest_modbus_data', $results, 60);
 
             // Update history
             $history = \Illuminate\Support\Facades\Cache::get('modbus_history', []);
@@ -328,7 +328,7 @@ class WaterLevelSensorController extends Controller
                 }
             }
 
-            \Illuminate\Support\Facades\Cache::put('modbus_history', $history, 1440); // 24 hours
+            \Illuminate\Support\Facades\Cache::put('modbus_history', $history, 60); // 24 hours
 
             \Illuminate\Support\Facades\Cache::forget($lockKey);
 

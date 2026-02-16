@@ -71,7 +71,7 @@ const deleteRiver = (river: any) => {
                             Rivers List
                         </h3>
                         <PrimaryButton 
-                            v-if="$page.props.auth.can.manage"
+                            v-if="$page.props.auth.can.create"
                             @click="openCreateModal"
                         >
                             Add River
@@ -112,14 +112,14 @@ const deleteRiver = (river: any) => {
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                         <SecondaryButton 
-                                            v-if="$page.props.auth.can.manage"
+                                            v-if="$page.props.auth.can.update"
                                             @click="openEditModal(river)" 
                                             class="mr-2"
                                         >
                                             Edit
                                         </SecondaryButton>
                                         <DangerButton 
-                                            v-if="$page.props.auth.can.admin"
+                                            v-if="$page.props.auth.can.delete"
                                             @click="deleteRiver(river)"
                                         >
                                             Delete

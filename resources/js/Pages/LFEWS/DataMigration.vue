@@ -383,9 +383,12 @@ const handleFileUpload = (event: Event) => {
     // Basic SQL parsing logic (very simplified)
     reader.onload = (e) => {
       const content = e.target?.result as string;
-      alert(
-        "SQL parsing is limited. Please use CSV/XLSX for better compatibility."
-      );
+      window.dispatchEvent(new CustomEvent('toast', { 
+        detail: { 
+            message: 'SQL parsing is limited. Please use CSV/XLSX for better compatibility.', 
+            type: 'error' 
+        } 
+      }));
     };
     reader.readAsText(file);
   }
@@ -399,7 +402,12 @@ const targetOptions = computed(() => {
 
 const importData = async () => {
   if (!targetId.value) {
-    alert("Please select a target station/sensor.");
+    window.dispatchEvent(new CustomEvent('toast', { 
+      detail: { 
+          message: 'Please select a target station/sensor.', 
+          type: 'error' 
+      } 
+    }));
     return;
   }
 
@@ -430,7 +438,12 @@ const importData = async () => {
     }
 
     // Success handling
-    alert("Data imported successfully.");
+    window.dispatchEvent(new CustomEvent('toast', { 
+        detail: { 
+            message: 'Data imported successfully.', 
+            type: 'success' 
+        } 
+    }));
     uploadedData.value = [];
     columns.value = [];
     fileName.value = "No file chosen";
@@ -444,7 +457,12 @@ const importData = async () => {
 
   } catch (error) {
     console.error(error);
-    alert("An error occurred during import. Please check console for details.");
+    window.dispatchEvent(new CustomEvent('toast', { 
+      detail: { 
+          message: 'An error occurred during import. Please check console for details.', 
+          type: 'error' 
+      } 
+    }));
   } finally {
     isImporting.value = false;
     importProgress.value = 0;
@@ -951,6 +969,7 @@ const downloadTemplate = (type: "weather_station" | "water_level_sensor") => {
                   </div>
                 </div>
                 <button
+                  v-if="$page.props.auth.can.create"
                   @click="importData"
                   :disabled="form.processing || !targetId"
                   class="inline-flex items-center px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold rounded-full shadow-lg shadow-orange-500/20 transition-all duration-200 disabled:opacity-50 disabled:shadow-none"

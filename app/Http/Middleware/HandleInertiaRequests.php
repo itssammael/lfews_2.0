@@ -53,6 +53,10 @@ class HandleInertiaRequests extends Middleware
                 'can' => $request->user() ? [
                     'admin' => $request->user()->can('admin-only'),
                     'manage' => $request->user()->can('manage-data'),
+                    'create' => $request->user()->can('can-create'),
+                    'read' => $request->user()->can('can-read'),
+                    'update' => $request->user()->can('can-update'),
+                    'delete' => $request->user()->can('can-delete'),
                 ] : [],
             ],
         ];

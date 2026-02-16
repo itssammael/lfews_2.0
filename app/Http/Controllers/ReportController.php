@@ -15,6 +15,7 @@ class ReportController extends Controller
 {
     public function index()
     {
+        \Illuminate\Support\Facades\Gate::authorize('can-read');
         $sensors = WaterLevelSensor::all();
         $stations = WeatherStation::all();
 
@@ -39,6 +40,7 @@ class ReportController extends Controller
 
     public function getWaterLevelData(Request $request)
     {
+        \Illuminate\Support\Facades\Gate::authorize('can-read');
         $query = WaterLevelSensorData::with('sensor');
 
         if ($request->has('sensor') && $request->sensor !== 'All' && $request->sensor !== '') {
@@ -129,6 +131,7 @@ class ReportController extends Controller
 
     public function getWeatherObservationData(Request $request)
     {
+        \Illuminate\Support\Facades\Gate::authorize('can-read');
         $query = WeatherStationObservationData::with('weatherStation');
 
         if ($request->has('station') && $request->station !== 'All' && $request->station !== '') {

@@ -21,11 +21,9 @@ class RiverController extends Controller
         ]);
     }
 
-
-
     public function store(Request $request)
     {
-        \Illuminate\Support\Facades\Gate::authorize('manage-data');
+        \Illuminate\Support\Facades\Gate::authorize('can-create');
         $request->validate([
             'name' => 'required|string',
             'properties' => 'nullable|array',
@@ -39,7 +37,7 @@ class RiverController extends Controller
 
     public function update(Request $request, River $river)
     {
-        \Illuminate\Support\Facades\Gate::authorize('manage-data');
+        \Illuminate\Support\Facades\Gate::authorize('can-update');
         $request->validate([
             'name' => 'required|string',
             'properties' => 'nullable|array',
@@ -53,7 +51,7 @@ class RiverController extends Controller
 
     public function destroy(River $river)
     {
-        \Illuminate\Support\Facades\Gate::authorize('admin-only');
+        \Illuminate\Support\Facades\Gate::authorize('can-delete');
         $river->delete();
         return redirect()->route('rivers.index')->with('success', 'River deleted successfully.');
     }

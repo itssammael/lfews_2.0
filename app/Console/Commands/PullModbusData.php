@@ -37,13 +37,13 @@ class PullModbusData extends Command
                 try {
                     $data = $modbusService->readModbusData(
                         $sensor->ip,
-                        (int)$sensor->port,
+                        (int) $sensor->port,
                         1, // startAddress (from previous requirement)
                         6, // quantity
-                        (int)$sensor->slave_id,
+                        (int) $sensor->slave_id,
                         3.0// timeout
                     );
-                    
+
                     if ($data[5] !== 0) {
                         $results[$sensor->id] = [
                             'sensor_id' => $sensor->id,
@@ -70,8 +70,8 @@ class PullModbusData extends Command
                 }
             }
 
-            \Illuminate\Support\Facades\Cache::put('latest_modbus_data', $results, 1440);
-            
+            \Illuminate\Support\Facades\Cache::put('latest_modbus_data', $results, 60);
+
             // Update history
             $history = \Illuminate\Support\Facades\Cache::get('modbus_history', []);
             if (empty($history)) {
@@ -88,21 +88,21 @@ class PullModbusData extends Command
                         'value' => $entry->sensor_data,
                         'timestamp' => $entry->date,
                     ];
-                    
+
                 }
             }
             foreach ($results as $sensorId => $result) {
-            
+
                 if ($result['success']) {
                     if (!isset($history[$sensorId])) {
                         $history[$sensorId] = [];
                     }
-                    
+
                     $history[$sensorId][] = [
                         'value' => $result['data'],
                         'timestamp' => $result['timestamp']
                     ];
-                    
+
 
                     // Keep only last 50 points
                     if (count($history[$sensorId]) > 50) {
@@ -110,8 +110,8 @@ class PullModbusData extends Command
                     }
                 }
             }
-            \Illuminate\Support\Facades\Cache::put('modbus_history', $history, 1440); // 24 hours
-            
+            \Illuminate\Support\Facades\Cache::put('modbus_history', $history, 60); // 24 hours
+
             $this->info('[' . now()->toDateTimeString() . '] Pulled data for ' . $sensors->count() . ' sensors.');
 
             sleep(300);

@@ -139,7 +139,7 @@ const closePingModal = () => {
                                     Water Level Sensor List
                                 </h2>
                                 <Link
-                                    v-if="$page.props.auth.can.manage"
+                                    v-if="$page.props.auth.can.create"
                                     :href="route('water-level-sensors.create')"
                                     class="inline-flex items-center px-4 py-2 bg-gray-800 dark:bg-gray-200 border border-transparent rounded-md font-semibold text-xs text-white dark:text-gray-800 uppercase tracking-widest hover:bg-gray-700 dark:hover:bg-white focus:bg-gray-700 dark:focus:bg-white active:bg-gray-900 dark:active:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150"
                                 >
@@ -200,32 +200,32 @@ const closePingModal = () => {
                             </div>
                             <div class="flex justify-center space-x-2">
                                 <Link 
-                                    v-if="$page.props.auth.can.manage"
+                                    v-if="$page.props.auth.can.update"
                                     :href="route('water-level-sensors.edit', sensor.id)"
                                     class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
                                 >
                                     Edit
                                 </Link>
                                 <button
-                                    v-if="$page.props.auth.can.admin"
+                                    v-if="$page.props.auth.can.delete"
                                     @click="confirmSensorDeletion(sensor)"
                                     class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
                                 >
                                     Delete
                                 </button>
                                 <button
-                                    v-if="$page.props.auth.can.manage && sensor.ip"
+                                    v-if="$page.props.auth.can.read && sensor.ip"
                                     @click="pingSensor(sensor)"
                                     class="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
                                 >
                                     Ping
                                 </button>
-                                <span v-if="!$page.props.auth.can.manage" class="text-gray-400 text-sm">No Actions</span>
+                                <span v-if="!$page.props.auth.can.update && !$page.props.auth.can.delete" class="text-gray-400 text-sm">No Actions</span>
                             </div>
                         </div>
 
                         <div v-if="props.sensors.data.length === 0" class="w-full py-10 text-center text-gray-500 dark:text-gray-400 text-xl font-medium">
-                            No sensors found. <Link v-if="$page.props.auth.can.manage" :href="route('water-level-sensors.create')" class="text-indigo-600 hover:text-indigo-500 underline">Add one now</Link>.
+                            No sensors found. <Link v-if="$page.props.auth.can.create" :href="route('water-level-sensors.create')" class="text-indigo-600 hover:text-indigo-500 underline">Add one now</Link>.
                         </div>
 
                         <Pagination :links="props.sensors.links" />

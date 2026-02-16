@@ -16,7 +16,7 @@ class ConnectivityController extends Controller
      */
     public function ping(Request $request)
     {
-        Gate::authorize('manage-data');
+        Gate::authorize('can-read');
 
         $request->validate([
             'ip' => 'required|string',

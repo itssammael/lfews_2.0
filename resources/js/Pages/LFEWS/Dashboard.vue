@@ -125,8 +125,13 @@ let interval: any = null;
 const pullData = () => {
   if (processingWater.value) return;
   processingWater.value = true;
+  
+  const endpoint = page.props.auth.can.create 
+    ? route("dashboard.pull-water-data") 
+    : route("dashboard.refresh-water-data");
+
   router.post(
-    route("dashboard.pull-water-data"),
+    endpoint,
     {},
     {
       preserveScroll: true,
@@ -142,8 +147,13 @@ const pullData = () => {
 const pullWeatherData = () => {
   if (processingWeather.value) return;
   processingWeather.value = true;
+
+  const endpoint = page.props.auth.can.create 
+    ? route("dashboard.pull-weather-data") 
+    : route("dashboard.refresh-weather-data");
+
   router.post(
-    route("dashboard.pull-weather-data"),
+    endpoint,
     {},
     {
       preserveScroll: true,
@@ -198,7 +208,7 @@ onUnmounted(() => {
                                 Water Level Sensors Data
                             </h3>
                             
-                            <div v-if="$page.props.auth.can.admin" class="flex items-center space-x-4">
+                            <div v-if="$page.props.auth.can.read" class="flex items-center space-x-4">
                                 <div class="flex items-center">
                                     <Checkbox 
                                         id="auto-pull" 
@@ -214,7 +224,7 @@ onUnmounted(() => {
                                     :disabled="processingWater"
                                     class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 focus:bg-blue-700 active:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150 disabled:opacity-50"
                                 >
-                                    {{ processingWater ? 'Pulling...' : 'Pull Data Now' }}
+                                    {{ processingWater ? 'Pulling...' : ($page.props.auth.can.create ? 'Pull Data Now' : 'Refresh Data') }}
                                 </button>
                             </div>
                         </div>
@@ -282,7 +292,7 @@ onUnmounted(() => {
                                     Weather Stations Observation Data
                                 </h3>
                                 
-                                <div v-if="$page.props.auth.can.manage" class="flex items-center space-x-4">
+                                <div v-if="$page.props.auth.can.read" class="flex items-center space-x-4">
                                     <div class="flex items-center">
                                         <Checkbox 
                                             id="auto-weather-pull" 
@@ -298,7 +308,7 @@ onUnmounted(() => {
                                         :disabled="processingWeather"
                                         class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 focus:bg-blue-700 active:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150 disabled:opacity-50"
                                     >
-                                        {{ processingWeather ? 'Pulling...' : 'Pull Data Now' }}
+                                        {{ processingWeather ? 'Pulling...' : ($page.props.auth.can.create ? 'Pull Data Now' : 'Refresh Data') }}
                                     </button>
                                 </div>
                             </div>

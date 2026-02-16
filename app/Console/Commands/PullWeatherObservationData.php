@@ -34,12 +34,12 @@ class PullWeatherObservationData extends Command
         while (true) {
             $stations = \App\Models\WeatherStation::where('state', 1)->get();
             $observations = [];
-            
+
             foreach ($stations as $station) {
                 $this->info("Pulling data for station: {$station->name} ({$station->station_id})");
                 try {
                     $weatherData = null;
-                    if($station->mode === "API/wunderground"){
+                    if ($station->mode === "API/wunderground") {
                         $response = $controller->fetchWundergroundData($station);
                         if ($response && $response->successful()) {
                             $weatherData = $response->json();
@@ -52,7 +52,7 @@ class PullWeatherObservationData extends Command
                             $this->error("Failed to connect to Davis station at {$station->ip}");
                         }
                     }
-                    
+
                     if ($weatherData && isset($weatherData['observations']) && !empty($weatherData['observations'])) {
                         $obs = $weatherData['observations'][0];
                         $trimmedData = [
@@ -71,7 +71,7 @@ class PullWeatherObservationData extends Command
                             'date_time' => Carbon::parse($obs['obsTimeLocal'])->toDateTimeString(),
                             'weather_station_id' => $station->id,
                         ];
-                        
+
                         $observations[$station->id] = [
                             'id' => $station->id,
                             'station_id' => $station->station_id,
@@ -80,7 +80,7 @@ class PullWeatherObservationData extends Command
                             'data' => $trimmedData,
                             'timestamp' => now()->toDateTimeString(),
                         ];
-                         
+
                         WeatherStationObservationData::create($trimmedData);
                         $this->info("Successfully pulled and stored data for {$station->name}");
                     } else {
@@ -108,8 +108,8 @@ class PullWeatherObservationData extends Command
             }
 
             // Update latest data
-            \Illuminate\Support\Facades\Cache::put('latest_weather_observation_data', $observations, 1440);
-            
+            \Illuminate\Support\Facades\Cache::put('latest_weather_observation_data', $observations, 60);
+
             // Update history
             $history = \Illuminate\Support\Facades\Cache::get('weather_observation_history', []);
             foreach ($observations as $stationId => $observation) {
@@ -117,7 +117,7 @@ class PullWeatherObservationData extends Command
                     if (!isset($history[$stationId])) {
                         $history[$stationId] = [];
                     }
-                    
+
                     $history[$stationId][] = [
                         'data' => $observation['data'],
                         'timestamp' => $observation['timestamp']
@@ -128,8 +128,8 @@ class PullWeatherObservationData extends Command
                     }
                 }
             }
-            \Illuminate\Support\Facades\Cache::put('weather_observation_history', $history, 1440); 
-            
+            \Illuminate\Support\Facades\Cache::put('weather_observation_history', $history, 60);
+
             $this->info('[' . now()->toDateTimeString() . '] Processed ' . count($observations) . ' stations.');
             sleep(300);
         }

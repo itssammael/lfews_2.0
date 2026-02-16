@@ -13,6 +13,7 @@ class DataMigrationController extends Controller
 {
     public function index()
     {
+        \Illuminate\Support\Facades\Gate::authorize('can-create');
         $weatherStations = WeatherStation::all();
         $waterLevelSensors = WaterLevelSensor::all();
 
@@ -24,6 +25,7 @@ class DataMigrationController extends Controller
 
     public function import(Request $request)
     {
+        \Illuminate\Support\Facades\Gate::authorize('can-create');
         $request->validate([
             'target' => 'required|in:weather_station,water_level_sensor',
             'target_id' => 'required|integer',
@@ -42,7 +44,7 @@ class DataMigrationController extends Controller
             }
         } elseif ($target === 'water_level_sensor') {
             foreach ($data as $row) {
-                WaterLevelSensorData::create(array_merge($row, [
+                WeatherStationObservationData::create(array_merge($row, [
                     'water_level_sensor_id' => $targetId,
                 ]));
             }

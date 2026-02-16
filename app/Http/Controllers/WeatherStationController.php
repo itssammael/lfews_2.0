@@ -44,7 +44,7 @@ class WeatherStationController extends Controller
      */
     public function create()
     {
-        \Illuminate\Support\Facades\Gate::authorize('manage-data');
+        \Illuminate\Support\Facades\Gate::authorize('can-create');
         $allStations = WeatherStation::all();
         $paginatedStations = WeatherStation::query()
             ->with(['location', 'location.locationType'])
@@ -76,7 +76,7 @@ class WeatherStationController extends Controller
      */
     public function store(Request $request)
     {
-        \Illuminate\Support\Facades\Gate::authorize('manage-data');
+        \Illuminate\Support\Facades\Gate::authorize('can-create');
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'station_id' => 'required|string|max:255',
@@ -122,7 +122,7 @@ class WeatherStationController extends Controller
      */
     public function edit(string $id)
     {
-        \Illuminate\Support\Facades\Gate::authorize('manage-data');
+        \Illuminate\Support\Facades\Gate::authorize('can-update');
         $station = WeatherStation::find($id);
 
         if (!$station) {
@@ -162,7 +162,7 @@ class WeatherStationController extends Controller
      */
     public function update(Request $request, WeatherStation $weatherStation)
     {
-        \Illuminate\Support\Facades\Gate::authorize('manage-data');
+        \Illuminate\Support\Facades\Gate::authorize('can-update');
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'station_id' => 'required|string|max:255',
@@ -204,7 +204,7 @@ class WeatherStationController extends Controller
      */
     public function destroy(WeatherStation $weatherStation)
     {
-        \Illuminate\Support\Facades\Gate::authorize('admin-only');
+        \Illuminate\Support\Facades\Gate::authorize('can-delete');
         try {
             $weatherStation->delete();
             return redirect()->route('weather-stations')->with('success', 'Weather station deleted successfully.');
@@ -216,7 +216,7 @@ class WeatherStationController extends Controller
 
     public function pullObservationData()
     {
-        \Illuminate\Support\Facades\Gate::authorize('manage-data');
+        \Illuminate\Support\Facades\Gate::authorize('can-create');
         // Simple lock to prevent concurrent weather api pulls
         $lockKey = 'weather_pull_lock';
         if (\Illuminate\Support\Facades\Cache::has($lockKey)) {
@@ -288,7 +288,7 @@ class WeatherStationController extends Controller
             } //END of for loop
 
             // Update latest data
-            \Illuminate\Support\Facades\Cache::put('latest_weather_observation_data', $observations, 1440);
+            \Illuminate\Support\Facades\Cache::put('latest_weather_observation_data', $observations, 60);
 
             //Update history
             $history = \Illuminate\Support\Facades\Cache::get('weather_observation_history', []);
@@ -309,7 +309,7 @@ class WeatherStationController extends Controller
                     }
                 }
             }
-            \Illuminate\Support\Facades\Cache::put('weather_observation_history', $history, 1440); // 24 hours
+            \Illuminate\Support\Facades\Cache::put('weather_observation_history', $history, 60); // 24 hours
 
             \Illuminate\Support\Facades\Cache::forget($lockKey);
 
@@ -426,7 +426,7 @@ class WeatherStationController extends Controller
             $weather['heat_index'] = $this->calculateHeatIndex($weather['temperature'], $weather['humidity']);
             $weather['dewpoint'] = $this->calculateDewPoint($weather['temperature'], $weather['humidity']);
 
-            
+
 
             fclose($fp);
             $result = $this->formatResult($weather);
