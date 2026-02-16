@@ -204,7 +204,7 @@ const downloadTemplate = (type: 'weather_station' | 'water_level_sensor') => {
                     <div class="col-span-12 lg:col-span-4 h-full flex flex-col space-y-6 overflow-y-auto pr-2 scrollbar-thin">
                         
                         <!-- Upload Section -->
-                        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-8 shrink-0">
+                        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border-2 border-blue-600 dark:border-gray-700 p-8 shrink-0">
                             <h3 class="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-6">Upload File</h3>
                             
                             <div class="space-y-6">
@@ -254,7 +254,7 @@ const downloadTemplate = (type: 'weather_station' | 'water_level_sensor') => {
                         </div>
 
                         <!-- Settings Section -->
-                        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-8 shrink-0">
+                        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border-2 border-blue-600 dark:border-gray-700 p-8 shrink-0">
                             <h3 class="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-6">Import Settings</h3>
                             
                             <div class="space-y-6">
@@ -279,7 +279,7 @@ const downloadTemplate = (type: 'weather_station' | 'water_level_sensor') => {
 
                     <!-- Right Column: Data View -->
                     <div class="col-span-12 lg:col-span-8 h-full overflow-hidden">
-                        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 h-full flex flex-col overflow-hidden">
+                        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border-2 border-blue-600 dark:border-gray-700 h-full flex flex-col overflow-hidden">
                             
                             <!-- Spreadsheet Header -->
                             <div v-if="uploadedData.length > 0" class="p-6 border-b border-gray-50 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-800 rounded-t-2xl sticky top-0 z-10">
