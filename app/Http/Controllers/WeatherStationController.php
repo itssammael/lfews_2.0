@@ -28,7 +28,7 @@ class WeatherStationController extends Controller
             ->paginate(6)
             ->withQueryString();
 
-        return Inertia::render('WeatherStations', [
+        return Inertia::render('LFEWS/WeatherStations', [
             'stations' => $paginatedStations,
             'filters' => request()->only(['search']),
             'showCreateModal' => false,
@@ -59,7 +59,7 @@ class WeatherStationController extends Controller
             ->withQueryString();
         $locations = Location::with('locationType')->get();
 
-        return Inertia::render('WeatherStations', [
+        return Inertia::render('LFEWS/WeatherStations', [
             'stations' => $paginatedStations,
             'filters' => request()->only(['search']),
             'locations' => $locations,
@@ -145,7 +145,7 @@ class WeatherStationController extends Controller
             ->withQueryString();
         $locations = Location::with('locationType')->get();
 
-        return Inertia::render('WeatherStations', [
+        return Inertia::render('LFEWS/WeatherStations', [
             'stations' => $paginatedStations,
             'filters' => request()->only(['search']),
             'locations' => $locations,
@@ -399,7 +399,7 @@ class WeatherStationController extends Controller
                 //    $rain_storm     = unpack("v", substr($packet, 46, 2))[1] / 100; // Offset 46
                 // Scaling and "No Data" handling
                 // Davis sentinel values: 32767 or 65535 for words, 255 for bytes
-                dd($wind_speed);
+
                 $weather = [
                     'temperature' => ($temp_out == 32767) ? 0 : $temp_out / 10,
                     'dewpoint' => ($dewpoint == 255) ? 0 : $dewpoint,

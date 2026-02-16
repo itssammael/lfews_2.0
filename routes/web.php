@@ -68,4 +68,9 @@ Route::middleware([
     });
 
     Route::get('/locator', [\App\Http\Controllers\LocatorController::class, 'index'])->name('locator');
+
+    Route::get('/data-migration', [\App\Http\Controllers\DataMigrationController::class, 'index'])->name('data-migration.index')
+        ->middleware('can:manage-data');
+    Route::post('/data-migration/import', [\App\Http\Controllers\DataMigrationController::class, 'import'])->name('data-migration.import')
+        ->middleware('can:manage-data');
 });

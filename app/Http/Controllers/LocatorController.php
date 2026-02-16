@@ -19,7 +19,7 @@ class LocatorController extends Controller
         $locations = Location::with('locationType')->whereHas('locationType')->get();
         $rivers = \App\Models\River::all();
 
-        return Inertia::render('Locator', [
+        return Inertia::render('LFEWS/Locator', [
             'weatherStations' => $weatherStations,
             'waterLevelSensors' => $waterLevelSensors,
             'locations' => $locations,

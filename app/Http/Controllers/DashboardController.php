@@ -11,7 +11,7 @@ class DashboardController extends Controller
     public function index()
     {
 
-        return Inertia::render('Dashboard', [
+        return Inertia::render('LFEWS/Dashboard', [
             'sensors' => \App\Models\WaterLevelSensor::all(),
             'stations' => \App\Models\WeatherStation::all(),
             'latestData' => \Illuminate\Support\Facades\Cache::get('latest_modbus_data'),

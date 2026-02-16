@@ -10,7 +10,7 @@ class RiverController extends Controller
 {
     public function index()
     {
-        return Inertia::render('Rivers/Index', [
+        return Inertia::render('LFEWS/Rivers', [
             'rivers' => River::query()
                 ->when(request('search'), function ($query, $search) {
                     $query->where('name', 'like', "%{$search}%");

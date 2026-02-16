@@ -28,7 +28,7 @@ class ReportController extends Controller
             ->orderBy('year', 'desc')
             ->pluck('year');
 
-        return Inertia::render('Reports', [
+        return Inertia::render('LFEWS/Reports', [
             'sensors' => $sensors,
             'stations' => $stations,
             'waterLevelYears' => $waterLevelYears,
