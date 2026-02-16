@@ -16,6 +16,8 @@ const rawUploadedData = ref<any[]>([]);
 const rawColumns = ref<string[]>([]);
 const targetType = ref("weather_station");
 const targetId = ref<number | null>(null);
+const isParsing = ref(false);
+const parsingProgress = ref(0);
 
 // Pagination State
 const currentPage = ref(1);
@@ -132,6 +134,115 @@ const removeColumn = (colName: string) => {
   });
 };
 
+const cleanseDate = () => {
+  let hourShift = 0;
+  let shiftDay = false;
+  uploadedData.value = uploadedData.value.map((row) => {
+    const newRow = { ...row };
+    Object.keys(newRow).forEach((key) => {
+      if (
+        key.toLowerCase().includes("date") &&
+        typeof newRow[key] === "string"
+      ) {
+        const val = newRow[key];
+        if (val.includes("_")) {
+          const parts = val.split("_");
+          const datePart = parts[0];
+          const afterUnderscore = parts[1] || "";
+          const len = afterUnderscore.length;
+
+          let timeStr = "";
+          if (len === 1) {
+            timeStr = "000" + afterUnderscore + "00";
+          } else if (len === 2) {
+            timeStr = "00" + afterUnderscore + "00";
+          } else if (len === 3) {
+            timeStr = "0" + afterUnderscore + "00";
+          } else if (len === 4) {
+            timeStr = afterUnderscore + "00";
+          }
+
+          if (timeStr.length === 6) {
+            const formattedTime = timeStr.match(/.{1,2}/g)?.join(":") || timeStr;
+            let finalValue = datePart + " " + formattedTime;
+
+            // Find if there's a 'time' column to append AM/PM
+            const timeKey = Object.keys(row).find(
+              (k) => k.toLowerCase() === "time"
+            );
+            if (timeKey && row[timeKey]) {
+              const amPm = String(row[timeKey]).match(/AM|PM/i);
+              if (amPm) {
+                finalValue += " " + amPm[0].toUpperCase();
+              }
+            }
+
+            // Time Shift Logic: if "00:00:00 PM" is detected, increment shift and apply to all subsequent
+            if (finalValue.includes("00:00:00 PM")) {
+              hourShift++;
+            }
+
+            if (hourShift > 0) {
+              // Apply hour shift
+              const dateTimeParts = finalValue.split(" ");
+              const dateStr = dateTimeParts[0];
+              const timeStrFull = dateTimeParts[1];
+              const ampmStr = dateTimeParts[2] || "";
+
+              let d = new Date(`${dateStr} ${timeStrFull}`);
+              if (!isNaN(d.getTime())) {
+                d.setHours(d.getHours() + hourShift);
+
+                const pad = (n: number | string) => String(n).padStart(2, "0");
+                const newDate = `${d.getFullYear()}-${pad(
+                  d.getMonth() + 1
+                )}-${pad(d.getDate())}`;
+                const newTime = `${pad(d.getHours())}:${pad(
+                  d.getMinutes()
+                )}:${pad(d.getSeconds())}`;
+
+                finalValue = `${newDate} ${newTime}${
+                  ampmStr ? " " + ampmStr : ""
+                }`;
+              }
+            }
+
+            // Day Correction Logic: AFTER shifts, check if we need to flip PM to AM and add a day
+            if (shiftDay) {
+              finalValue = finalValue.replace("PM", "AM");
+              const dateTimeParts = finalValue.split(" ");
+              const datePartStr = dateTimeParts[0];
+              const timePartStr = dateTimeParts[1];
+              const ampmPartStr = dateTimeParts[2] || "";
+
+              let d = new Date(`${datePartStr} ${timePartStr}`);
+              if (!isNaN(d.getTime())) {
+                d.setDate(d.getDate() + 1);
+                const pad = (n: number | string) => String(n).padStart(2, "0");
+                const newDate = `${d.getFullYear()}-${pad(
+                  d.getMonth() + 1
+                )}-${pad(d.getDate())}`;
+                finalValue = `${newDate} ${timePartStr}${
+                  ampmPartStr ? " " + ampmPartStr : ""
+                }`;
+              }
+            }
+
+            newRow[key] = finalValue;
+
+            if (finalValue.includes("11:59:00 PM")) {
+              shiftDay = true;
+            }
+
+            
+          }
+        }
+      }
+    });
+    return newRow;
+  });
+};
+
 const resetData = () => {
   uploadedData.value = JSON.parse(JSON.stringify(rawUploadedData.value));
   columns.value = [...rawColumns.value];
@@ -209,7 +320,7 @@ const handleFileUpload = (event: Event) => {
     file.name.endsWith(".xls") ||
     file.name.endsWith(".csv")
   ) {
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const data = e.target?.result;
       const workbook = XLSX.read(data, { type: "binary", cellDates: true });
       const sheetName = workbook.SheetNames[0];
@@ -218,26 +329,46 @@ const handleFileUpload = (event: Event) => {
 
       if (json.length > 0) {
         columns.value = Object.keys(json[0] as object);
-        uploadedData.value = json.map((row: any) => {
-          const newRow = { ...row };
-          Object.keys(newRow).forEach((key) => {
-            const k = key.toLowerCase();
-            if (
-              k === "date" ||
-              k === "date_time" ||
-              k === "datetime" ||
-              k === "timestamp" ||
-              k.includes("date")
-            ) {
-              if (newRow[key]) {
-                newRow[key] = formatDate(newRow[key]);
+        isParsing.value = true;
+        parsingProgress.value = 0;
+
+        const totalRows = json.length;
+        const chunkSize = 500;
+        const processedRows: any[] = [];
+
+        for (let i = 0; i < totalRows; i += chunkSize) {
+          const chunk = json.slice(i, i + chunkSize);
+          const formattedChunk = chunk.map((row: any) => {
+            const newRow = { ...row };
+            Object.keys(newRow).forEach((key) => {
+              const k = key.toLowerCase();
+              if (
+                k === "date" ||
+                k === "date_time" ||
+                k === "datetime" ||
+                k === "timestamp" ||
+                k.includes("date")
+              ) {
+                if (newRow[key]) {
+                  newRow[key] = formatDate(newRow[key]);
+                }
               }
-            }
+            });
+            return newRow;
           });
-          return newRow;
-        });
+
+          processedRows.push(...formattedChunk);
+          parsingProgress.value = ((i + chunk.length) / totalRows) * 100;
+
+          // Allow UI to update
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        }
+
+        uploadedData.value = processedRows;
         rawUploadedData.value = JSON.parse(JSON.stringify(uploadedData.value));
         rawColumns.value = [...columns.value];
+        isParsing.value = false;
+        parsingProgress.value = 0;
       }
     };
     reader.readAsBinaryString(file);
@@ -285,6 +416,42 @@ const importData = () => {
 const totalPages = computed(() =>
   Math.ceil(uploadedData.value.length / rowsPerPage)
 );
+
+const displayedPages = computed(() => {
+  const total = totalPages.value;
+  const current = currentPage.value;
+
+  if (total <= 30) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+
+  const pages: (number | string)[] = [];
+  const delta = 2; // Number of pages to show around current page
+  const left = current - delta;
+  const right = current + delta;
+  const range: number[] = [];
+
+  for (let i = 1; i <= total; i++) {
+    if (i === 1 || i === total || (i >= left && i <= right)) {
+      range.push(i);
+    }
+  }
+
+  let l: number | undefined;
+  for (const i of range) {
+    if (l) {
+      if (i - l === 2) {
+        pages.push(l + 1);
+      } else if (i - l !== 1) {
+        pages.push("...");
+      }
+    }
+    pages.push(i);
+    l = i;
+  }
+
+  return pages;
+});
 
 const paginatedData = computed(() => {
   const start = (currentPage.value - 1) * rowsPerPage;
@@ -350,6 +517,62 @@ const downloadTemplate = (type: "weather_station" | "water_level_sensor") => {
         Data Migration
       </h2>
     </template>
+
+    <!-- Progress Loader Overlay -->
+    <div
+      v-if="isParsing"
+      class="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm"
+    >
+      <div
+        class="bg-white dark:bg-gray-800 rounded-3xl p-8 shadow-2xl max-w-sm w-full mx-4 border border-gray-100 dark:border-gray-700 transform transition-all"
+      >
+        <div class="flex items-center justify-between mb-6">
+          <div class="flex flex-col">
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white">
+              Parsing Data
+            </h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              Processing Row Records
+            </p>
+          </div>
+          <div class="flex flex-col items-end">
+            <span class="text-2xl font-black text-orange-600"
+              >{{ Math.round(parsingProgress) }}%</span
+            >
+          </div>
+        </div>
+
+        <div
+          class="w-full bg-gray-100 dark:bg-gray-700/50 rounded-full h-3 mb-6 overflow-hidden p-0.5"
+        >
+          <div
+            class="bg-gradient-to-r from-orange-500 to-orange-400 h-full rounded-full transition-all duration-300 ease-out shadow-[0_0_10px_rgba(249,115,22,0.4)]"
+            :style="{ width: `${parsingProgress}%` }"
+          ></div>
+        </div>
+
+        <div class="flex items-center justify-center space-x-2 text-gray-400">
+          <svg class="animate-spin size-4" fill="none" viewBox="0 0 24 24">
+            <circle
+              class="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              stroke-width="4"
+            ></circle>
+            <path
+              class="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            ></path>
+          </svg>
+          <span class="text-[10px] font-bold uppercase tracking-widest"
+            >Please wait...</span
+          >
+        </div>
+      </div>
+    </div>
 
     <div
       class="h-[calc(100vh-140px)] bg-gray-50/50 dark:bg-gray-900/50 py-4 overflow-hidden"
@@ -445,7 +668,7 @@ const downloadTemplate = (type: "weather_station" | "water_level_sensor") => {
                   </span>
                 </div>
                 <p class="text-[10px] text-gray-400 uppercase tracking-wider">
-                  Supported formats: XLSX, CSV, SQL
+                  Supported formats: XLSX, CSV
                 </p>
 
                 <div class="pt-4 border-t border-gray-50 dark:border-gray-700">
@@ -590,6 +813,7 @@ const downloadTemplate = (type: "weather_station" | "water_level_sensor") => {
                       Reset
                     </button>
                     <button
+                      v-if="targetType === 'weather_station'"
                       @click="cleanData"
                       class="inline-flex items-center px-4 py-2 bg-gray-50 hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-200 text-xs font-bold rounded-full transition-all duration-200 border border-gray-200 dark:border-gray-500"
                     >
@@ -607,6 +831,26 @@ const downloadTemplate = (type: "weather_station" | "water_level_sensor") => {
                         />
                       </svg>
                       Clean Data
+                    </button>
+                    <button
+                      v-if="targetType === 'water_level_sensor'"
+                      @click="cleanseDate"
+                      class="inline-flex items-center px-4 py-2 bg-gray-50 hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-200 text-xs font-bold rounded-full transition-all duration-200 border border-gray-200 dark:border-gray-500"
+                    >
+                      <svg
+                        class="size-3.5 mr-2"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                        />
+                      </svg>
+                      Cleanse Date
                     </button>
                   </div>
                 </div>
@@ -777,19 +1021,29 @@ const downloadTemplate = (type: "weather_station" | "water_level_sensor") => {
                         Previous
                       </button>
                       <div class="flex items-center space-x-1">
-                        <button
-                          v-for="page in totalPages"
-                          :key="page"
-                          @click="currentPage = page"
-                          :class="[
-                            'size-7 rounded-lg text-xs font-bold transition-all duration-200',
-                            currentPage === page
-                              ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20'
-                              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700',
-                          ]"
+                        <template
+                          v-for="(page, index) in displayedPages"
+                          :key="index"
                         >
-                          {{ page }}
-                        </button>
+                          <button
+                            v-if="typeof page === 'number'"
+                            @click="currentPage = page"
+                            :class="[
+                              'size-7 rounded-lg text-xs font-bold transition-all duration-200',
+                              currentPage === page
+                                ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20'
+                                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700',
+                            ]"
+                          >
+                            {{ page }}
+                          </button>
+                          <span
+                            v-else
+                            class="size-7 flex items-center justify-center text-xs font-bold text-gray-400"
+                          >
+                            {{ page }}
+                          </span>
+                        </template>
                       </div>
                       <button
                         @click="currentPage++"
