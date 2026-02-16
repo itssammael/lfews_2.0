@@ -102,6 +102,7 @@ const showSidebar = ref(false);
       </ResponsiveNavLink>
 
       <ResponsiveNavLink
+        v-if="$page.props.auth.can.manage"
         :href="route('data-migration.index')"
         :active="route().current('data-migration.*')"
       >

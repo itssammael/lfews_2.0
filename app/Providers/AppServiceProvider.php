@@ -24,7 +24,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         \Illuminate\Support\Facades\Gate::define('manage-data', function ($user) {
-            return $user->roles->contains('name', 'admin') || $user->roles->contains('name', 'cmdcenter');
+            return !$user->roles->contains('name', 'user');
         });
 
         \Illuminate\Support\Facades\Gate::define('view-only', function ($user) {

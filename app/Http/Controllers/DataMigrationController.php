@@ -33,7 +33,7 @@ class DataMigrationController extends Controller
         $target = $request->input('target');
         $targetId = $request->input('target_id');
         $data = $request->input('rows');
-
+        dd($data);
         if ($target === 'weather_station') {
             foreach ($data as $row) {
                 WeatherStationObservationData::create(array_merge($row, [

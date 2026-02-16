@@ -73,4 +73,8 @@ Route::middleware([
         ->middleware('can:manage-data');
     Route::post('/data-migration/import', [\App\Http\Controllers\DataMigrationController::class, 'import'])->name('data-migration.import')
         ->middleware('can:manage-data');
+
+    Route::post('/connectivity/ping', [\App\Http\Controllers\ConnectivityController::class, 'ping'])
+        ->name('connectivity.ping')
+        ->middleware('can:manage-data');
 });
