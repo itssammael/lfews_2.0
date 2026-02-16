@@ -8,6 +8,9 @@ const props = defineProps<{
     sensors: Array<{
         id: number;
         name: string;
+        level_2?: number;
+        level_3?: number;
+        level_4?: number;
     }>;
     latestData?: Record<number, {
         data: number;
@@ -135,7 +138,27 @@ onMounted(() => {
     }));
 
     chart.appear(1000, 100);
+
+    // Set initial max
+    updateYAxisMax();
 });
+
+const updateYAxisMax = () => {
+    if (!yAxis) return;
+    
+    let maxFound = 100; // Default min max
+    
+    props.sensors.forEach(sensor => {
+        const l3 = Number(sensor.level_3 || 0);
+        const latestVal = Number(props.latestData?.[sensor.id]?.data || 0);
+        const sensorMax = l3 + latestVal;
+        if (sensorMax > maxFound) {
+            maxFound = sensorMax;
+        }
+    });
+
+    yAxis.set("max", maxFound);
+};
 
 onUnmounted(() => {
     if (root) root.dispose();
@@ -166,6 +189,7 @@ watch(() => props.latestData, (newData) => {
             }
         }
     });
+    updateYAxisMax();
 }, { deep: true });
 </script>
 

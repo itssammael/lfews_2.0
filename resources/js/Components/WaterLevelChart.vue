@@ -251,9 +251,10 @@ onMounted(() => {
     series.appear(1000);
     chart.appear(1000, 100);
 
-    // Initial tooltip display
+    // Initial tooltip and axis scale
     series.events.on("datavalidated", () => {
         showLastTooltip();
+        updateYAxisMax();
     });
 });
 
@@ -296,10 +297,25 @@ const addDataPoint = (value: number, timestamp: string) => {
     showLastTooltip();
 };
 
+const updateYAxisMax = () => {
+    if (!yAxis) return;
+    const l3 = Number(props.level3 || 0);
+    const val = Number(props.value || 0);
+    const newMax = l3 + val;
+    
+    // Set a reasonable minimum max if both are very small or zero
+    yAxis.set("max", newMax > 10 ? newMax : 100);
+};
+
 watch(() => props.value, (newValue: number | undefined) => {
     if (newValue !== undefined && newValue !== null) {
         addDataPoint(Number(newValue), props.timestamp);
+        updateYAxisMax();
     }
+});
+
+watch(() => props.level3, () => {
+    updateYAxisMax();
 });
 </script>
 
