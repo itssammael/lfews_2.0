@@ -423,16 +423,13 @@ const isAlertDismissed = (sensorId: number, level: number) => {
                                 </div>
                             </div>
                         
-                            <div v-if="stations && stations.length > 0" class="flex flex-wrap gap-6 mt-6">
+                            <div v-if="stations && stations.length > 0" class="grid grid-cols-2 gap-6 mt-6">
                             
                                 <div v-for="station in stations" :key="station.id" 
                                     class="bg-white dark:bg-gray-800 border-2 border-blue-600 rounded-[2rem] overflow-hidden shadow-lg w-full flex flex-col md:flex-row">
                                     <template v-if="weatherResult?.[station.id]">
                                         <!-- Left Column: Chart -->
-                                        <div class="w-full md:w-3/5 p-4 border-r dark:border-gray-700 flex flex-col">
-                                            <div class="flex items-center justify-between mb-2">
-                                                <span class="text-sm font-bold text-gray-700 dark:text-gray-200">{{ new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) }}</span>
-                                            </div>
+                                        <div class="w-full md:w-4/5 p-4 border-r dark:border-gray-700 flex flex-col">
                                             <div class="flex-grow">
                                                 <WeatherStationChart 
                                                     :stationId="station.id" 
@@ -455,8 +452,16 @@ const isAlertDismissed = (sensorId: number, level: number) => {
                                                         last update: {{ weatherResult[station.id].data.date_time }}
                                                     </span>
                                                 </div>
-                                                <div class="text-gray-300">
-                                                    <svg class="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                                <div :class="Number(weatherResult[station.id]?.data?.precipitation_rate || 0) > 0 ? 'text-blue-500' : 'text-gray-300'">
+                                                    <!-- Rain Cloud -->
+                                                    <svg v-if="Number(weatherResult[station.id]?.data?.precipitation_rate || 0) > 0" class="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                                        <path d="M17.5 19c2.5 0 4.5-2 4.5-4.5 0-2.3-1.7-4.2-3.9-4.5.3-.6.4-1.2.4-1.8 0-2.3-1.8-4.2-4.1-4.2-1.7 0-3.2 1-3.8 2.5C9.8 6.2 9 6 8.2 6c-2.3 0-4.2 1.8-4.2 4.1 0 .4.1.8.2 1.2C2.1 11.8 1 13.3 1 15c0 2.2 1.8 4 4 4h12.5z" />
+                                                        <path class="animate-bounce" d="M8 20v2" />
+                                                        <path class="animate-bounce" style="animation-delay: 0.2s" d="M12 20v2" />
+                                                        <path class="animate-bounce" style="animation-delay: 0.4s" d="M16 20v2" />
+                                                    </svg>
+                                                    <!-- Regular Cloud -->
+                                                    <svg v-else class="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                                                         <path d="M17.5 19c2.5 0 4.5-2 4.5-4.5 0-2.3-1.7-4.2-3.9-4.5.3-.6.4-1.2.4-1.8 0-2.3-1.8-4.2-4.1-4.2-1.7 0-3.2 1-3.8 2.5C9.8 6.2 9 6 8.2 6c-2.3 0-4.2 1.8-4.2 4.1 0 .4.1.8.2 1.2C2.1 11.8 1 13.3 1 15c0 2.2 1.8 4 4 4h12.5z" />
                                                     </svg>
                                                 </div>
@@ -470,14 +475,14 @@ const isAlertDismissed = (sensorId: number, level: number) => {
                                                     <div class="flex flex-col">
                                                         <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Rain Rate</span>
                                                         <div class="flex items-baseline mt-1">
-                                                            <span class="text-3xl font-bold text-orange-500">{{ weatherResult[station.id].data.precipitation_rate }}</span>
+                                                            <span class="text-3xl font-bold text-orange-500">{{ Number(weatherResult[station.id]?.data?.precipitation_rate || 0).toFixed(2) }}</span>
                                                             <span class="text-xs text-gray-500 ml-1">mm/h</span>
                                                         </div>
                                                     </div>
                                                     <div class="flex flex-col pl-4 border-l border-gray-100 dark:border-gray-700">
                                                         <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Rain Total</span>
                                                         <div class="flex items-baseline mt-1">
-                                                            <span class="text-3xl font-bold text-orange-600">{{ weatherResult[station.id].data.precipitation_total }}</span>
+                                                            <span class="text-3xl font-bold text-orange-600">{{ Number(weatherResult[station.id]?.data?.precipitation_total || 0).toFixed(2) }}</span>
                                                             <span class="text-xs text-gray-500 ml-1">mm</span>
                                                         </div>
                                                     </div>

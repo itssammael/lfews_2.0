@@ -78,7 +78,6 @@ onMounted(() => {
         am5xy.ValueAxis.new(root, {
             renderer: yRenderer,
             min: 0,
-            max: 15,
             strictMinMax: false
         })
     );
@@ -108,7 +107,7 @@ onMounted(() => {
     // Add series 1: Precip. Accum. Total
     totalSeries = chart.series.push(
         am5xy.LineSeries.new(root, {
-            name: "Precip. Accum. Total (mm)",
+            name: "Rain Total (mm)",
             xAxis: xAxis,
             yAxis: yAxis,
             valueYField: "total",
@@ -142,7 +141,7 @@ onMounted(() => {
     // Add series 2: Precip. Rate
     rateSeries = chart.series.push(
         am5xy.LineSeries.new(root, {
-            name: "Precip. Rate (mm)",
+            name: "Rain Rate (mm)",
             xAxis: xAxis,
             yAxis: yAxis,
             valueYField: "rate",
@@ -188,7 +187,7 @@ onMounted(() => {
 
     legend.data.setAll(chart.series.values);
 
-    // Process data
+    // Process data and set axis range
     if (props.history && props.history.length > 0) {
         const processedData = props.history.map(item => ({
             date: new Date(item.timestamp).getTime(),
@@ -201,6 +200,16 @@ onMounted(() => {
         
         totalSeries.data.setAll(processedData);
         rateSeries.data.setAll(processedData);
+
+        // Set axis range to 00:00 to 23:59 of the latest record's date
+        const latestDate = new Date(processedData[processedData.length - 1].date);
+        const startOfDay = new Date(latestDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(latestDate);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        xAxis.set("min", startOfDay.getTime());
+        xAxis.set("max", endOfDay.getTime());
     }
 
     // Make stuff animate on load
@@ -216,7 +225,7 @@ onUnmounted(() => {
 });
 
 watch(() => props.history, (newHistory) => {
-    if (newHistory && totalSeries && rateSeries) {
+    if (newHistory && totalSeries && rateSeries && xAxis) {
         const processedData = newHistory.map(item => ({
             date: new Date(item.timestamp).getTime(),
             total: Number(item.data.precipitation_total),
@@ -227,6 +236,17 @@ watch(() => props.history, (newHistory) => {
         
         totalSeries.data.setAll(processedData);
         rateSeries.data.setAll(processedData);
+
+        if (processedData.length > 0) {
+            const latestDate = new Date(processedData[processedData.length - 1].date);
+            const startOfDay = new Date(latestDate);
+            startOfDay.setHours(0, 0, 0, 0);
+            const endOfDay = new Date(latestDate);
+            endOfDay.setHours(23, 59, 59, 999);
+
+            xAxis.set("min", startOfDay.getTime());
+            xAxis.set("max", endOfDay.getTime());
+        }
     }
 }, { deep: true });
 </script>

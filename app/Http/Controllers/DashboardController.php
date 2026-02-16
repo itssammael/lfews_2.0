@@ -12,13 +12,40 @@ class DashboardController extends Controller
     {
         \Illuminate\Support\Facades\Gate::authorize('can-read');
 
+        $stations = \App\Models\WeatherStation::all();
+        $historyWeatherData = [];
+
+        foreach ($stations as $station) {
+            $latestEntry = \App\Models\WeatherStationObservationData::where('weather_station_id', $station->id)
+                ->orderBy('date_time', 'desc')
+                ->first();
+
+            if ($latestEntry) {
+                $targetDate = \Illuminate\Support\Carbon::parse($latestEntry->date_time)->toDateString();
+                $historyWeatherData[$station->id] = \App\Models\WeatherStationObservationData::where('weather_station_id', $station->id)
+                    ->whereDate('date_time', $targetDate)
+                    ->orderBy('date_time', 'asc')
+                    ->get()
+                    ->map(fn($entry) => [
+                        'data' => [
+                            'precipitation_rate' => $entry->precipitation_rate,
+                            'precipitation_total' => $entry->precipitation_total,
+                            'temperature' => $entry->temperature,
+                            'humidity' => $entry->humidity,
+                            'wind_speed' => $entry->wind_speed,
+                        ],
+                        'timestamp' => $entry->date_time,
+                    ])->toArray();
+            }
+        }
+
         return Inertia::render('LFEWS/Dashboard', [
             'sensors' => \App\Models\WaterLevelSensor::all(),
-            'stations' => \App\Models\WeatherStation::all(),
+            'stations' => $stations,
             'latestData' => \Illuminate\Support\Facades\Cache::get('latest_modbus_data'),
             'historyData' => \Illuminate\Support\Facades\Cache::get('modbus_history', []),
             'latestWeatherData' => \Illuminate\Support\Facades\Cache::get('latest_weather_observation_data'),
-            'historyWeatherData' => \Illuminate\Support\Facades\Cache::get('weather_observation_history', []),
+            'historyWeatherData' => $historyWeatherData,
         ]);
     }
 
@@ -124,29 +151,30 @@ class DashboardController extends Controller
                     'timestamp' => $latestEntry->created_at->toDateTimeString(),
                 ];
 
-                if (!isset($history[$station->id])) {
-                    $history[$station->id] = [];
-                }
-
-                $alreadyInHistory = collect($history[$station->id])->contains('timestamp', $observations[$station->id]['timestamp']);
-
-                if (!$alreadyInHistory) {
-                    $history[$station->id][] = [
-                        'data' => $observations[$station->id]['data'],
-                        'timestamp' => $observations[$station->id]['timestamp']
-                    ];
-
-                    if (count($history[$station->id]) > 50) {
-                        array_shift($history[$station->id]);
-                    }
-                }
+                $targetDate = \Illuminate\Support\Carbon::parse($latestEntry->date_time)->toDateString();
+                $history[$station->id] = \App\Models\WeatherStationObservationData::where('weather_station_id', $station->id)
+                    ->whereDate('date_time', $targetDate)
+                    ->orderBy('date_time', 'asc')
+                    ->get()
+                    ->map(fn($entry) => [
+                        'data' => [
+                            'precipitation_rate' => $entry->precipitation_rate,
+                            'precipitation_total' => $entry->precipitation_total,
+                            'temperature' => $entry->temperature,
+                            'humidity' => $entry->humidity,
+                            'wind_speed' => $entry->wind_speed,
+                        ],
+                        'timestamp' => $entry->date_time,
+                    ])->toArray();
             }
         }
 
         if (!empty($observations)) {
             \Illuminate\Support\Facades\Cache::put('latest_weather_observation_data', $observations, 60);
         }
-        \Illuminate\Support\Facades\Cache::put('weather_observation_history', $history, 60);
+        if (!empty($history)) {
+            \Illuminate\Support\Facades\Cache::put('weather_observation_history', $history, 60);
+        }
 
         return redirect()->route('dashboard')->with('weatherResult', $observations);
     }
