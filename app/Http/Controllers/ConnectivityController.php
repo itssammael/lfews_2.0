@@ -35,7 +35,7 @@ class ConnectivityController extends Controller
 
         // Use Symfony Process for safer command execution
         // ping -c 1 (1 packet) -W 2 (wait 2 seconds)
-        $process = new Process(['ping', '-c', '10', '-W', '2', $ip]);
+        $process = new Process(['ping', '-c', '3', '-W', '2', $ip]);
         $process->run();
 
         $output = $process->getOutput();
