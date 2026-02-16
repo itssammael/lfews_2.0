@@ -234,12 +234,13 @@ onUnmounted(() => {
                             >
                                 <div class="px-4 py-3 border-b dark:border-gray-700">
                                     <h4 class="text-center font-bold text-gray-700 dark:text-gray-200">
-                                        {{ sensor.name }} <span v-if="modbusResult?.[sensor.id]">- {{ modbusResult[sensor.id].data }}</span>
+                                        {{ sensor.name }} <span v-if="modbusResult?.[sensor.id]?.success">- {{ modbusResult[sensor.id].data }}</span>
                                     </h4>
                                 </div>
                                 
                                 <div class="p-4">
-                                    <div v-if="modbusResult?.[sensor.id]">
+                                    <!-- Data Available and Success -->
+                                    <div v-if="modbusResult?.[sensor.id]?.success">
                                         <WaterLevelChart 
                                             :sensorId="sensor.id" 
                                             :name="sensor.name" 
@@ -251,6 +252,17 @@ onUnmounted(() => {
                                             :level4="Number(sensor.level_4)"
                                         />
                                     </div>
+                                    <!-- Error State -->
+                                    <div v-else-if="modbusResult?.[sensor.id] && !modbusResult?.[sensor.id]?.success" 
+                                        class="bg-red-50 dark:bg-red-900/10 text-red-700 dark:text-red-300 rounded-lg p-6"
+                                    >
+                                        <p class="font-bold mb-2 text-sm text-center">Connection Issue</p>
+                                        <p class="text-xs text-center line-clamp-2" :title="modbusResult[sensor.id].error">
+                                            {{ modbusResult[sensor.id].error }}
+                                        </p>
+                                        <p class="text-[10px] text-center mt-2 opacity-50">{{ modbusResult[sensor.id].timestamp }}</p>
+                                    </div>
+                                    <!-- Waiting for Data -->
                                     <div v-else class="flex flex-col items-center justify-center py-12 text-gray-400">
                                         <svg class="w-12 h-12 mb-3 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />

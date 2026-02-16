@@ -336,13 +336,15 @@ class WeatherStationController extends Controller
     {
         return Http::timeout(30)
             ->connectTimeout(15)
+            ->withoutVerifying()
+            ->retry(3, 2000)
             ->withOptions([
                 'curl' => [
                     CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
                 ],
             ])
             ->retry(3, 2000)
-            ->get('https://api.weather.com/v2/pws/observations/current', [
+            ->get('http://api.weather.com/v2/pws/observations/current', [
                 'stationId' => $station->station_id,
                 'format' => 'json',
                 'units' => 'm',
