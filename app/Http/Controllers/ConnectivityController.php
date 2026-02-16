@@ -33,9 +33,14 @@ class ConnectivityController extends Controller
             ], 422);
         }
 
-        // Use Symfony Process for safer command execution
-        // ping -c 1 (1 packet) -W 2 (wait 2 seconds)
-        $process = new Process(['ping', '-c', '3', '-W', '2', $ip]);
+        // Detect OS to determine ping arguments
+        if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+            // Windows: -n (count), -w (timeout in milliseconds)
+            $process = new Process(['ping', '-n', '3', '-w', '2000', $ip]);
+        } else {
+            // Linux/Unix: -c (count), -W (timeout in seconds)
+            $process = new Process(['ping', '-c', '3', '-W', '2', $ip]);
+        }
         $process->run();
 
         $output = $process->getOutput();
