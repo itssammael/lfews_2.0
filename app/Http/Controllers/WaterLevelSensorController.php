@@ -29,7 +29,7 @@ class WaterLevelSensorController extends Controller
             ->paginate(6)
             ->withQueryString();
 
-        return \Inertia\Inertia::render('WaterLevelSensors', [
+        return \Inertia\Inertia::render('LFEWS/WaterLevelSensors', [
             'sensors' => $paginatedSensors,
             'filters' => request()->only(['search']),
             'showCreateModal' => false,
@@ -59,7 +59,7 @@ class WaterLevelSensorController extends Controller
             ->withQueryString();
         $locations = Location::with('locationType')->get();
 
-        return \Inertia\Inertia::render('WaterLevelSensors', [
+        return \Inertia\Inertia::render('LFEWS/WaterLevelSensors', [
             'sensors' => $paginatedSensors,
             'filters' => request()->only(['search']),
             'locations' => $locations,
@@ -153,7 +153,7 @@ class WaterLevelSensorController extends Controller
             ->withQueryString();
         $locations = Location::with('locationType')->get();
 
-        return \Inertia\Inertia::render('WaterLevelSensors', [
+        return \Inertia\Inertia::render('LFEWS/WaterLevelSensors', [
             'sensors' => $paginatedSensors,
             'filters' => request()->only(['search']),
             'locations' => $locations,

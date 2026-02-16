@@ -6,7 +6,7 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import DangerButton from '@/Components/DangerButton.vue';
 import TextInput from '@/Components/TextInput.vue';
-import RiverModal from '@/Pages/Rivers/RiverModal.vue';
+import RiverModal from '@/Components/RiverModal.vue';
 import Pagination from '@/Components/Pagination.vue';
 import debounce from 'lodash/debounce';
 

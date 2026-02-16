@@ -12,7 +12,7 @@ class UserController extends Controller
 {
     public function index()
     {
-        return Inertia::render('Users', [
+        return Inertia::render('LFEWS/Users', [
             'users' => User::with('roles')->get(),
             'roles' => Role::all(),
             'showCreateModal' => false,
@@ -41,7 +41,7 @@ class UserController extends Controller
 
     public function edit(User $user)
     {
-        return Inertia::render('Users', [
+        return Inertia::render('LFEWS/Users', [
             'users' => User::with('roles')->get(),
             'roles' => Role::all(),
             'editingUser' => $user->load('roles'),

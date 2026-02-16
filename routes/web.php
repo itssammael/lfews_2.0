@@ -4,9 +4,9 @@ use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-Route::get('/', function () {
-    return redirect()->route('login');
-});
+Route::get('/', [\App\Http\Controllers\PagesController::class, 'index'])->name('home');
+Route::get('/awards', [\App\Http\Controllers\PagesController::class, 'awards'])->name('awards');
+Route::get('/services', [\App\Http\Controllers\PagesController::class, 'services'])->name('services');
 
 Route::middleware([
     'auth:sanctum',
@@ -68,4 +68,9 @@ Route::middleware([
     });
 
     Route::get('/locator', [\App\Http\Controllers\LocatorController::class, 'index'])->name('locator');
+
+    Route::get('/data-migration', [\App\Http\Controllers\DataMigrationController::class, 'index'])->name('data-migration.index')
+        ->middleware('can:manage-data');
+    Route::post('/data-migration/import', [\App\Http\Controllers\DataMigrationController::class, 'import'])->name('data-migration.import')
+        ->middleware('can:manage-data');
 });

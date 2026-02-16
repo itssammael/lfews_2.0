@@ -101,6 +101,16 @@ const showSidebar = ref(false);
         </div>
       </ResponsiveNavLink>
 
+      <ResponsiveNavLink
+        :href="route('data-migration.index')"
+        :active="route().current('data-migration.*')"
+      >
+        <div class="flex items-center">
+             <img src="/images/migration.png" alt="Data Migration" class="w-8 h-8 mr-2" />
+             <span :class="{'block': showSidebar, 'hidden': ! showSidebar}">Data Migration</span>
+        </div>
+      </ResponsiveNavLink>
+
       <!-- Add more sidebar links here -->
     </div>
   </aside>
