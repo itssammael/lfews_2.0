@@ -33,7 +33,7 @@ class DataMigrationController extends Controller
         $target = $request->input('target');
         $targetId = $request->input('target_id');
         $data = $request->input('rows');
-        dd($data);
+
         if ($target === 'weather_station') {
             foreach ($data as $row) {
                 WeatherStationObservationData::create(array_merge($row, [
@@ -46,6 +46,10 @@ class DataMigrationController extends Controller
                     'water_level_sensor_id' => $targetId,
                 ]));
             }
+        }
+
+        if ($request->wantsJson()) {
+            return response()->json(['message' => 'Data imported successfully.']);
         }
 
         return back()->with('success', 'Data imported successfully.');

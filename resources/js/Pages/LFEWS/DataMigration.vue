@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import AppLayout from "@/Layouts/AppLayout.vue";
 import { ref, computed } from "vue";
-import { useForm, Head } from "@inertiajs/vue3";
+import { useForm, Head, router } from "@inertiajs/vue3";
 import * as XLSX from "xlsx";
+import axios from "axios";
 
 const props = defineProps<{
   weatherStations: any[];
@@ -18,6 +19,12 @@ const targetType = ref("weather_station");
 const targetId = ref<number | null>(null);
 const isParsing = ref(false);
 const parsingProgress = ref(0);
+
+// Import State
+const isImporting = ref(false);
+const importProgress = ref(0);
+const importedCount = ref(0);
+const totalRecords = ref(0);
 
 // Pagination State
 const currentPage = ref(1);
@@ -390,27 +397,60 @@ const targetOptions = computed(() => {
     : props.waterLevelSensors;
 });
 
-const importData = () => {
+const importData = async () => {
   if (!targetId.value) {
     alert("Please select a target station/sensor.");
     return;
   }
 
-  form.target = targetType.value;
-  form.target_id = targetId.value;
-  form.rows = uploadedData.value;
+  const allRows = uploadedData.value;
+  const chunkSize = 50; // Requirement: send 50 records at a time
+  const total = allRows.length;
 
-  form.post(route("data-migration.import"), {
-    onSuccess: () => {
-      uploadedData.value = [];
-      columns.value = [];
-      fileName.value = "No file chosen";
-      currentPage.value = 1;
-      convertTemperature.value = false;
-      convertInToMm.value = false;
-      if (fileInput.value) fileInput.value.value = "";
-    },
-  });
+  isImporting.value = true;
+  importProgress.value = 0;
+  importedCount.value = 0;
+  totalRecords.value = total;
+
+  try {
+    for (let i = 0; i < total; i += chunkSize) {
+      const chunk = allRows.slice(i, i + chunkSize);
+      
+      await axios.post(route("data-migration.import"), {
+        target: targetType.value,
+        target_id: targetId.value,
+        rows: chunk,
+      });
+
+      importedCount.value = Math.min(i + chunkSize, total);
+      importProgress.value = (importedCount.value / total) * 100;
+      
+      // Allow UI update
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+
+    // Success handling
+    alert("Data imported successfully.");
+    uploadedData.value = [];
+    columns.value = [];
+    fileName.value = "No file chosen";
+    currentPage.value = 1;
+    convertTemperature.value = false;
+    convertInToMm.value = false;
+    if (fileInput.value) fileInput.value.value = "";
+    
+    // Refresh page data if needed, or just clear state
+    router.reload({ only: ['weatherStations', 'waterLevelSensors'] });
+
+  } catch (error) {
+    console.error(error);
+    alert("An error occurred during import. Please check console for details.");
+  } finally {
+    isImporting.value = false;
+    importProgress.value = 0;
+    importedCount.value = 0;
+    totalRecords.value = 0;
+  }
 };
 
 const totalPages = computed(() =>
@@ -574,6 +614,62 @@ const downloadTemplate = (type: "weather_station" | "water_level_sensor") => {
       </div>
     </div>
 
+    <!-- Import Progress Loader Overlay -->
+    <div
+      v-if="isImporting"
+      class="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm"
+    >
+      <div
+        class="bg-white dark:bg-gray-800 rounded-3xl p-8 shadow-2xl max-w-sm w-full mx-4 border border-gray-100 dark:border-gray-700 transform transition-all"
+      >
+        <div class="flex items-center justify-between mb-6">
+          <div class="flex flex-col">
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white">
+              Importing Data
+            </h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              Processed Records: {{ importedCount }} / {{ totalRecords }}
+            </p>
+          </div>
+          <div class="flex flex-col items-end">
+            <span class="text-2xl font-black text-orange-600"
+              >{{ Math.round(importProgress) }}%</span
+            >
+          </div>
+        </div>
+
+        <div
+          class="w-full bg-gray-100 dark:bg-gray-700/50 rounded-full h-3 mb-6 overflow-hidden p-0.5"
+        >
+          <div
+            class="bg-gradient-to-r from-orange-500 to-orange-400 h-full rounded-full transition-all duration-300 ease-out shadow-[0_0_10px_rgba(249,115,22,0.4)]"
+            :style="{ width: `${importProgress}%` }"
+          ></div>
+        </div>
+
+        <div class="flex items-center justify-center space-x-2 text-gray-400">
+          <svg class="animate-spin size-4" fill="none" viewBox="0 0 24 24">
+            <circle
+              class="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              stroke-width="4"
+            ></circle>
+            <path
+              class="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            ></path>
+          </svg>
+          <span class="text-[10px] font-bold uppercase tracking-widest"
+            >Please wait...</span
+          >
+        </div>
+      </div>
+    </div>
+
     <div
       class="h-[calc(100vh-140px)] bg-gray-50/50 dark:bg-gray-900/50 py-4 overflow-hidden"
     >
@@ -656,7 +752,7 @@ const downloadTemplate = (type: "weather_station" | "water_level_sensor") => {
                       type="file"
                       ref="fileInput"
                       @change="handleFileUpload"
-                      accept=".xlsx, .xls, .csv, .sql"
+                      accept=".xlsx, .xls, .csv"
                       class="hidden"
                     />
                   </label>
@@ -1085,7 +1181,7 @@ const downloadTemplate = (type: "weather_station" | "water_level_sensor") => {
                     </h3>
                     <p class="text-gray-500 dark:text-gray-400 max-w-sm">
                       Select a file to start the migration process. We support
-                      XLSX, CSV, and SQL formats.
+                      XLSX, and CSV formats.
                     </p>
                   </div>
                 </template>
