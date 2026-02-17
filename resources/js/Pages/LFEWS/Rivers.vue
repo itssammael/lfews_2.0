@@ -63,10 +63,10 @@ const deleteRiver = (river: any) => {
             </h2>
         </template>
 
-        <div class="pt-6 mb-16">
-            <div class="w-full mx-auto px-8 h-full">
-                <div class="bg-white border-2 border-orange-500 rounded-2xl shadow-md overflow-hidden sm:rounded-lg h-full p-6">
-                    <div class="flex space-x-8 items-center mb-6">
+        <div class="pt-6 mb-16 px-4 sm:px-0">
+            <div class="w-full mx-auto px-0 sm:px-8 h-full">
+                <div class="bg-white border-2 border-orange-500 rounded-2xl shadow-md overflow-hidden sm:rounded-lg h-full p-4 sm:p-6">
+                    <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-8 items-start sm:items-center mb-6">
                         <h3 class="text-xl font-semibold text-gray-900 dark:text-gray-100 uppercase">
                             Rivers List
                         </h3>
@@ -76,8 +76,8 @@ const deleteRiver = (river: any) => {
                         >
                             Add River
                         </PrimaryButton>
-                        <div class="flex-grow"></div>
-                        <div class="w-64">
+                        <div class="hidden sm:block flex-grow"></div>
+                        <div class="w-full sm:w-64">
                             <TextInput
                                 v-model="search"
                                 type="text"

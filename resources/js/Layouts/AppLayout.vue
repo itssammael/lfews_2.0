@@ -8,6 +8,9 @@ import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
 import Toast from '@/Components/Toast.vue';
+import { useDashboardSettings } from '@/Composables/useDashboardSettings';
+
+const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters } = useDashboardSettings();
 
 const page = usePage();
 
@@ -16,6 +19,7 @@ defineProps({
 });
 
 const showingNavigationDropdown = ref(false);
+const showingDashboardSettings = ref(false);
 
 const switchToTeam = (team) => {
     router.put(route('current-team.update'), {
@@ -48,7 +52,7 @@ const currentDate = new Date().toLocaleDateString('en-US', {
             <div class="flex-1 flex flex-col overflow-hidden">
                 <nav class="bg-orange-500/[0.7] dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 uppercase">
                     <!-- Primary Navigation Menu -->
-                    <div class="mx-auto px-24 sm:px-6 lg:px-8 w-full">
+                    <div class="mx-auto px-4 sm:px-6 lg:px-8 w-full">
                         <div class="flex justify-between h-[3.6rem]">
                             <div class="flex">
                                 <!-- Logo -->
@@ -119,8 +123,8 @@ const currentDate = new Date().toLocaleDateString('en-US', {
                                 </div>
 
                                 <!-- Current Date -->
-                                <div class="ms-3 relative flex items-center">
-                                    <span class="text-gray-800 dark:text-gray-400 font-bold text-sm"><span class="text-gray-800/[0.7] dark:text-gray-700 text-xs italic pr-1.5"> Today is</span>{{ currentDate }}</span>
+                                <div class="ms-3 relative hidden lg:flex items-center">
+                                    <span class="text-gray-800 dark:text-gray-400 font-bold text-sm"><span class="text-gray-800/[0.7] dark:text-gray-700 text-xs italic pr-1.5"> Today is </span>{{ currentDate }}</span>
                                 </div>
 
                                 <!-- Settings Dropdown -->
@@ -196,11 +200,77 @@ const currentDate = new Date().toLocaleDateString('en-US', {
                     </div>
 
                     <!-- Responsive Navigation Menu -->
-                    <div :class="{'block': showingNavigationDropdown, 'hidden': ! showingNavigationDropdown}" class="sm:hidden">
+                    <div :class="{'block': showingNavigationDropdown, 'hidden': ! showingNavigationDropdown}" class="sm:hidden max-h-[calc(100vh-3.6rem)] overflow-y-auto pb-10">
                         <div class="pt-2 pb-3 space-y-1">
                             <ResponsiveNavLink :href="route('dashboard')" :active="route().current('dashboard')">
                                 Dashboard
                             </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('reports')" :active="route().current('reports')">
+                                Reports
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('locator')" :active="route().current('locator')">
+                                Locator
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('water-level-sensors')" :active="route().current('water-level-sensors')">
+                                Water Level Sensors
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('weather-stations')" :active="route().current('weather-stations')">
+                                Weather Stations
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('rivers.index')" :active="route().current('rivers.*')">
+                                Rivers
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('evacuation-center.index')" :active="route().current('evacuation-center.*')">
+                                Evacuation Center
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink v-if="$page.props.auth.can.manage" :href="route('data-migration.index')" :active="route().current('data-migration.*')">
+                                Data Migration
+                            </ResponsiveNavLink>
+                        </div>
+                        
+                        <!-- Dashboard Settings Toggles (Mobile) -->
+                        <div v-if="route().current('dashboard')" class="pt-4 pb-1 border-t border-gray-200 dark:border-gray-600">
+                             <button 
+                                 class="w-full flex justify-between items-center px-4 py-2 text-xs font-bold text-gray-400 uppercase focus:outline-none"
+                                 @click="showingDashboardSettings = !showingDashboardSettings"
+                             >
+                                 <span>Dashboard Settings</span>
+                                 <svg 
+                                     class="size-4 transform transition-transform duration-200" 
+                                     :class="{'rotate-180': showingDashboardSettings}"
+                                     fill="none" 
+                                     viewBox="0 0 24 24" 
+                                     stroke="currentColor"
+                                 >
+                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                 </svg>
+                             </button>
+                             <div v-show="showingDashboardSettings" class="px-4 py-2 space-y-4">
+                                <label class="flex items-center cursor-pointer">
+                                    <div class="relative inline-block w-8 h-4 transition duration-200 ease-in-out mr-2">
+                                        <input type="checkbox" v-model="showWaterLevelSensors" class="opacity-0 w-0 h-0 peer" />
+                                        <div class="absolute cursor-pointer top-0 left-0 right-0 bottom-0 bg-gray-300 dark:bg-gray-600 rounded-full transition-all duration-300 peer-checked:bg-orange-500"></div>
+                                        <div class="absolute cursor-pointer h-3 w-3 left-0.5 bottom-0.5 bg-white rounded-full transition-all duration-300 peer-checked:translate-x-4 shadow-sm"></div>
+                                    </div>
+                                    <span class="text-sm font-medium text-gray-600 dark:text-gray-400">Water Level Sensors</span>
+                                </label>
+                                <label class="flex items-center cursor-pointer">
+                                    <div class="relative inline-block w-8 h-4 transition duration-200 ease-in-out mr-2">
+                                        <input type="checkbox" v-model="showWeatherStations" class="opacity-0 w-0 h-0 peer" />
+                                        <div class="absolute cursor-pointer top-0 left-0 right-0 bottom-0 bg-gray-300 dark:bg-gray-600 rounded-full transition-all duration-300 peer-checked:bg-orange-500"></div>
+                                        <div class="absolute cursor-pointer h-3 w-3 left-0.5 bottom-0.5 bg-white rounded-full transition-all duration-300 peer-checked:translate-x-4 shadow-sm"></div>
+                                    </div>
+                                    <span class="text-sm font-medium text-gray-600 dark:text-gray-400">Weather Stations</span>
+                                </label>
+                                <label class="flex items-center cursor-pointer">
+                                    <div class="relative inline-block w-8 h-4 transition duration-200 ease-in-out mr-2">
+                                        <input type="checkbox" v-model="showEvacuationCenters" class="opacity-0 w-0 h-0 peer" />
+                                        <div class="absolute cursor-pointer top-0 left-0 right-0 bottom-0 bg-gray-300 dark:bg-gray-600 rounded-full transition-all duration-300 peer-checked:bg-orange-500"></div>
+                                        <div class="absolute cursor-pointer h-3 w-3 left-0.5 bottom-0.5 bg-white rounded-full transition-all duration-300 peer-checked:translate-x-4 shadow-sm"></div>
+                                    </div>
+                                    <span class="text-sm font-medium text-gray-600 dark:text-gray-400">Evacuation Centers</span>
+                                </label>
+                             </div>
                         </div>
 
                         <!-- Responsive Settings Options -->
@@ -221,10 +291,26 @@ const currentDate = new Date().toLocaleDateString('en-US', {
                             </div>
 
                             <div class="mt-3 space-y-1">
+                                <!-- Account Management -->
+                                <div class="block px-4 py-2 text-xs text-gray-400">
+                                    Manage Account
+                                </div>
                                 <ResponsiveNavLink :href="route('profile.show')" :active="route().current('profile.show')">
                                     Profile
                                 </ResponsiveNavLink>
+                                <template v-if="$page.props.auth.can.admin">
+                                                <div class="block px-4 py-2 text-xs text-gray-400">
+                                                    System Administration
+                                                </div>
 
+                                                <DropdownLink :href="route('users.index')">
+                                                    Manage Users
+                                                </DropdownLink>
+
+                                                <DropdownLink :href="route('system-settings')">
+                                                    System Settings
+                                                </DropdownLink>
+                                            </template>
                                 <ResponsiveNavLink v-if="$page.props.jetstream.hasApiFeatures" :href="route('api-tokens.index')" :active="route().current('api-tokens.index')">
                                     API Tokens
                                 </ResponsiveNavLink>
@@ -280,8 +366,8 @@ const currentDate = new Date().toLocaleDateString('en-US', {
                     </div>
                 </nav>
 
-                <div class="flex h-screen mb-6">
-                    <Sidebar />
+                <div class="flex h-screen mb-6 relative overflow-hidden">
+                    <Sidebar :show-on-mobile="false" @close-mobile="showingNavigationDropdown = false" />
                 
                     <!-- Page Content -->
                     <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-900">

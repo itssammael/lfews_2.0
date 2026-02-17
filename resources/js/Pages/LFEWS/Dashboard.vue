@@ -236,9 +236,9 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters } = us
 
         <div class="pt-0 mb-12">
             <div class="w-full space-y-12 bg-gray-200/[0.25]">
-                 <div v-if="showWaterLevelSensors" class="bg-transparent p-8 pt-2"> <!--Water level sensors data -->
+                 <div v-if="showWaterLevelSensors" class="bg-transparent p-4 sm:p-8 pt-2"> <!--Water level sensors data -->
                     <div class="overflow-hidden">
-                        <div class="flex items-center justify-between mb-6">
+                        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 space-y-4 sm:space-y-0">
                             <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
                                 Water Level Sensors Data
                             </h3>
@@ -403,10 +403,10 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters } = us
                         </div>
                     </div>
                 </div>
-                <div v-if="showWeatherStations" class="bg-transparent p-8 pt-2"> <!--Weather Station data -->
+                <div v-if="showWeatherStations" class="bg-transparent p-4 sm:p-8 pt-2"> <!--Weather Station data -->
                     <div class="overflow-hidden"> 
                  
-                            <div class="flex items-center justify-between mb-6">
+                            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 space-y-4 sm:space-y-0">
                                 <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
                                     Weather Stations Observation Data
                                 </h3>
@@ -439,7 +439,7 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters } = us
                                 </div>
                             </div>
                         
-                            <div v-if="stations && stations.length > 0" class="grid grid-cols-2 gap-6 mt-6">
+                            <div v-if="stations && stations.length > 0" class="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-6">
                             
                                 <div v-for="station in stations" :key="station.id" 
                                     class="bg-white dark:bg-gray-800 border-2 border-orange-500 rounded-[2rem] overflow-hidden shadow-lg w-full flex flex-col md:flex-row">
@@ -587,7 +587,7 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters } = us
                        
                     </div>
                 </div>
-                <div v-if="showEvacuationCenters" class="bg-transparent p-8 pt-2"> <!--Evacuation Center data -->
+                <div v-if="showEvacuationCenters" class="bg-transparent p-4 sm:p-8 pt-2"> <!--Evacuation Center data -->
                     <div class="overflow-hidden mb-6"> 
                         <div class="flex items-center justify-between mb-6">
                             <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">

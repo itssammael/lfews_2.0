@@ -1,25 +1,36 @@
 <script setup lang="ts">
-  import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { Link } from "@inertiajs/vue3";
 import ResponsiveNavLink from "@/Components/ResponsiveNavLink.vue";
-
 import { useDashboardSettings } from '@/Composables/useDashboardSettings';
 
-defineProps({
-  //
+const props = defineProps({
+  showOnMobile: Boolean,
 });
+
+const emit = defineEmits(['closeMobile']);
+
 const showSidebar = ref(false);
 const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters } = useDashboardSettings();
+
+// When mobile sidebar is shown, we might want to expand it or handle it specifically
+watch(() => props.showOnMobile, (val) => {
+  if (val) showSidebar.value = false;
+});
 </script>
 
 <template>
   <aside
-  :class="{'w-64 lg:w-48': showSidebar, 'w-24 lg:w-16': ! showSidebar }"
-    class="flex flex-col bg-white dark:bg-gray-800 border-r border-gray-100 dark:border-gray-700 min-h-screen"
+    :class="{
+      'w-64 lg:w-48': showSidebar, 
+      'w-24 lg:w-16': !showSidebar,
+      'hidden lg:flex': true
+    }"
+    class="flex flex-col bg-white dark:bg-gray-800 border-r border-gray-100 dark:border-gray-700 min-h-screen transition-transform duration-300 ease-in-out"
   >
-      <div class="flex items-center justify-center">
+      <div class="flex items-center justify-center p-2">
           <div class="font-bold text-xl w-3/4 text-center" :class="{'inline-block': showSidebar, 'hidden': ! showSidebar }">LFEWS</div>
-          <div>
+          <div class="lg:block">
             <button class="w-fit inline-flex items-right justify-center p-2 rounded-md text-gray-800 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-800 hover:bg-orange-100 dark:hover:bg-orange-900 focus:outline-none dark:focus:bg-orange-900 focus:text-gray-800 dark:focus:text-gray-800 transition duration-150 ease-in-out" @click="showSidebar = ! showSidebar">
               <svg
                   class="size-6"
@@ -50,6 +61,7 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters } = us
       <ResponsiveNavLink
         :href="route('dashboard')"
         :active="route().current('dashboard')"
+        @click="$emit('closeMobile')"
       >
         <div class="flex items-center">
              <img src="/images/dashboard.png" alt="Dashboard" class="w-8 h-8 mr-2" />
@@ -61,6 +73,7 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters } = us
       <ResponsiveNavLink
         :href="route('reports')"
         :active="route().current('reports')"
+        @click="$emit('closeMobile')"
       >
         <div class="flex items-center">
              <img src="/images/report.png" alt="Reports" class="w-8 h-8 mr-2" />
@@ -70,6 +83,7 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters } = us
       <ResponsiveNavLink
         :href="route('locator')"
         :active="route().current('locator')"
+        @click="$emit('closeMobile')"
       >
         <div class="flex items-center">
              <img src="/images/maps.png" alt="Locator" class="w-8 h-8 mr-2" />
@@ -79,6 +93,7 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters } = us
        <ResponsiveNavLink
         :href="route('water-level-sensors')"
         :active="route().current('water-level-sensors')"
+        @click="$emit('closeMobile')"
       >
         <div class="flex items-center">
              <img src="/images/water-level.png" alt="Water Level" class="w-8 h-8 mr-2" />
@@ -88,6 +103,7 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters } = us
       <ResponsiveNavLink
         :href="route('weather-stations')"
         :active="route().current('weather-stations')"
+        @click="$emit('closeMobile')"
       >
         <div class="flex items-center">
              <img src="/images/weather-station.png" alt="Weather Station" class="w-8 h-8 mr-2" />
@@ -97,6 +113,7 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters } = us
       <ResponsiveNavLink
         :href="route('rivers.index')"
         :active="route().current('rivers.*')"
+        @click="$emit('closeMobile')"
       >
         <div class="flex items-center">
              <img src="/images/landscape.png" alt="Rivers" class="w-8 h-8 mr-2" />
@@ -107,6 +124,7 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters } = us
       <ResponsiveNavLink
         :href="route('evacuation-center.index')"
         :active="route().current('evacuation-center.*')"
+        @click="$emit('closeMobile')"
       >
         <div class="flex items-center">
              <img src="/images/disaster.png" alt="Evacuation Center" class="w-8 h-8 mr-2" />
@@ -118,6 +136,7 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters } = us
         v-if="$page.props.auth.can.manage"
         :href="route('data-migration.index')"
         :active="route().current('data-migration.*')"
+        @click="$emit('closeMobile')"
       >
         <div class="flex items-center">
              <img src="/images/migration.png" alt="Data Migration" class="w-8 h-8 mr-2" />
@@ -177,4 +196,5 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters } = us
       </div>
     </div>
   </aside>
+
 </template>

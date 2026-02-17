@@ -44,7 +44,7 @@ const currentYear = new Date().getFullYear();
 
 const detailRainReport = ref({
     month: currentMonth,
-    year: currentYear,
+    year: currentYear.toString(),
     from: '',
     to: '',
     station: 'All'
@@ -52,7 +52,7 @@ const detailRainReport = ref({
 
 const heatIndexReport = ref({
     month: currentMonth, // Default Month
-    year: currentYear,
+    year: currentYear.toString(),
     from: '',
     to: '',
     station: 'All'
@@ -60,7 +60,7 @@ const heatIndexReport = ref({
 
 const waterLevelReport = ref({
     sensor: 'All',
-    year: currentYear,
+    year: currentYear.toString(),
     month: currentMonth,
     from: '',
     to: ''
@@ -1564,85 +1564,85 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
 <template>
     <AppLayout title="Reports">
         <template #header>
-            <div class="flex justify-between items-center">
-                <h2 class="font-bold text-3xl text-gray-800 uppercase tracking-wide">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <h2 class="font-bold text-2xl sm:text-3xl text-gray-800 uppercase tracking-wide">
                     Reports
                 </h2>
-                <div class="text-gray-400 text-sm">
+                <div class="text-gray-400 text-xs sm:text-sm">
                     Today is {{ currentDate }}
                 </div>
             </div>
         </template>
 
-        <div class="pt-0 mb-16">
+        <div class="pt-0 mb-16 px-4 sm:px-0">
             <div class="w-full space-y-12">
-                <div class="bg-gray-200/[0.25] p-8 pt-2 mb-6 h-full">
+                <div class="bg-gray-200/[0.25] p-4 sm:p-8 pt-2 mb-6 h-full">
                     <!-- Report Selection Header -->
-                     <div class="flex justify-between items-center mb-4 border-b border-gray-100 pb-2">
+                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 border-b border-gray-100 pb-2 space-y-4 sm:space-y-0">
                         <div class="flex items-center space-x-4">
                             <h3 class="text-xl font-bold text-gray-800 uppercase">
                                 Select Report
                             </h3>
-                            <p class="text-sm text-gray-400 italic opacity-70">
+                            <p class="text-sm text-gray-400 italic opacity-70 hidden sm:block">
                                 Choose which report you would like to generate
                             </p>
                         </div>
-                        <select v-model="selectedReport" class="w-80 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+                        <select v-model="selectedReport" class="w-full sm:w-80 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
                             <option v-for="type in reportTypes" :key="type" :value="type">{{ type }}</option>
                         </select>
                     </div>
 
                 <!-- Rain Report -->
                     <div v-if="selectedReport === 'Rain'" class="space-y-4">
-                        <h3 class="text-xl font-bold text-gray-800 uppercase flex items-center gap-4">
+                        <h3 class="text-lg sm:text-xl font-bold text-gray-800 uppercase flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
                             Weather Observation (<span class="italic">Rain</span>)
-                            <span class="text-sm font-normal italic text-gray-600 opacity-50 capitalize">Default interval is 24 Hours and Observation data with 0s for both rate & total are ommitted</span>
+                            <span class="text-[10px] sm:text-sm font-normal italic text-gray-600 opacity-50 capitalize">Default interval is 24 Hours and Observation data with 0s for both rate & total are ommitted</span>
                         </h3>
-                        <div class="flex flex-wrap gap-4 items-center">
-                            <select v-model="rainReportType" class="w-48 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+                        <div class="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-4 items-start sm:items-center">
+                            <select v-model="rainReportType" class="w-full sm:w-40 uppercase bg-white border border-gray-200 text-gray-800 text-xs sm:text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2 sm:p-2.5 font-bold tracking-wider">
                                 <option value="Monthly">Monthly</option>
                                 <option value="Date Range">Date Range</option>
                             </select>
-
-                            <template v-if="rainReportType === 'Monthly'">
-                                <select v-model="detailRainReport.month" class="w-48 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+ 
+                            <div v-if="rainReportType === 'Monthly'" class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                                <select v-model="detailRainReport.month" class="w-full sm:w-40 uppercase bg-white border border-gray-200 text-gray-800 text-xs sm:text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2 sm:p-2.5 font-bold tracking-wider">
                                     <option value="" disabled selected>SELECT MONTH</option>
                                     <option v-for="m in months" :key="m" :value="m">{{ m }}</option>
                                 </select>
-
-                                <select v-model="detailRainReport.year" class="w-48 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+ 
+                                <select v-model="detailRainReport.year" class="w-full sm:w-32 uppercase bg-white border border-gray-200 text-gray-800 text-xs sm:text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2 sm:p-2.5 font-bold tracking-wider">
                                     <option value="" disabled selected>SELECT YEAR</option>
-                                    <option v-for="y in weatherStationYears" :key="y" :value="y">{{ y }}</option>
+                                    <option v-for="y in weatherStationYears" :key="y" :value="y.toString()">{{ y }}</option>
                                 </select>
-                            </template>
+                            </div>
                             
-                            <template v-else>
-                                <div class="flex items-center gap-2">
-                                    <span class="text-gray-400 font-bold text-sm uppercase">FROM</span>
-                                    <div class="relative w-48 h-[50px] bg-white border border-gray-200 rounded-sm">
-                                        <span class="absolute left-3 top-1 text-black font-bold text-[10px] uppercase pointer-events-none z-10">DATE</span>
-                                        <input type="date" v-model="detailRainReport.from" class="w-full h-full bg-transparent border-none text-gray-500 text-sm focus:ring-0 block px-2.5 pt-4 font-bold" />
+                            <div v-else class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                                <div class="flex items-center gap-2 w-full sm:w-auto">
+                                    <span class="text-gray-400 font-bold text-[10px] uppercase flex-shrink-0 w-8">FROM</span>
+                                    <div class="relative w-full sm:w-40 h-[40px] sm:h-[50px] bg-white border border-gray-200 rounded-sm">
+                                        <span class="absolute left-3 top-1 text-black font-bold text-[8px] sm:text-[10px] uppercase pointer-events-none z-10">DATE</span>
+                                        <input type="date" v-model="detailRainReport.from" class="w-full h-full bg-transparent border-none text-gray-500 text-xs sm:text-sm focus:ring-0 block px-2.5 pt-3 sm:pt-4 font-bold" />
                                     </div>
                                 </div>
-
-                                <div class="flex items-center gap-2">
-                                    <span class="text-gray-400 font-bold text-sm uppercase">TO</span>
-                                    <div class="relative w-48 h-[50px] bg-white border border-gray-200 rounded-sm">
-                                        <span class="absolute left-3 top-1 text-black font-bold text-[10px] uppercase pointer-events-none z-10">DATE</span>
-                                        <input type="date" v-model="detailRainReport.to" class="w-full h-full bg-transparent border-none text-gray-500 text-sm focus:ring-0 block px-2.5 pt-4 font-bold" />
+ 
+                                <div class="flex items-center gap-2 w-full sm:w-auto">
+                                    <span class="text-gray-400 font-bold text-[10px] uppercase flex-shrink-0 w-8">TO</span>
+                                    <div class="relative w-full sm:w-40 h-[40px] sm:h-[50px] bg-white border border-gray-200 rounded-sm">
+                                        <span class="absolute left-3 top-1 text-black font-bold text-[8px] sm:text-[10px] uppercase pointer-events-none z-10">DATE</span>
+                                        <input type="date" v-model="detailRainReport.to" class="w-full h-full bg-transparent border-none text-gray-500 text-xs sm:text-sm focus:ring-0 block px-2.5 pt-3 sm:pt-4 font-bold" />
                                     </div>
                                 </div>
-                            </template>
-                            <select v-model="detailRainReport.station" class="w-64 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+                            </div>
+                            <select v-model="detailRainReport.station" class="w-full sm:w-56 uppercase bg-white border border-gray-200 text-gray-800 text-xs sm:text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2 sm:p-2.5 font-bold tracking-wider">
                                 <option value="" disabled selected>SELECT STATION</option>
                                 <option v-for="station in stations" :key="station.id" :value="station.name">{{ station.name }}</option>
                                 <option value="All">All Stations</option>
                             </select>
-
+ 
                             <button 
                                 @click="generateReport" 
                                 :disabled="isGenerating"
-                                class="bg-blue-900 hover:bg-blue-800 disabled:bg-gray-400 text-white px-8 py-2.5 rounded-sm font-bold uppercase tracking-wider text-sm transition-colors flex items-center gap-2"
+                                class="w-full sm:w-auto bg-blue-900 hover:bg-blue-800 disabled:bg-gray-400 text-white px-8 py-2 sm:py-2.5 rounded-sm font-bold uppercase tracking-wider text-xs sm:text-sm transition-colors flex justify-center items-center gap-2"
                             >
                                 <span v-if="isGenerating" class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
                                 {{ isGenerating ? 'Generating...' : 'Generate' }}
@@ -1652,47 +1652,47 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
 
                     <!-- Heat Index Report -->
                     <div v-if="selectedReport === 'Heat Index'" class="space-y-4">
-                        <h3 class="text-xl font-bold text-gray-800 uppercase flex items-center gap-4">
+                        <h3 class="text-lg sm:text-xl font-bold text-gray-800 uppercase flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
                             Weather Observation (<span class="italic">Heat Index</span>)
-                            <span class="text-sm font-normal italic text-gray-600 opacity-50 capitalize">Data displayed on a daily basis from all devices</span>
+                            <span class="text-[10px] sm:text-sm font-normal italic text-gray-600 opacity-50 capitalize">Data displayed on a daily basis from all devices</span>
                         </h3>
-                        <div class="flex flex-wrap gap-4 items-center">
-                            <select v-model="heatIndexReportType" class="w-48 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+                        <div class="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-4 items-start sm:items-center">
+                            <select v-model="heatIndexReportType" class="w-full sm:w-40 uppercase bg-white border border-gray-200 text-gray-800 text-xs sm:text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2 sm:p-2.5 font-bold tracking-wider">
                                 <option value="Monthly">Monthly</option>
                                 <option value="Date Range">Date Range</option>
                             </select>
 
-                            <template v-if="heatIndexReportType === 'Monthly'">
-                                <select v-model="heatIndexReport.month" class="w-64 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+                            <div v-if="heatIndexReportType === 'Monthly'" class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                                <select v-model="heatIndexReport.month" class="w-full sm:w-48 uppercase bg-white border border-gray-200 text-gray-800 text-xs sm:text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2 sm:p-2.5 font-bold tracking-wider">
                                     <option value="" disabled selected>SELECT MONTH</option>
                                     <option v-for="m in months" :key="m" :value="m">{{ m }}</option>
                                 </select>
 
-                                <select v-model="heatIndexReport.year" class="w-64 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+                                <select v-model="heatIndexReport.year" class="w-full sm:w-32 uppercase bg-white border border-gray-200 text-gray-800 text-xs sm:text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2 sm:p-2.5 font-bold tracking-wider">
                                     <option value="" disabled selected>SELECT YEAR</option>
-                                    <option v-for="y in weatherStationYears" :key="y" :value="y">{{ y }}</option>
+                                    <option v-for="y in weatherStationYears" :key="y" :value="y.toString()">{{ y }}</option>
                                 </select>
-                            </template>
+                            </div>
 
-                            <template v-else>
-                                <div class="flex items-center gap-2">
-                                    <span class="text-gray-400 font-bold text-sm uppercase">FROM</span>
-                                    <div class="relative w-48 h-[50px] bg-white border border-gray-200 rounded-sm">
-                                        <span class="absolute left-3 top-1 text-black font-bold text-[10px] uppercase pointer-events-none z-10">DATE</span>
-                                        <input type="date" v-model="heatIndexReport.from" class="w-full h-full bg-transparent border-none text-gray-500 text-sm focus:ring-0 block px-2.5 pt-4 font-bold" />
+                            <div v-else class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                                <div class="flex items-center gap-2 w-full sm:w-auto">
+                                    <span class="text-gray-400 font-bold text-[10px] uppercase flex-shrink-0 w-8">FROM</span>
+                                    <div class="relative w-full sm:w-40 h-[40px] sm:h-[50px] bg-white border border-gray-200 rounded-sm">
+                                        <span class="absolute left-3 top-1 text-black font-bold text-[8px] sm:text-[10px] uppercase pointer-events-none z-10">DATE</span>
+                                        <input type="date" v-model="heatIndexReport.from" class="w-full h-full bg-transparent border-none text-gray-500 text-xs sm:text-sm focus:ring-0 block px-2.5 pt-3 sm:pt-4 font-bold" />
                                     </div>
                                 </div>
 
-                                <div class="flex items-center gap-2">
-                                    <span class="text-gray-400 font-bold text-sm uppercase">TO</span>
-                                    <div class="relative w-48 h-[50px] bg-white border border-gray-200 rounded-sm">
-                                        <span class="absolute left-3 top-1 text-black font-bold text-[10px] uppercase pointer-events-none z-10">DATE</span>
-                                        <input type="date" v-model="heatIndexReport.to" class="w-full h-full bg-transparent border-none text-gray-500 text-sm focus:ring-0 block px-2.5 pt-4 font-bold" />
+                                <div class="flex items-center gap-2 w-full sm:w-auto">
+                                    <span class="text-gray-400 font-bold text-[10px] uppercase flex-shrink-0 w-8">TO</span>
+                                    <div class="relative w-full sm:w-40 h-[40px] sm:h-[50px] bg-white border border-gray-200 rounded-sm">
+                                        <span class="absolute left-3 top-1 text-black font-bold text-[8px] sm:text-[10px] uppercase pointer-events-none z-10">DATE</span>
+                                        <input type="date" v-model="heatIndexReport.to" class="w-full h-full bg-transparent border-none text-gray-500 text-xs sm:text-sm focus:ring-0 block px-2.5 pt-3 sm:pt-4 font-bold" />
                                     </div>
                                 </div>
-                            </template>
+                            </div>
 
-                            <select v-model="heatIndexReport.station" class="w-64 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+                            <select v-model="heatIndexReport.station" class="w-full sm:w-56 uppercase bg-white border border-gray-200 text-gray-800 text-xs sm:text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2 sm:p-2.5 font-bold tracking-wider">
                                 <option value="" disabled selected>SELECT STATION</option>
                                 <option v-for="station in stations" :key="station.id" :value="station.name">{{ station.name }}</option>
                                 <option value="All">All Stations</option>
@@ -1701,7 +1701,7 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                             <button 
                                 @click="generateReport" 
                                 :disabled="isGenerating"
-                                class="bg-blue-900 hover:bg-blue-800 disabled:bg-gray-400 text-white px-8 py-2.5 rounded-sm font-bold uppercase tracking-wider text-sm transition-colors flex items-center gap-2"
+                                class="w-full sm:w-auto bg-blue-900 hover:bg-blue-800 disabled:bg-gray-400 text-white px-8 py-2 sm:py-2.5 rounded-sm font-bold uppercase tracking-wider text-xs sm:text-sm transition-colors flex justify-center items-center gap-2"
                             >
                                 <span v-if="isGenerating" class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
                                 {{ isGenerating ? 'Generating...' : 'Generate' }}
@@ -1711,47 +1711,47 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
 
                     <!-- Water Level Sensor Data Report -->
                     <div v-if="selectedReport === 'Water Level'" class="space-y-4">
-                        <h3 class="text-xl font-bold text-gray-800 uppercase flex items-center gap-4">
+                        <h3 class="text-lg sm:text-xl font-bold text-gray-800 uppercase flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
                             Water Level Sensors
-                            <span class="text-sm font-normal italic text-gray-600 opacity-50 capitalize">Select sensor and date range</span>
+                            <span class="text-[10px] sm:text-sm font-normal italic text-gray-600 opacity-50 capitalize">Select sensor and date range</span>
                         </h3>
-                        <div class="flex flex-wrap gap-4 items-center">
-                            <select v-model="waterLevelReportType" class="w-48 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+                        <div class="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-4 items-start sm:items-center">
+                            <select v-model="waterLevelReportType" class="w-full sm:w-40 uppercase bg-white border border-gray-200 text-gray-800 text-xs sm:text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2 sm:p-2.5 font-bold tracking-wider">
                                 <option value="Monthly">Monthly</option>
                                 <option value="Date Range">Date Range</option>
                             </select>
 
-                            <template v-if="waterLevelReportType === 'Monthly'">
-                                <select v-model="waterLevelReport.month" class="w-48 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+                            <div v-if="waterLevelReportType === 'Monthly'" class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                                <select v-model="waterLevelReport.month" class="w-full sm:w-48 uppercase bg-white border border-gray-200 text-gray-800 text-xs sm:text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2 sm:p-2.5 font-bold tracking-wider">
                                     <option value="" disabled selected>SELECT MONTH</option>
                                     <option v-for="m in months" :key="m" :value="m">{{ m }}</option>
                                 </select>
 
-                                  <select v-model="waterLevelReport.year" class="w-48 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+                                  <select v-model="waterLevelReport.year" class="w-full sm:w-32 uppercase bg-white border border-gray-200 text-gray-800 text-xs sm:text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2 sm:p-2.5 font-bold tracking-wider">
                                     <option value="" disabled selected>SELECT YEAR</option>
-                                    <option v-for="y in waterLevelYears" :key="y" :value="y">{{ y }}</option>
+                                    <option v-for="y in waterLevelYears" :key="y" :value="y.toString()">{{ y }}</option>
                                 </select>
-                            </template>
+                            </div>
 
-                            <template v-else>
-                                <div class="flex items-center gap-2">
-                                    <span class="text-gray-400 font-bold text-sm uppercase">FROM</span>
-                                    <div class="relative w-48 h-[50px] bg-white border border-gray-200 rounded-sm">
-                                        <span class="absolute left-3 top-1 text-black font-bold text-[10px] uppercase pointer-events-none z-10">DATE</span>
-                                        <input type="date" v-model="waterLevelReport.from" class="w-full h-full bg-transparent border-none text-gray-500 text-sm focus:ring-0 block px-2.5 pt-4 font-bold" />
+                            <div v-else class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                                <div class="flex items-center gap-2 w-full sm:w-auto">
+                                    <span class="text-gray-400 font-bold text-[10px] uppercase flex-shrink-0 w-8">FROM</span>
+                                    <div class="relative w-full sm:w-40 h-[40px] sm:h-[50px] bg-white border border-gray-200 rounded-sm">
+                                        <span class="absolute left-3 top-1 text-black font-bold text-[8px] sm:text-[10px] uppercase pointer-events-none z-10">DATE</span>
+                                        <input type="date" v-model="waterLevelReport.from" class="w-full h-full bg-transparent border-none text-gray-500 text-xs sm:text-sm focus:ring-0 block px-2.5 pt-3 sm:pt-4 font-bold" />
                                     </div>
                                 </div>
 
-                                <div class="flex items-center gap-2">
-                                    <span class="text-gray-400 font-bold text-sm uppercase">TO</span>
-                                    <div class="relative w-48 h-[50px] bg-white border border-gray-200 rounded-sm">
-                                        <span class="absolute left-3 top-1 text-black font-bold text-[10px] uppercase pointer-events-none z-10">DATE</span>
-                                        <input type="date" v-model="waterLevelReport.to" class="w-full h-full bg-transparent border-none text-gray-500 text-sm focus:ring-0 block px-2.5 pt-4 font-bold" />
+                                <div class="flex items-center gap-2 w-full sm:w-auto">
+                                    <span class="text-gray-400 font-bold text-[10px] uppercase flex-shrink-0 w-8">TO</span>
+                                    <div class="relative w-full sm:w-40 h-[40px] sm:h-[50px] bg-white border border-gray-200 rounded-sm">
+                                        <span class="absolute left-3 top-1 text-black font-bold text-[8px] sm:text-[10px] uppercase pointer-events-none z-10">DATE</span>
+                                        <input type="date" v-model="waterLevelReport.to" class="w-full h-full bg-transparent border-none text-gray-500 text-xs sm:text-sm focus:ring-0 block px-2.5 pt-3 sm:pt-4 font-bold" />
                                     </div>
                                 </div>
-                            </template>
+                            </div>
                             
-                            <select v-model="waterLevelReport.sensor" class="w-64 uppercase bg-white border border-gray-200 text-gray-800 text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold tracking-wider">
+                            <select v-model="waterLevelReport.sensor" class="w-full sm:w-56 uppercase bg-white border border-gray-200 text-gray-800 text-xs sm:text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2 sm:p-2.5 font-bold tracking-wider">
                                 <option value="" disabled selected>SELECT SENSOR</option>
                                 <option v-for="sensor in sensors" :key="sensor.id" :value="sensor.name">{{ sensor.name }}</option>
                                 <option value="All">All Sensors</option>
@@ -1761,7 +1761,7 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                             <button 
                                 @click="generateReport" 
                                 :disabled="isGenerating"
-                                class="bg-blue-900 hover:bg-blue-800 disabled:bg-gray-400 text-white px-8 py-2.5 rounded-sm font-bold uppercase tracking-wider text-sm transition-colors flex items-center gap-2"
+                                class="w-full sm:w-auto bg-blue-900 hover:bg-blue-800 disabled:bg-gray-400 text-white px-8 py-2 sm:py-2.5 rounded-sm font-bold uppercase tracking-wider text-xs sm:text-sm transition-colors flex justify-center items-center gap-2"
                             >
                                 <span v-if="isGenerating" class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
                                 {{ isGenerating ? 'Generating...' : 'Generate' }}
@@ -1785,14 +1785,14 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                                     Download Chart
                                 </button>
                             </div>
-                            <div class="bg-white p-2 border-2 border-orange-500 rounded-2xl shadow-md h-[600px] w-full" ref="rainChartDiv"></div>
+                            <div class="bg-white p-2 border-2 border-orange-500 rounded-2xl shadow-md h-[400px] sm:h-[600px] w-full" ref="rainChartDiv"></div>
                             <!-- <div class="text-center text-xs font-bold text-gray-400 uppercase">Month</div> -->
 
                             <!-- Rain Results Table -->
-                            <div v-if="rainRecords.length > 0" class="bg-white  border-2 border-orange-500 rounded-2xl shadow-md overflow-hidden mt-8">
-                                <div class="flex justify-between items-center py-2 px-4 border-b border-gray-100">
-                                    <h4 class="font-bold text-gray-600 uppercase text-sm">Weather Observation (Rain) Data Table</h4>
-                                    <div class="flex gap-2">
+                            <div v-if="rainRecords.length > 0" class="bg-white border-2 border-orange-500 rounded-2xl shadow-md overflow-hidden mt-8">
+                                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center py-3 px-4 border-b border-gray-100 gap-4">
+                                    <h4 class="font-bold text-gray-600 uppercase text-xs sm:text-sm">Weather Observation (Rain) Data Table</h4>
+                                    <div class="flex gap-2 w-full sm:w-auto">
                                         <button 
                                             v-if="(rainActiveTab || rainTabs[0]) === 'Summary'"
                                             @click="exportSummaryToExcel" 
@@ -1897,31 +1897,33 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                                     </table>
                                 </div>
 
-                                <table v-else class="w-full text-left">
-                                    <thead class="bg-gray-100 border-b border-gray-200">
-                                        <tr>
-                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">No.</th>
-                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">Station Name</th>
-                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Rate (mm/h)</th>
-                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Total (mm)</th>
-                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Date & Time</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-gray-100">
-                                        <tr v-for="(record, index) in paginatedRainRecords" :key="index" class="hover:bg-gray-50 transition-colors">
-                                            <td class="px-4 py-3 text-sm text-gray-500 font-bold font-mono">{{ (currentPage - 1) * itemsPerPage + index + 1 }}</td>
-                                            <td class="px-4 py-3 text-sm text-gray-800 font-bold uppercase tracking-wider">{{ record.station_name }}</td>
-                                            <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">{{ record.precipitation_rate }}</td>
-                                            <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">{{ record.precipitation_total }}</td>
-                                            <td class="px-4 py-3 text-sm text-gray-500 font-bold text-center">
-                                                {{ new Date(record.date_time).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) }}
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
+                                <div v-else class="overflow-x-auto">
+                                    <table class="w-full text-left min-w-[600px]">
+                                        <thead class="bg-gray-100 border-b border-gray-200">
+                                            <tr>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">No.</th>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">Station Name</th>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Rate (mm/h)</th>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Total (mm)</th>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Date & Time</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-100">
+                                            <tr v-for="(record, index) in paginatedRainRecords" :key="index" class="hover:bg-gray-50 transition-colors">
+                                                <td class="px-4 py-3 text-sm text-gray-500 font-bold font-mono">{{ (currentPage - 1) * itemsPerPage + index + 1 }}</td>
+                                                <td class="px-4 py-3 text-sm text-gray-800 font-bold uppercase tracking-wider">{{ record.station_name }}</td>
+                                                <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">{{ record.precipitation_rate }}</td>
+                                                <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">{{ record.precipitation_total }}</td>
+                                                <td class="px-4 py-3 text-sm text-gray-500 font-bold text-center">
+                                                    {{ new Date(record.date_time).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) }}
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
 
                                 <!-- Pagination Controls -->
-                                <div v-if="(rainActiveTab || rainTabs[0]) !== 'Summary' && rainTotalPages > 1" class="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-100">
+                                <div v-if="(rainActiveTab || rainTabs[0]) !== 'Summary' && rainTotalPages > 1" class="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-100 overflow-x-auto">
                                     <div class="flex items-center gap-2">
                                         <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Page {{ currentPage }} of {{ rainTotalPages }}</span>
                                         <span class="text-[10px] text-gray-300 font-bold uppercase tracking-widest">({{ filteredRainRecords.length }} records)</span>
@@ -1964,14 +1966,14 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                                     Download Chart
                                 </button>
                             </div>
-                            <div class="bg-white p-2 rounded-sm border border-gray-100 w-full" :class="heatIndexReport.station === 'All' ? 'h-[450px]' : 'h-[500px]'" ref="heatIndexChartDiv"></div>
+                            <div class="bg-white p-2 rounded-sm border border-gray-100 w-full" :class="heatIndexReport.station === 'All' ? 'h-[350px] sm:h-[450px]' : 'h-[400px] sm:h-[500px]'" ref="heatIndexChartDiv"></div>
                             <!-- <div class="text-center text-xs font-bold text-gray-400 uppercase">Month</div> -->
 
                             <!-- Heat Index Results Table -->
-                            <div v-if="heatIndexRecords.length > 0" class="bg-white border border-gray-200 rounded-sm overflow-hidden mt-8">
-                                <div class="flex justify-between items-center py-2 px-4 border-b border-gray-100">
-                                    <h4 class="font-bold text-gray-600 uppercase text-sm">Heat Index Data Table</h4>
-                                    <div class="flex gap-2">
+                            <div v-if="heatIndexRecords.length > 0" class="bg-white border border-gray-200 rounded-sm mt-8 overflow-hidden">
+                                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center py-3 px-4 border-b border-gray-100 gap-4">
+                                    <h4 class="font-bold text-gray-600 uppercase text-xs sm:text-sm">Heat Index Data Table</h4>
+                                    <div class="flex gap-2 w-full sm:w-auto">
                                         <button 
                                             v-if="(heatIndexActiveTab || heatIndexTabs[0]) === 'Summary'"
                                             @click="exportSummaryToExcel" 
@@ -2070,34 +2072,36 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                                     </table>
                                 </div>
 
-                                <table v-else class="w-full text-left">
-                                    <thead class="bg-gray-100 border-b border-gray-200">
-                                        <tr>
-                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">No.</th>
-                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">Station Name</th>
-                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Temp (°C)</th>
-                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Humidity (%)</th>
-                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Heat Index (°C)</th>
-                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Date & Time</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-gray-100">
-                                        <tr v-for="(record, index) in paginatedHeatIndexRecords" :key="index" class="hover:bg-gray-50 transition-colors">
-                                            <td class="px-4 py-3 text-sm text-gray-500 font-bold font-mono">{{ (currentPage - 1) * itemsPerPage + index + 1 }}</td>
-                                            <td class="px-4 py-3 text-sm text-gray-800 font-bold uppercase tracking-wider">{{ record.station_name }}</td>
-                                            <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">{{ record.temperature }}</td>
-                                            <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">{{ record.humidity }}%</td>
-                                            <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">
-                                                <span class="bg-orange-50 text-orange-700 px-2 py-1 rounded text-xs font-bold">
-                                                    {{ record.heat_index }}°C
-                                                </span>
-                                            </td>
-                                            <td class="px-4 py-3 text-sm text-gray-500 font-bold text-center">
-                                                {{ new Date(record.date_time).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) }}
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
+                                <div v-else class="overflow-x-auto">
+                                    <table class="w-full text-left min-w-[700px]">
+                                        <thead class="bg-gray-100 border-b border-gray-200">
+                                            <tr>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">No.</th>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">Station Name</th>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Temp (°C)</th>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Humidity (%)</th>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Heat Index (°C)</th>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Date & Time</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-100">
+                                            <tr v-for="(record, index) in paginatedHeatIndexRecords" :key="index" class="hover:bg-gray-50 transition-colors">
+                                                <td class="px-4 py-3 text-sm text-gray-500 font-bold font-mono">{{ (currentPage - 1) * itemsPerPage + index + 1 }}</td>
+                                                <td class="px-4 py-3 text-sm text-gray-800 font-bold uppercase tracking-wider">{{ record.station_name }}</td>
+                                                <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">{{ record.temperature }}</td>
+                                                <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">{{ record.humidity }}%</td>
+                                                <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">
+                                                    <span class="bg-orange-50 text-orange-700 px-2 py-1 rounded text-xs font-bold">
+                                                        {{ record.heat_index }}°C
+                                                    </span>
+                                                </td>
+                                                <td class="px-4 py-3 text-sm text-gray-500 font-bold text-center">
+                                                    {{ new Date(record.date_time).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) }}
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
 
                                 <!-- Pagination Controls -->
                                 <div v-if="(heatIndexActiveTab || heatIndexTabs[0]) !== 'Summary' && heatIndexTotalPages > 1" class="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-100">
@@ -2144,15 +2148,15 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                                         Download Chart
                                     </button>
                                 </div>
-                                <div class="bg-white p-2 rounded-sm border border-gray-100 h-[600px] w-full" ref="waterLevelChartDiv"></div>
+                                <div class="bg-white p-2 rounded-sm border border-gray-100 h-[400px] sm:h-[600px] w-full" ref="waterLevelChartDiv"></div>
                                 <div class="text-center text-xs font-bold text-gray-800 uppercase">Timestamp</div>
                             </div>
 
                             <!-- Results Table -->
-                            <div v-if="waterLevelRecords.length > 0" class="bg-white border border-gray-200 rounded-sm overflow-hidden">
-                                <div class="flex justify-between items-center py-2 px-4">
-                                    <h4 class="font-bold text-gray-600 uppercase text-sm">Water Level Data Table</h4>
-                                    <div class="flex gap-2">
+                            <div v-if="waterLevelRecords.length > 0" class="bg-white border border-gray-200 rounded-sm overflow-hidden mt-8">
+                                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center py-3 px-4 border-b border-gray-100 gap-4">
+                                    <h4 class="font-bold text-gray-600 uppercase text-xs sm:text-sm">Water Level Data Table</h4>
+                                    <div class="flex gap-2 w-full sm:w-auto">
                                         <button 
                                             v-if="(waterLevelActiveTab || waterLevelTabs[0]) === 'Summary'"
                                             @click="exportSummaryToExcel" 
@@ -2251,30 +2255,32 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                                     </table>
                                 </div>
 
-                                <table v-else class="w-full text-left">
-                                    <thead class="bg-gray-100 border-b border-gray-200">
-                                        <tr>
-                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">No.</th>
-                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">Sensor Name</th>
-                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Water Level (m)</th>
-                                            <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Date & Time</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-gray-100">
-                                        <tr v-for="(record, index) in paginatedWaterLevelRecords" :key="index" class="hover:bg-gray-50 transition-colors">
-                                            <td class="px-4 py-3 text-sm text-gray-500 font-bold font-mono">{{ (currentPage - 1) * itemsPerPage + index + 1 }}</td>
-                                            <td class="px-4 py-3 text-sm text-gray-800 font-bold uppercase tracking-wider">{{ record.sensor_name }}</td>
-                                            <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">
-                                                <span class="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs">
-                                                    {{ record.water_level }}m
-                                                </span>
-                                            </td>
-                                            <td class="px-4 py-3 text-sm text-gray-500 font-bold text-center">
-                                                {{ new Date(record.date_time).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) }}
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
+                                <div v-else class="overflow-x-auto">
+                                    <table class="w-full text-left min-w-[500px]">
+                                        <thead class="bg-gray-100 border-b border-gray-200">
+                                            <tr>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">No.</th>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">Sensor Name</th>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Water Level (m)</th>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Date & Time</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-100">
+                                            <tr v-for="(record, index) in paginatedWaterLevelRecords" :key="index" class="hover:bg-gray-50 transition-colors">
+                                                <td class="px-4 py-3 text-sm text-gray-500 font-bold font-mono">{{ (currentPage - 1) * itemsPerPage + index + 1 }}</td>
+                                                <td class="px-4 py-3 text-sm text-gray-800 font-bold uppercase tracking-wider">{{ record.sensor_name }}</td>
+                                                <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">
+                                                    <span class="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs">
+                                                        {{ record.water_level }}m
+                                                    </span>
+                                                </td>
+                                                <td class="px-4 py-3 text-sm text-gray-500 font-bold text-center">
+                                                    {{ new Date(record.date_time).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) }}
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
 
                                 <!-- Pagination Controls -->
                                 <div v-if="(waterLevelActiveTab || waterLevelTabs[0]) !== 'Summary' && waterLevelTotalPages > 1" class="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-100">

@@ -133,9 +133,9 @@ const closePingModal = () => {
             <div class="w-full mx-auto px-8 h-full">
                 <div class="bg-white border-2 border-orange-500 rounded-2xl shadow-md overflow-hidden sm:rounded-lg h-full min-h-[calc(100vh-280px)]">
                     <div class="p-6 h-full">
-                        <div class="flex">
-                            <div class="w-1/3 flex space-x-8 items-center py-2">
-                                <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight uppercase">
+                        <div class="flex flex-col lg:flex-row lg:items-center space-y-4 lg:space-y-0 lg:space-x-4 mb-6">
+                            <div class="lg:w-1/3 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4 items-start sm:items-center py-2">
+                                <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight uppercase shrink-0">
                                     Weather Station List
                                 </h2>
                                 <Link
@@ -147,7 +147,7 @@ const closePingModal = () => {
                                 </Link>
                                 
                             </div>
-                            <div class="w-1/3 py-2 flex items-center justify-center">
+                            <div class="lg:w-1/3 py-2">
                                 <TextInput
                                     v-model="search"
                                     type="text"
@@ -155,73 +155,78 @@ const closePingModal = () => {
                                     class="w-full"
                                 />
                             </div>
-                            <div class="w-1/3 py-2 flex space-x-6 items-center justify-center">
-                                <div class="flex items-center justify-center w-fit space-x-1.5">
-                                    <div class="w-[20px] h-[20px] bg-green-500 rounded-full">&nbsp;</div>
-                                    <span class="text-lg uppercase">Active (<span class="font-bold">{{ activeCount }}</span>)</span>
+                            <div class="lg:w-1/3 py-2 flex flex-wrap gap-4 items-center justify-start lg:justify-end">
+                                <div class="flex items-center space-x-1.5 shrink-0">
+                                    <div class="w-4 h-4 bg-green-500 rounded-full"></div>
+                                    <span class="text-sm uppercase">Active (<span class="font-bold">{{ activeCount }}</span>)</span>
                                 </div>
-                                <div class="flex items-center justify-center w-fit space-x-1.5">
-                                    <div class="w-[20px] h-[20px] bg-red-500 rounded-full">&nbsp;</div>
-                                    <span class="text-lg uppercase">inactive (<span class="font-bold">{{ inactiveCount }}</span>)</span>
+                                <div class="flex items-center space-x-1.5 shrink-0">
+                                    <div class="w-4 h-4 bg-red-500 rounded-full"></div>
+                                    <span class="text-sm uppercase">inactive (<span class="font-bold">{{ inactiveCount }}</span>)</span>
                                 </div>
-                                <div class="flex items-center justify-center w-fit space-x-1.5">
-                                    <div class="w-[20px] h-[20px] bg-gray-500 rounded-full">&nbsp;</div>
-                                    <span class="text-lg uppercase">maintenance (<span class="font-bold">{{ maintenanceCount }}</span>)</span>
+                                <div class="flex items-center space-x-1.5 shrink-0">
+                                    <div class="w-4 h-4 bg-gray-500 rounded-full"></div>
+                                    <span class="text-sm uppercase">maintenance (<span class="font-bold">{{ maintenanceCount }}</span>)</span>
                                 </div>
                             </div>
                         </div>
-                        <div class="w-full grid grid-cols-7 gap-4 bg-gray-200 text-xl text-center font-bold">
-                            <div>Name</div>
-                            <div>Station ID</div>
-                            <div>Mode</div>
-                            <div>IP</div>
-                            <div>Location</div>
-                            <div>State</div>
-                            <div>Action</div>
-                        </div>
-                        
-                        <div v-for="station in props.stations.data" :key="station.id" class="w-full grid grid-cols-7 gap-4 border-b border-gray-200 dark:border-gray-700 py-3 text-lg text-center items-center odd:bg-gray-100/[0.6] hover:bg-gray-100 dark:hover:bg-gray-700 transition duration-150 ease-in-out">
-                            <div class="font-medium text-gray-900 dark:text-gray-100">{{ station.name }}</div>
-                            <div class="text-gray-600 dark:text-gray-400 font-mono">{{ station.station_id }}</div>
-                            <div class="text-gray-600 dark:text-gray-400">{{ station.mode }}</div>
-                            <div class="text-gray-600 dark:text-gray-400 font-mono text-sm">{{ station.ip || 'N/A' }}</div>
-                            <div class="text-gray-600 dark:text-gray-400">
-                                {{ station.location?.location_type?.description || 'N/A' }} 
-                                <span v-if="station.location" class="text-xs text-gray-500 block">({{ station.location.latitude }}, {{ station.location.longitude }})</span>
-                            </div>
-                            <div class="text-gray-600 dark:text-gray-400">
-                                <span :class="{
-                                    'px-2 py-1 text-xs font-semibold rounded-full': true,
-                                    'bg-green-100 text-green-800': station.state === 1,
-                                    'bg-red-100 text-red-800': station.state === 0,
-                                    'bg-gray-100 text-gray-800': station.state !== 1 && station.state !== 0
-                                }">
-                                    {{ station.state === 1 ? 'Active' : (station.state === 0 ? 'Inactive' : station.state) }}
-                                </span>
-                            </div>
-                            <div class="flex justify-center space-x-2">
-                                <Link 
-                                    v-if="$page.props.auth.can.update"
-                                    :href="route('weather-stations.edit', station.id)"
-                                    class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
-                                >
-                                    Edit
-                                </Link>
-                                <button
-                                    v-if="$page.props.auth.can.delete"
-                                    @click="confirmStationDeletion(station)"
-                                    class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                                >
-                                    Delete
-                                </button>
-                                <button
-                                    v-if="$page.props.auth.can.read && (station.ip || station.mode === 'Davis')"
-                                    @click="pingStation(station)"
-                                    class="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
-                                >
-                                    Ping
-                                </button>
-                                <span v-if="!$page.props.auth.can.update && !$page.props.auth.can.delete" class="text-gray-400 text-sm">No Actions</span>
+
+                        <div class="overflow-x-auto">
+                            <div class="min-w-[1000px]">
+                                <div class="w-full grid grid-cols-7 gap-4 bg-gray-200 text-xl text-center font-bold py-2">
+                                    <div>Name</div>
+                                    <div>Station ID</div>
+                                    <div>Mode</div>
+                                    <div>IP</div>
+                                    <div>Location</div>
+                                    <div>State</div>
+                                    <div>Action</div>
+                                </div>
+                                
+                                <div v-for="station in props.stations.data" :key="station.id" class="w-full grid grid-cols-7 gap-4 border-b border-gray-200 dark:border-gray-700 py-3 text-lg text-center items-center odd:bg-gray-100/[0.6] hover:bg-gray-100 dark:hover:bg-gray-700 transition duration-150 ease-in-out">
+                                    <div class="font-medium text-gray-900 dark:text-gray-100">{{ station.name }}</div>
+                                    <div class="text-gray-600 dark:text-gray-400 font-mono">{{ station.station_id }}</div>
+                                    <div class="text-gray-600 dark:text-gray-400">{{ station.mode }}</div>
+                                    <div class="text-gray-600 dark:text-gray-400 font-mono text-sm">{{ station.ip || 'N/A' }}</div>
+                                    <div class="text-gray-600 dark:text-gray-400">
+                                        {{ station.location?.location_type?.description || 'N/A' }} 
+                                        <span v-if="station.location" class="text-xs text-gray-500 block">({{ station.location.latitude }}, {{ station.location.longitude }})</span>
+                                    </div>
+                                    <div class="text-gray-600 dark:text-gray-400">
+                                        <span :class="{
+                                            'px-2 py-1 text-xs font-semibold rounded-full': true,
+                                            'bg-green-100 text-green-800': station.state === 1,
+                                            'bg-red-100 text-red-800': station.state === 0,
+                                            'bg-gray-100 text-gray-800': station.state !== 1 && station.state !== 0
+                                        }">
+                                            {{ station.state === 1 ? 'Active' : (station.state === 0 ? 'Inactive' : station.state) }}
+                                        </span>
+                                    </div>
+                                    <div class="flex justify-center space-x-2">
+                                        <Link 
+                                            v-if="$page.props.auth.can.update"
+                                            :href="route('weather-stations.edit', station.id)"
+                                            class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                                        >
+                                            Edit
+                                        </Link>
+                                        <button
+                                            v-if="$page.props.auth.can.delete"
+                                            @click="confirmStationDeletion(station)"
+                                            class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                                        >
+                                            Delete
+                                        </button>
+                                        <button
+                                            v-if="$page.props.auth.can.read && (station.ip || station.mode === 'Davis')"
+                                            @click="pingStation(station)"
+                                            class="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-blue-300"
+                                        >
+                                            Ping
+                                        </button>
+                                        <span v-if="!$page.props.auth.can.update && !$page.props.auth.can.delete" class="text-gray-400 text-sm">No Actions</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
