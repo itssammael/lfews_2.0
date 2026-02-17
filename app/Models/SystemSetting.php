@@ -12,9 +12,16 @@ class SystemSetting extends Model
     protected $fillable = [
         'name',
         'value',
+        'description',
+        'updated_by',
     ];
 
     protected $casts = [
         'value' => 'array',
     ];
+
+    public function updatedBy()
+    {
+        return $this->belongsTo(User::class, 'updated_by');
+    }
 }

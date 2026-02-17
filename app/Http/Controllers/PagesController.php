@@ -25,7 +25,7 @@ class PagesController extends Controller
 
     public function systemSettings()
     {
-        $settings = SystemSetting::all()->pluck('value', 'name');
+        $settings = SystemSetting::with('updatedBy')->get()->pluck('value', 'name');
         return Inertia::render('SystemSettings', [
             'settings' => $settings,
         ]);
@@ -40,7 +40,10 @@ class PagesController extends Controller
 
         SystemSetting::updateOrCreate(
             ['name' => $validated['name']],
-            ['value' => $validated['value']]
+            [
+                'value' => $validated['value'],
+                'updated_by' => auth()->id(),
+            ]
         );
 
         return redirect()->back()->with('success', 'Settings updated successfully.');

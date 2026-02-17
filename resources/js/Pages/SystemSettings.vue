@@ -2,6 +2,13 @@
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { useForm } from '@inertiajs/vue3';
 import { ref } from 'vue';
+import FormSection from '@/Components/FormSection.vue';
+import InputLabel from '@/Components/InputLabel.vue';
+import TextInput from '@/Components/TextInput.vue';
+import InputError from '@/Components/InputError.vue';
+import PrimaryButton from '@/Components/PrimaryButton.vue';
+import ActionMessage from '@/Components/ActionMessage.vue';
+import SectionBorder from '@/Components/SectionBorder.vue';
 
 const props = defineProps({
     settings: Object,
@@ -35,48 +42,57 @@ const submit = () => {
             </h2>
         </template>
 
-        <div class="py-12">
-            <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-xl sm:rounded-lg p-6">
-                    <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Data Pull Configuration</h3>
-                    
-                    <form @submit.prevent="submit" class="space-y-6">
-                        <div>
-                            <label for="water_level_timeout" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                Water Level Sensor Timeout (seconds)
-                            </label>
-                            <input 
+        <div>
+            <div class="max-w-7xl mx-auto py-10 sm:px-6 lg:px-8">
+                <FormSection @submitted="submit">
+                    <template #title>
+                        Data Pull Configuration
+                    </template>
+
+                    <template #description>
+                        Controls the frequency and timeout of data pulling operations from Water Level Sensor and Weather Station.
+                    </template>
+
+                    <template #form>
+                        <!-- Water Level Sensor Timeout -->
+                        <div class="col-span-6 sm:col-span-4">
+                            <InputLabel for="water_level_timeout" value="Water Level Sensor Timeout (seconds)" />
+                            <TextInput
                                 id="water_level_timeout"
-                                type="number" 
                                 v-model="form.value.water_level_sensor"
-                                class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-orange-500 dark:focus:border-orange-600 focus:ring-orange-500 dark:focus:ring-orange-600 rounded-md shadow-sm"
+                                type="number"
+                                class="mt-1 block w-full"
+                                autocomplete="off"
                             />
+                            <InputError :message="form.errors.value" class="mt-2" />
                         </div>
 
-                        <div>
-                            <label for="weather_station_timeout" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                Weather Station Timeout (seconds)
-                            </label>
-                            <input 
+                        <!-- Weather Station Timeout -->
+                        <div class="col-span-6 sm:col-span-4">
+                            <InputLabel for="weather_station_timeout" value="Weather Station Timeout (seconds)" />
+                            <TextInput
                                 id="weather_station_timeout"
-                                type="number" 
                                 v-model="form.value.weather_station"
-                                class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-orange-500 dark:focus:border-orange-600 focus:ring-orange-500 dark:focus:ring-orange-600 rounded-md shadow-sm"
+                                type="number"
+                                class="mt-1 block w-full"
+                                autocomplete="off"
                             />
+                            <InputError :message="form.errors.value" class="mt-2" />
                         </div>
+                    </template>
 
-                        <div class="flex items-center justify-end">
-                            <button 
-                                type="submit" 
-                                :disabled="form.processing"
-                                class="inline-flex items-center px-4 py-2 bg-orange-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-orange-500 active:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150"
-                                :class="{ 'opacity-25': form.processing }"
-                            >
-                                Save Settings
-                            </button>
-                        </div>
-                    </form>
-                </div>
+                    <template #actions>
+                        <ActionMessage :on="form.recentlySuccessful" class="me-3">
+                            Saved.
+                        </ActionMessage>
+
+                        <PrimaryButton :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
+                            Save
+                        </PrimaryButton>
+                    </template>
+                </FormSection>
+
+                <SectionBorder />
             </div>
         </div>
     </AppLayout>

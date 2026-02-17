@@ -12,8 +12,10 @@ return new class extends Migration {
     {
         Schema::create('system_settings', function (Blueprint $table) {
             $table->id();
-            $table->string('name')->unique();
+            $table->string('name', 191)->unique();
             $table->text('value');
+            $table->text('description')->nullable();
+            $table->foreignId('updated_by')->nullable()->constrained('users')->onDelete('set null');
             $table->timestamps();
         });
     }

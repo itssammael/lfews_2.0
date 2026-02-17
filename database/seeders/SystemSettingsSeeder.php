@@ -18,7 +18,9 @@ class SystemSettingsSeeder extends Seeder
                 'value' => [
                     'water_level_sensor' => 300,
                     'weather_station' => 300,
-                ]
+                    'description' => 'Timeouts for data pull operations (in seconds).',
+                ],
+                'description' => 'Controls the frequency and timeout of data pulling operations from Water Level Sensor and Weather Station.',
             ]
         );
     }
