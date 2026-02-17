@@ -5,6 +5,7 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import WaterLevelChart from "@/Components/WaterLevelChart.vue";
 import WaterLevelCombinedChart from "@/Components/WaterLevelCombinedChart.vue";
 import WeatherStationChart from "@/Components/WeatherStationChart.vue";
+import WindCompass from "@/Components/WindCompass.vue";
 import Checkbox from "@/Components/Checkbox.vue";
 import InputLabel from "@/Components/InputLabel.vue";
 
@@ -543,17 +544,10 @@ const isAlertDismissed = (sensorId: number, level: number) => {
                                                     </div>
 
                                                     <div class="flex flex-col items-center justify-center">
-                                                        <div class="relative w-24 h-24 flex items-center justify-center">
-                                                            <div class="absolute inset-0 border-2 border-dashed border-gray-200 dark:border-gray-600 rounded-full"></div>
-                                                            <span class="font-bold text-gray-800 dark:text-gray-100 text-base z-10 bg-white dark:bg-gray-800 px-1">{{ getWindDirection(weatherResult[station.id].data.wind_direction) }}</span>
-                                                            <!-- Compass Needle -->
-                                                            <div 
-                                                                class="absolute w-0.5 h-10 bg-gray-400 rounded-full"
-                                                                :style="{ transform: `rotate(${weatherResult[station.id].data.wind_direction}deg)`, transformOrigin: 'center bottom', bottom: '50%' }"
-                                                            >
-                                                                <div class="absolute top-0 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-600 rounded-full"></div>
-                                                            </div>
-                                                        </div>
+                                                        <WindCompass 
+                                                            :direction="weatherResult[station.id].data.wind_direction" 
+                                                            :size="120"
+                                                        />
                                                     </div>
                                                 </div>
                                             </div>
