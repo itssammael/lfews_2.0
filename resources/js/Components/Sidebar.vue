@@ -53,7 +53,7 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters } = us
       >
         <div class="flex items-center">
              <img src="/images/dashboard.png" alt="Dashboard" class="w-8 h-8 mr-2" />
-             <span :class="{'block': showSidebar, 'hidden': ! showSidebar}">Dashboard</span>
+             <span class="text-xs font-bold" :class="{'block': showSidebar, 'hidden': ! showSidebar}">Dashboard</span>
         </div>
       </ResponsiveNavLink>
 
@@ -64,7 +64,7 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters } = us
       >
         <div class="flex items-center">
              <img src="/images/report.png" alt="Reports" class="w-8 h-8 mr-2" />
-             <span :class="{'block': showSidebar, 'hidden': ! showSidebar}">Reports</span>
+             <span class="text-xs font-bold" :class="{'block': showSidebar, 'hidden': ! showSidebar}">Reports</span>
         </div>
       </ResponsiveNavLink>
       <ResponsiveNavLink
@@ -73,7 +73,7 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters } = us
       >
         <div class="flex items-center">
              <img src="/images/maps.png" alt="Locator" class="w-8 h-8 mr-2" />
-             <span :class="{'block': showSidebar, 'hidden': ! showSidebar}">Locator</span>
+             <span class="text-xs font-bold" :class="{'block': showSidebar, 'hidden': ! showSidebar}">Locator</span>
         </div>
       </ResponsiveNavLink>
        <ResponsiveNavLink
@@ -82,7 +82,7 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters } = us
       >
         <div class="flex items-center">
              <img src="/images/water-level.png" alt="Water Level" class="w-8 h-8 mr-2" />
-             <span :class="{'block': showSidebar, 'hidden': ! showSidebar}">Water Level Sensors</span>
+             <span class="text-xs font-bold" :class="{'block': showSidebar, 'hidden': ! showSidebar}">Water Level Sensors</span>
         </div>
       </ResponsiveNavLink>
       <ResponsiveNavLink
@@ -91,7 +91,7 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters } = us
       >
         <div class="flex items-center">
              <img src="/images/weather-station.png" alt="Weather Station" class="w-8 h-8 mr-2" />
-             <span :class="{'block': showSidebar, 'hidden': ! showSidebar}">Weather Stations</span>
+             <span class="text-xs font-bold" :class="{'block': showSidebar, 'hidden': ! showSidebar}">Weather Stations</span>
         </div>
       </ResponsiveNavLink>
       <ResponsiveNavLink
@@ -100,7 +100,7 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters } = us
       >
         <div class="flex items-center">
              <img src="/images/landscape.png" alt="Rivers" class="w-8 h-8 mr-2" />
-             <span :class="{'block': showSidebar, 'hidden': ! showSidebar}">Rivers</span>
+             <span class="text-xs font-bold" :class="{'block': showSidebar, 'hidden': ! showSidebar}">Rivers</span>
         </div>
       </ResponsiveNavLink>
 
@@ -110,7 +110,7 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters } = us
       >
         <div class="flex items-center">
              <img src="/images/disaster.png" alt="Evacuation Center" class="w-8 h-8 mr-2" />
-             <span :class="{'block': showSidebar, 'hidden': ! showSidebar}">Evacuation Center</span>
+             <span class="text-xs font-bold" :class="{'block': showSidebar, 'hidden': ! showSidebar}">Evacuation Center</span>
         </div>
       </ResponsiveNavLink>
 
