@@ -89,4 +89,12 @@ Route::middleware([
     Route::post('/connectivity/ping', [\App\Http\Controllers\ConnectivityController::class, 'ping'])
         ->name('connectivity.ping')
         ->middleware('can:can-read');
+
+    Route::get('/evacuation-center', [\App\Http\Controllers\EvacuationCenterController::class, 'index'])
+        ->name('evacuation-center.index')
+        ->middleware('can:can-read');
+
+    Route::get('/evacuation-center/api', [\App\Http\Controllers\EvacuationCenterController::class, 'getEvacuationCenters'])
+        ->name('evacuation-center.api')
+        ->middleware('can:can-read');
 });

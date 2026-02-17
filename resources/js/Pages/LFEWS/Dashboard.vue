@@ -8,6 +8,7 @@ import WeatherStationChart from "@/Components/WeatherStationChart.vue";
 import WindCompass from "@/Components/WindCompass.vue";
 import Checkbox from "@/Components/Checkbox.vue";
 import InputLabel from "@/Components/InputLabel.vue";
+import { useDashboardSettings } from "@/Composables/useDashboardSettings";
 
 declare function route(name: string, params?: any, absolute?: boolean): string;
 
@@ -61,6 +62,16 @@ const props = defineProps<{
       timestamp: string;
     }>
   > | null;
+
+  evacuationCenters?: Array<{
+    id: number;
+    name: string;
+    address: string;
+    latitude: string;
+    longitude: string;
+    max_capacity: string | number;
+    curren_resident: string | number;
+  }>;
 }>();
 
 const page = usePage();
@@ -208,20 +219,24 @@ const dismissAlert = (sensorId: number, level: number) => {
 const isAlertDismissed = (sensorId: number, level: number) => {
     return dismissedAlerts.value[sensorId] === level;
 };
+
+const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters } = useDashboardSettings();
 </script>
 
 <template>
     <AppLayout title="Dashboard">
         <template #header>
-            <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
-                Dashboard
-            </h2>
+            <div class="flex justify-between items-center">
+                <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
+                    Dashboard
+                </h2>
+            </div>
             
         </template>
 
         <div class="pt-0 mb-12">
             <div class="w-full space-y-12 bg-gray-200/[0.25]">
-                 <div class="bg-transparent p-8 pt-2"> <!--Water level sensors data -->
+                 <div v-if="showWaterLevelSensors" class="bg-transparent p-8 pt-2"> <!--Water level sensors data -->
                     <div class="overflow-hidden">
                         <div class="flex items-center justify-between mb-6">
                             <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
@@ -267,7 +282,7 @@ const isAlertDismissed = (sensorId: number, level: number) => {
 
                         <div v-if="sensors && sensors.length > 0" class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
                             <div v-for="sensor in sensors" :key="sensor.id" 
-                                class="bg-white dark:bg-gray-800 border-2 border-blue-600 rounded-2xl overflow-hidden shadow-md"
+                                class="bg-white dark:bg-gray-800 border-2 border-orange-500 rounded-2xl overflow-hidden shadow-md"
                             >
                                 <div class="px-4 py-3 border-b dark:border-gray-700 flex items-center justify-between">
                                     <div class="flex items-center">
@@ -388,9 +403,9 @@ const isAlertDismissed = (sensorId: number, level: number) => {
                         </div>
                     </div>
                 </div>
-                <div class="bg-transparent p-8 pt-2">
-                    <div class="overflow-hidden mb-6"> <!--Weather Station data -->
-                        <div>
+                <div v-if="showWeatherStations" class="bg-transparent p-8 pt-2"> <!--Weather Station data -->
+                    <div class="overflow-hidden"> 
+                 
                             <div class="flex items-center justify-between mb-6">
                                 <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
                                     Weather Stations Observation Data
@@ -427,7 +442,7 @@ const isAlertDismissed = (sensorId: number, level: number) => {
                             <div v-if="stations && stations.length > 0" class="grid grid-cols-2 gap-6 mt-6">
                             
                                 <div v-for="station in stations" :key="station.id" 
-                                    class="bg-white dark:bg-gray-800 border-2 border-blue-600 rounded-[2rem] overflow-hidden shadow-lg w-full flex flex-col md:flex-row">
+                                    class="bg-white dark:bg-gray-800 border-2 border-orange-500 rounded-[2rem] overflow-hidden shadow-lg w-full flex flex-col md:flex-row">
                                     <template v-if="weatherResult?.[station.id]">
                                         <!-- Left Column: Chart -->
                                         <div class="w-full md:w-4/5 p-4 border-r dark:border-gray-700 flex flex-col">
@@ -569,6 +584,56 @@ const isAlertDismissed = (sensorId: number, level: number) => {
                                 </div>
 
                             </div>
+                       
+                    </div>
+                </div>
+                <div v-if="showEvacuationCenters" class="bg-transparent p-8 pt-2"> <!--Evacuation Center data -->
+                    <div class="overflow-hidden mb-6"> 
+                        <div class="flex items-center justify-between mb-6">
+                            <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
+                                Evacuation Centers Status
+                            </h3>
+                        </div>
+
+                        <div v-if="evacuationCenters && evacuationCenters.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div v-for="center in evacuationCenters" :key="center.id" class="bg-white dark:bg-gray-800 border-2 border-orange-500  rounded-xl shadow-md p-4 relative overflow-hidden group hover:shadow-md transition-shadow">
+                                <div class="flex items-start space-x-4">
+                                    <!-- Icon -->
+                                    <div class="flex-shrink-0">
+                                        <img src="/images/disaster.png" alt="Evacuation" class="w-16 h-16 object-contain opacity-80" />
+                                    </div>
+                                    
+                                    <!-- Content -->
+                                    <div class="flex-grow min-w-0">
+                                        <h4 class="text-lg font-bold text-gray-800 dark:text-gray-100 uppercase truncate border-b-2 border-gray-300 dark:border-gray-600 pb-1 mb-2">
+                                            {{ center.name }}
+                                        </h4>
+                                        
+                                        <div class="space-y-1">
+                                            <div class="text-sm text-gray-600 dark:text-gray-300">
+                                                <span class="font-bold uppercase text-[10px] tracking-wider">Occupants:</span>
+                                                <span class="font-bold ml-1 text-base">{{ center.curren_resident }}/{{ center.max_capacity }}</span>
+                                            </div>
+                                            
+                                            <div class="text-sm font-bold flex items-center">
+                                                <span class="uppercase text-[10px] tracking-wider text-gray-500 dark:text-gray-400 mr-1">Status:</span>
+                                                <span :class="{
+                                                    'text-red-600': (Number(center.curren_resident) / Number(center.max_capacity)) >= 1,
+                                                    'text-gray-800 dark:text-gray-200': (Number(center.curren_resident) / Number(center.max_capacity)) < 1
+                                                }">
+                                                    {{ Math.round((Number(center.curren_resident) / Number(center.max_capacity)) * 100) }}%
+                                                    <span v-if="(Number(center.curren_resident) / Number(center.max_capacity)) >= 1" class="text-red-600 ml-1">(FULL)</span>
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Background decoration -->
+                                <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-gray-50 dark:bg-gray-700/50 rounded-full -z-0 pointer-events-none"></div>
+                            </div>
+                        </div>
+                        <div v-else class="text-center py-8 text-gray-500 italic">
+                            No evacuation center data available.
                         </div>
                     </div>
                 </div>

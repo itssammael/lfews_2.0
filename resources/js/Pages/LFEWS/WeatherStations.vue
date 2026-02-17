@@ -131,7 +131,7 @@ const closePingModal = () => {
 
         <div class="pt-6 mb-16 min-h-[calc(100vh-220px)]">
             <div class="w-full mx-auto px-8 h-full">
-                <div class="bg-white border-2 border-blue-600 rounded-2xl shadow-md overflow-hidden sm:rounded-lg h-full min-h-[calc(100vh-280px)]">
+                <div class="bg-white border-2 border-orange-500 rounded-2xl shadow-md overflow-hidden sm:rounded-lg h-full min-h-[calc(100vh-280px)]">
                     <div class="p-6 h-full">
                         <div class="flex">
                             <div class="w-1/3 flex space-x-8 items-center py-2">

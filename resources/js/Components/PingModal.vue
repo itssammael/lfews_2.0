@@ -66,7 +66,7 @@ const close = () => {
             </div>
 
             <div v-if="pinging" class="flex justify-center py-8">
-                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
             </div>
 
             <div v-else-if="result" class="mt-4">

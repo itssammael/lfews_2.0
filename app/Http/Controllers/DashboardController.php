@@ -46,6 +46,7 @@ class DashboardController extends Controller
             'historyData' => \Illuminate\Support\Facades\Cache::get('modbus_history', []),
             'latestWeatherData' => \Illuminate\Support\Facades\Cache::get('latest_weather_observation_data'),
             'historyWeatherData' => $historyWeatherData,
+            'evacuationCenters' => \Illuminate\Support\Facades\Cache::get('evacuation_centers'),
         ]);
     }
 

@@ -283,7 +283,7 @@ const currentDate = new Date().toLocaleDateString('en-US', {
                     <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-900">
                         <!-- Page Heading -->
                         <header v-if="$slots.header" class="bg-white dark:bg-gray-800">
-                            <div class="max-w-8xl mx-auto py-2 px-4 sm:px-6 lg:px-8 uppercase">
+                            <div class="max-w-8xl mx-auto py-4 px-4 sm:px-6 lg:px-8 uppercase">
                                 <slot name="header" />
                             </div>
                         </header>

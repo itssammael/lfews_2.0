@@ -194,7 +194,7 @@ watch(() => props.latestData, (newData) => {
 </script>
 
 <template>
-    <div class="bg-white dark:bg-gray-800 border-2 border-blue-600 rounded-2xl p-6 shadow-md mb-8">
+    <div class="bg-white dark:bg-gray-800 border-2 border-orange-500 rounded-2xl p-6 shadow-md mb-8">
         <h3 class="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center">
             <svg class="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />

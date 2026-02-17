@@ -65,7 +65,7 @@ const deleteRiver = (river: any) => {
 
         <div class="pt-6 mb-16">
             <div class="w-full mx-auto px-8 h-full">
-                <div class="bg-white border-2 border-blue-600 rounded-2xl shadow-md overflow-hidden sm:rounded-lg h-full p-6">
+                <div class="bg-white border-2 border-orange-500 rounded-2xl shadow-md overflow-hidden sm:rounded-lg h-full p-6">
                     <div class="flex space-x-8 items-center mb-6">
                         <h3 class="text-xl font-semibold text-gray-900 dark:text-gray-100 uppercase">
                             Rivers List

@@ -3,10 +3,13 @@
 import { Link } from "@inertiajs/vue3";
 import ResponsiveNavLink from "@/Components/ResponsiveNavLink.vue";
 
+import { useDashboardSettings } from '@/Composables/useDashboardSettings';
+
 defineProps({
   //
 });
 const showSidebar = ref(false);
+const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters } = useDashboardSettings();
 </script>
 
 <template>
@@ -102,6 +105,16 @@ const showSidebar = ref(false);
       </ResponsiveNavLink>
 
       <ResponsiveNavLink
+        :href="route('evacuation-center.index')"
+        :active="route().current('evacuation-center.*')"
+      >
+        <div class="flex items-center">
+             <img src="/images/disaster.png" alt="Evacuation Center" class="w-8 h-8 mr-2" />
+             <span :class="{'block': showSidebar, 'hidden': ! showSidebar}">Evacuation Center</span>
+        </div>
+      </ResponsiveNavLink>
+
+      <ResponsiveNavLink
         v-if="$page.props.auth.can.manage"
         :href="route('data-migration.index')"
         :active="route().current('data-migration.*')"
@@ -113,6 +126,54 @@ const showSidebar = ref(false);
       </ResponsiveNavLink>
 
       <!-- Add more sidebar links here -->
+      
+      <!-- Dashboard Settings Toggles -->
+      <div class="px-4 py-4 space-y-4 border-t border-gray-200 dark:border-gray-700">
+        <span class="text-xs font-bold block" :class="{'block': showSidebar, 'hidden': ! showSidebar}" v-if="route().current('dashboard')">Dashboard Settings</span>
+          <div class="flex items-center justify-between" v-if="route().current('dashboard')">
+            
+               <label class="flex items-center cursor-pointer">
+                  <div class="relative inline-block w-8 h-4 transition duration-200 ease-in-out mr-2">
+                      <input 
+                          type="checkbox" 
+                          v-model="showWaterLevelSensors"
+                          class="opacity-0 w-0 h-0 peer"
+                      />
+                      <div class="absolute cursor-pointer top-0 left-0 right-0 bottom-0 bg-gray-300 dark:bg-gray-600 rounded-full transition-all duration-300 peer-checked:bg-orange-500"></div>
+                      <div class="absolute cursor-pointer h-3 w-3 left-0.5 bottom-0.5 bg-white rounded-full transition-all duration-300 peer-checked:translate-x-4 shadow-sm"></div>
+                  </div>
+                  <span :class="{'block': showSidebar, 'hidden': ! showSidebar}" class="text-xs font-medium text-gray-600 dark:text-gray-400">Water Level</span>
+              </label>
+          </div>
+           <div class="flex items-center justify-between" v-if="route().current('dashboard')">
+               <label class="flex items-center cursor-pointer">
+                  <div class="relative inline-block w-8 h-4 transition duration-200 ease-in-out mr-2">
+                      <input 
+                          type="checkbox" 
+                          v-model="showWeatherStations"
+                          class="opacity-0 w-0 h-0 peer"
+                      />
+                      <div class="absolute cursor-pointer top-0 left-0 right-0 bottom-0 bg-gray-300 dark:bg-gray-600 rounded-full transition-all duration-300 peer-checked:bg-orange-500"></div>
+                      <div class="absolute cursor-pointer h-3 w-3 left-0.5 bottom-0.5 bg-white rounded-full transition-all duration-300 peer-checked:translate-x-4 shadow-sm"></div>
+                  </div>
+                  <span :class="{'block': showSidebar, 'hidden': ! showSidebar}" class="text-xs font-medium text-gray-600 dark:text-gray-400">Weather Stn</span>
+              </label>
+          </div>
+           <div class="flex items-center justify-between" v-if="route().current('dashboard')">
+               <label class="flex items-center cursor-pointer">
+                  <div class="relative inline-block w-8 h-4 transition duration-200 ease-in-out mr-2">
+                      <input 
+                          type="checkbox" 
+                          v-model="showEvacuationCenters"
+                          class="opacity-0 w-0 h-0 peer"
+                      />
+                      <div class="absolute cursor-pointer top-0 left-0 right-0 bottom-0 bg-gray-300 dark:bg-gray-600 rounded-full transition-all duration-300 peer-checked:bg-orange-500"></div>
+                      <div class="absolute cursor-pointer h-3 w-3 left-0.5 bottom-0.5 bg-white rounded-full transition-all duration-300 peer-checked:translate-x-4 shadow-sm"></div>
+                  </div>
+                  <span :class="{'block': showSidebar, 'hidden': ! showSidebar}" class="text-xs font-medium text-gray-600 dark:text-gray-400">Evac Centers</span>
+              </label>
+          </div>
+      </div>
     </div>
   </aside>
 </template>

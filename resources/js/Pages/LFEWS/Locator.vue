@@ -259,7 +259,7 @@ onMounted(() => {
                             </div>
                         </div>
 
-                        <div ref="mapContainer" class="w-full h-[600px] z-0  border-2 border-blue-600 rounded-2xl shadow-md"></div>
+                        <div ref="mapContainer" class="w-full h-[600px] z-0  border-2 border-orange-500 rounded-2xl shadow-md"></div>
                     </div>
                 </div>
             </div>
