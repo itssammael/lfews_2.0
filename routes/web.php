@@ -97,4 +97,12 @@ Route::middleware([
     Route::get('/evacuation-center/api', [\App\Http\Controllers\EvacuationCenterController::class, 'getEvacuationCenters'])
         ->name('evacuation-center.api')
         ->middleware('can:can-read');
+
+    Route::get('/system-settings', [\App\Http\Controllers\PagesController::class, 'systemSettings'])
+        ->name('system-settings')
+        ->middleware('auth:sanctum');
+
+    Route::post('/system-settings', [\App\Http\Controllers\PagesController::class, 'updateSystemSettings'])
+        ->name('system-settings.update')
+        ->middleware('auth:sanctum');
 });

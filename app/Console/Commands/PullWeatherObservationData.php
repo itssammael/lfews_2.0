@@ -5,6 +5,8 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Carbon;
+use App\Models\SystemSetting;
+
 
 use App\Models\WeatherStationObservationData;
 
@@ -32,6 +34,9 @@ class PullWeatherObservationData extends Command
         $this->info('Starting weather observation data pulling loop for all stations...');
         $controller = new \App\Http\Controllers\WeatherStationController();
         while (true) {
+            $timeoutSettings = SystemSetting::where('name', 'data_pull_timeout')->first()?->value;
+            $timeout = (float) ($timeoutSettings['weather_station'] ?? 300);
+
             $stations = \App\Models\WeatherStation::where('state', 1)->get();
             $observations = [];
 
@@ -131,7 +136,7 @@ class PullWeatherObservationData extends Command
             \Illuminate\Support\Facades\Cache::put('weather_observation_history', $history, 60);
 
             $this->info('[' . now()->toDateTimeString() . '] Processed ' . count($observations) . ' stations.');
-            sleep(300);
+            sleep((int) $timeout);
         }
     }
 }

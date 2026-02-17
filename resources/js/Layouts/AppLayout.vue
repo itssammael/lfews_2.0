@@ -160,6 +160,10 @@ const currentDate = new Date().toLocaleDateString('en-US', {
                                                 <DropdownLink :href="route('users.index')">
                                                     Manage Users
                                                 </DropdownLink>
+
+                                                <DropdownLink :href="route('system-settings')">
+                                                    System Settings
+                                                </DropdownLink>
                                             </template>
 
                                             <DropdownLink v-if="$page.props.jetstream.hasApiFeatures" :href="route('api-tokens.index')">

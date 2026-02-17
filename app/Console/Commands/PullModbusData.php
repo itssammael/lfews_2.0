@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Models\WaterLevelSensorData;
+use App\Models\SystemSetting;
 use Illuminate\Support\Carbon;
 
 class PullModbusData extends Command
@@ -30,6 +31,9 @@ class PullModbusData extends Command
         $this->info('Starting Modbus data pulling loop for all sensors...');
 
         while (true) {
+            $timeoutSettings = SystemSetting::where('name', 'data_pull_timeout')->first()?->value;
+            $timeout = (float) ($timeoutSettings['water_level_sensor'] ?? 300);
+
             $sensors = \App\Models\WaterLevelSensor::where('state', 1)->get();
             $results = [];
 
@@ -114,7 +118,7 @@ class PullModbusData extends Command
 
             $this->info('[' . now()->toDateTimeString() . '] Pulled data for ' . $sensors->count() . ' sensors.');
 
-            sleep(300);
+            sleep((int) $timeout);
         }
     }
 }
