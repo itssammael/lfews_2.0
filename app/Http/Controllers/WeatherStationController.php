@@ -360,6 +360,8 @@ class WeatherStationController extends Controller
         $fp = fsockopen($ip, $port, $errno, $errstr, 2);
 
         if ($fp) {
+            stream_set_timeout($fp, 2); // Set read timeout to 2 seconds
+
             // 1. Wake up the console
             fwrite($fp, "\n");
             usleep(500000); // Wait 0.5s
