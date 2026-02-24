@@ -81,6 +81,13 @@ Route::middleware([
     Route::get('/locator', [\App\Http\Controllers\LocatorController::class, 'index'])->name('locator')
         ->middleware('can:can-read');
 
+    Route::get('/hazard-map', [\App\Http\Controllers\HazardMapController::class, 'index'])->name('hazard-map.index')
+        ->middleware('can:can-read');
+    
+    Route::middleware('can:can-read')->group(function () {
+        Route::resource('hazard-map', \App\Http\Controllers\HazardMapController::class)->except(['index']);
+    });
+
     Route::get('/data-migration', [\App\Http\Controllers\DataMigrationController::class, 'index'])->name('data-migration.index')
         ->middleware('can:can-create');
     Route::post('/data-migration/import', [\App\Http\Controllers\DataMigrationController::class, 'import'])->name('data-migration.import')
@@ -97,6 +104,13 @@ Route::middleware([
     Route::get('/evacuation-center/api', [\App\Http\Controllers\EvacuationCenterController::class, 'getEvacuationCenters'])
         ->name('evacuation-center.api')
         ->middleware('can:can-read');
+
+    Route::get('/flood-hazard-map', [\App\Http\Controllers\FloodRiskController::class, 'index'])->name('flood_risks.index')
+        ->middleware('can:can-read');
+
+    Route::middleware('can:can-read')->group(function () {
+        Route::resource('flood_risks', \App\Http\Controllers\FloodRiskController::class)->except(['index']);
+    });
 
     Route::get('/system-settings', [\App\Http\Controllers\PagesController::class, 'systemSettings'])
         ->name('system-settings')

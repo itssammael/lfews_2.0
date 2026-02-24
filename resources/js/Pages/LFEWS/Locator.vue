@@ -1,8 +1,10 @@
 <script setup lang="ts">
 // @ts-ignore
 import AppLayout from '@/Layouts/AppLayout.vue';
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import L from 'leaflet';
+// @ts-ignore
+import Checkbox from '@/Components/Checkbox.vue';
 
 import 'leaflet/dist/leaflet.css';
 import proj4 from 'proj4';
@@ -33,17 +35,32 @@ const props = defineProps<{
     waterLevelSensors: any[];
     locations: any[];
     rivers: any[];
+    contours: any[];
+    floodRisks: any[];
 }>();
 
 const mapContainer = ref<HTMLElement | null>(null);
 const map = ref<any>(null);
-const selectedCategory = ref('all'); // Default to showing everything
+const selectedCategories = ref<string[]>(['weather_stations', 'water_level_sensors', 'evacuation_centers', 'rivers']); // Default visible categories
+
+// Contour loading state
+const isLoadingContours = ref(false);
+const contourLoadingProgress = ref(0);
+const isContoursProcessed = ref(false);
+const totalContours = ref(0);
+const processedContoursCount = ref(0);
+
+// Flood Risk loading state
+const isLoadingFloodRisks = ref(false);
+const floodRiskLoadingProgress = ref(0);
+const isFloodRisksProcessed = ref(false);
 
 // Layer Groups
 const weatherStationsGroup = L.layerGroup();
 const waterLevelSensorsGroup = L.layerGroup();
 const evacuationCentersGroup = L.layerGroup();
 const riversGroup = L.layerGroup();
+const contoursGroup = L.layerGroup();
 const floodRiskGroup = L.layerGroup();
 
 const categories = [
@@ -52,44 +69,242 @@ const categories = [
     { id: 'all_devices', label: 'All Devices' },
     { id: 'evacuation_centers', label: 'Evacuation Centers' },
     { id: 'rivers', label: 'All Rivers in Bayawan City' },
-    { id: 'flood_risk', label: 'Flood Risk' },
+    { id: 'contours', label: 'Contour lines' },
+    { id: 'flood_risk', label: 'Flood Risk Map' },
 ];
 
-const selectCategory = (id: string) => {
-    selectedCategory.value = id;
+const toggleCategory = (id: string) => {
+    if (id === 'all_devices') {
+        const isAllDevicesSelected = selectedCategories.value.includes('weather_stations') && selectedCategories.value.includes('water_level_sensors');
+        if (isAllDevicesSelected) {
+            selectedCategories.value = selectedCategories.value.filter(item => item !== 'weather_stations' && item !== 'water_level_sensors' && item !== 'all_devices');
+        } else {
+            if (!selectedCategories.value.includes('weather_stations')) selectedCategories.value.push('weather_stations');
+            if (!selectedCategories.value.includes('water_level_sensors')) selectedCategories.value.push('water_level_sensors');
+            if (!selectedCategories.value.includes('all_devices')) selectedCategories.value.push('all_devices');
+        }
+    } else {
+        const index = selectedCategories.value.indexOf(id);
+        if (index > -1) {
+            selectedCategories.value.splice(index, 1);
+            if (id === 'weather_stations' || id === 'water_level_sensors') {
+                selectedCategories.value = selectedCategories.value.filter(item => item !== 'all_devices');
+            }
+        } else {
+            selectedCategories.value.push(id);
+            if (id === 'weather_stations' || id === 'water_level_sensors') {
+                 const hasBoth = selectedCategories.value.includes('weather_stations') && selectedCategories.value.includes('water_level_sensors');
+                 if (hasBoth && !selectedCategories.value.includes('all_devices')) {
+                     selectedCategories.value.push('all_devices');
+                 }
+            }
+        }
+    }
+
+    if (selectedCategories.value.includes('contours') && !isContoursProcessed.value && props.contours?.length > 0) {
+        processContours();
+    }
+    
+    if (selectedCategories.value.includes('flood_risk') && !isFloodRisksProcessed.value && props.floodRisks?.length > 0) {
+        processFloodRisks();
+    }
+
     updateVisibleLayers();
+};
+
+watch(selectedCategories, () => {
+    updateVisibleLayers();
+}, { deep: true });
+
+const processContours = async () => {
+    if (isLoadingContours.value || isContoursProcessed.value) return;
+    
+    isLoadingContours.value = true;
+    contourLoadingProgress.value = 0;
+    totalContours.value = props.contours.length;
+    processedContoursCount.value = 0;
+
+    const chunkSize = 50;
+    const features = props.contours.map(contour => ({
+        type: "Feature",
+        properties: contour.properties,
+        geometry: contour.geometry
+    }));
+
+    for (let i = 0; i < features.length; i += chunkSize) {
+        const chunk = features.slice(i, i + chunkSize);
+        
+        L.geoJSON({ type: "FeatureCollection", features: chunk } as any, {
+            style: (feature) => getContourStyle(feature),
+            coordsToLatLng: (coords) => L.latLng(coords[1], coords[0]),
+            onEachFeature: (feature, layer) => {
+                if (feature.properties) {
+                    const style = getContourStyle(feature);
+                    const label = `<b>${feature.properties.name || 'Contour'}</b><br/>Height: ${style.height}m<br/><b>${style.riskLevel}</b>`;
+                    layer.bindTooltip(label, {
+                        sticky: true,
+                        className: 'contour-label'
+                    });
+                }
+            }
+        }).addTo(contoursGroup);
+
+        processedContoursCount.value += chunk.length;
+        contourLoadingProgress.value = Math.min(100, Math.round((processedContoursCount.value / totalContours.value) * 100));
+        
+        // Yield to browser for UI updates
+        await new Promise(resolve => setTimeout(resolve, 10));
+    }
+
+    isContoursProcessed.value = true;
+    isLoadingContours.value = false;
+    updateVisibleLayers();
+};
+
+const processFloodRisks = async () => {
+    if (isLoadingFloodRisks.value || isFloodRisksProcessed.value) return;
+    
+    isLoadingFloodRisks.value = true;
+    floodRiskLoadingProgress.value = 0;
+    const total = props.floodRisks.length;
+    let processed = 0;
+
+    const chunkSize = 50;
+    const features = props.floodRisks.map(risk => ({
+        type: "Feature",
+        properties: risk.properties,
+        geometry: risk.geometry
+    }));
+
+    for (let i = 0; i < features.length; i += chunkSize) {
+        const chunk = features.slice(i, i + chunkSize);
+        
+        L.geoJSON({ type: "FeatureCollection", features: chunk } as any, {
+            style: (feature) => getFloodRiskStyle(feature),
+            coordsToLatLng: (coords) => L.latLng(coords[1], coords[0]),
+            onEachFeature: (feature, layer) => {
+                if (feature.properties) {
+                    const label = `<b>Flood Hazard Area</b><br/>Risk Level: ${feature.properties.FS_VH || 'Unknown'}`;
+                    layer.bindTooltip(label, {
+                        sticky: true,
+                        className: 'contour-label'
+                    });
+                }
+            }
+        }).addTo(floodRiskGroup);
+
+        processed += chunk.length;
+        floodRiskLoadingProgress.value = Math.min(100, Math.round((processed / total) * 100));
+        
+        await new Promise(resolve => setTimeout(resolve, 10));
+    }
+
+    isFloodRisksProcessed.value = true;
+    isLoadingFloodRisks.value = false;
+    updateVisibleLayers();
+};
+
+const getFloodRiskStyle = (feature: any) => {
+    const risk = feature.properties?.FS_VH || '';
+    
+    let color = '#22c55e'; // Green
+    let fillOpacity = 0.2;
+
+    if (risk === 'Very High') {
+        color = '#ef4444'; // Red
+        fillOpacity = 0.5;
+    } else if (risk === 'High') {
+        color = '#f97316'; // Orange
+        fillOpacity = 0.4;
+    } else if (risk === 'Moderate') {
+        color = '#eab308'; // Yellow
+        fillOpacity = 0.3;
+    }
+
+    return {
+        color: color,
+        weight: 1,
+        opacity: 0.8,
+        fillOpacity: fillOpacity,
+    };
+};
+
+const getContourStyle = (feature: any) => {
+    const height = feature.properties?.height || 0;
+    
+    // Risk levels based on height (Lower height = higher risk in coastal/river flooding context)
+    // 0-10: Very High Risk (Red)
+    // 11-20: High Risk (Orange)
+    // 21-40: Moderate Risk (Yellow)
+    // >40: Low Risk (Green)
+    
+    let color = '#22c55e'; // Default Green (Low Risk)
+    let riskLevel = 'Low Risk';
+
+    if (height <= 10) {
+        color = '#ef4444'; // Red (Very High)
+        riskLevel = 'Very High Risk';
+    } else if (height <= 20) {
+        color = '#f97316'; // Orange (High)
+        riskLevel = 'High Risk';
+    } else if (height <= 40) {
+        color = '#eab308'; // Yellow (Moderate)
+        riskLevel = 'Moderate Risk';
+    }
+
+    return {
+        color: color,
+        weight: 1.5,
+        opacity: 0.7,
+        fillOpacity: 0.1,
+        riskLevel: riskLevel, // Store for use in tooltip
+        height: height
+    };
 };
 
 const updateVisibleLayers = () => {
     if (!map.value) return;
 
-    // Clear all layers first
-    weatherStationsGroup.removeFrom(map.value);
-    waterLevelSensorsGroup.removeFrom(map.value);
-    evacuationCentersGroup.removeFrom(map.value);
-    riversGroup.removeFrom(map.value);
-    floodRiskGroup.removeFrom(map.value);
+    // weather_stations
+    if (selectedCategories.value.includes('weather_stations')) {
+        weatherStationsGroup.addTo(map.value);
+    } else {
+        weatherStationsGroup.removeFrom(map.value);
+    }
 
-    // Add layers based on selection
-    if (selectedCategory.value === 'all') {
-         weatherStationsGroup.addTo(map.value);
-         waterLevelSensorsGroup.addTo(map.value);
-         evacuationCentersGroup.addTo(map.value);
-         riversGroup.addTo(map.value);
-         floodRiskGroup.addTo(map.value);
-    } else if (selectedCategory.value === 'weather_stations') {
-        weatherStationsGroup.addTo(map.value);
-    } else if (selectedCategory.value === 'water_level_sensors') {
+    // water_level_sensors
+    if (selectedCategories.value.includes('water_level_sensors')) {
         waterLevelSensorsGroup.addTo(map.value);
-    } else if (selectedCategory.value === 'all_devices') {
-        weatherStationsGroup.addTo(map.value);
-        waterLevelSensorsGroup.addTo(map.value);
-    } else if (selectedCategory.value === 'evacuation_centers') {
+    } else {
+        waterLevelSensorsGroup.removeFrom(map.value);
+    }
+
+    // evacuation_centers
+    if (selectedCategories.value.includes('evacuation_centers')) {
         evacuationCentersGroup.addTo(map.value);
-    } else if (selectedCategory.value === 'rivers') {
+    } else {
+        evacuationCentersGroup.removeFrom(map.value);
+    }
+
+    // rivers
+    if (selectedCategories.value.includes('rivers')) {
         riversGroup.addTo(map.value);
-    } else if (selectedCategory.value === 'flood_risk') {
+    } else {
+        riversGroup.removeFrom(map.value);
+    }
+
+    // flood_risk
+    if (selectedCategories.value.includes('flood_risk')) {
         floodRiskGroup.addTo(map.value);
+    } else {
+        floodRiskGroup.removeFrom(map.value);
+    }
+
+    // contours
+    if (selectedCategories.value.includes('contours')) {
+        contoursGroup.addTo(map.value);
+    } else {
+        contoursGroup.removeFrom(map.value);
     }
 };
 
@@ -221,6 +436,13 @@ onMounted(() => {
              hasPoints = true; // Assume rivers exist and should be fitted to
         }
 
+
+        if (selectedCategories.value.includes('contours')) {
+            if (!isContoursProcessed.value && props.contours?.length > 0) {
+                 processContours();
+            }
+        }
+
         updateVisibleLayers();
 
         if (hasPoints) {
@@ -232,6 +454,44 @@ onMounted(() => {
 
 <template>
     <AppLayout title="Locator">
+        <Teleport to="body">
+            <div v-if="isLoadingContours" class="fixed inset-0 z-[9999] flex items-center justify-center bg-gray-900/50 backdrop-blur-sm">
+                <div class="bg-white dark:bg-gray-800 rounded-[2rem] p-8 shadow-2xl w-full max-w-md mx-4 transform transition-all">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Parsing Data</h2>
+                            <p class="text-gray-500 dark:text-gray-400 text-sm">Processing Row Records</p>
+                        </div>
+                        <div class="text-3xl font-bold text-orange-500">
+                            {{ contourLoadingProgress }}%
+                        </div>
+                    </div>
+
+                    <!-- Progress Bar Container -->
+                    <div class="w-full bg-gray-100 dark:bg-gray-700 h-4 rounded-full overflow-hidden mb-8 relative">
+                        <!-- Orange Progress Fill -->
+                        <div 
+                            class="h-full bg-orange-500 transition-all duration-300 ease-out" 
+                            :style="{ width: contourLoadingProgress + '%' }"
+                        ></div>
+                        <!-- Progress Knob/Circle -->
+                        <div 
+                            class="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-orange-500 border-2 border-white rounded-full transition-all duration-300 ease-out"
+                            :style="{ left: `calc(${contourLoadingProgress}% - 8px)` }"
+                        ></div>
+                    </div>
+
+                    <div class="flex items-center justify-center gap-3 text-gray-400 dark:text-gray-500">
+                        <svg class="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span class="text-xs font-bold tracking-widest uppercase">PLEASE WAIT...</span>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
+
         <template #header>
             <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
                 Locator
@@ -246,16 +506,49 @@ onMounted(() => {
                         <!-- Filtering Menu -->
                         <div class="mb-6">
                             <h3 class="text-sm font-bold text-red-400 mb-4 tracking-wider uppercase">Select an item to locate</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
-                                <button 
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
+                                <div 
                                     v-for="category in categories" 
                                     :key="category.id"
-                                    @click="selectCategory(category.id)"
-                                    class="text-left py-1 transition-colors duration-200"
-                                    :class="selectedCategory === category.id ? 'text-gray-900 dark:text-gray-100 font-bold' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
+                                    class="flex items-center gap-3"
                                 >
-                                    {{ category.label }}
-                                </button>
+                                    <Checkbox 
+                                        :id="category.id"
+                                        :value="category.id"
+                                        :checked="selectedCategories.includes(category.id)"
+                                        @update:checked="toggleCategory(category.id)"
+                                    />
+                                    <label 
+                                        :for="category.id" 
+                                        class="cursor-pointer transition-colors duration-200"
+                                        :class="selectedCategories.includes(category.id) ? 'text-gray-900 dark:text-gray-100 font-bold' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
+                                    >
+                                        {{ category.label }}
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Hazard Risk Legend -->
+                        <div v-if="selectedCategories.includes('flood_risk') || selectedCategories.includes('contours')" class="mb-6 bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+                            <h4 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Hazard risk levels</h4>
+                            <div class="flex flex-wrap gap-4">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-4 h-4 rounded-full bg-[#ef4444]"></div>
+                                    <span class="text-xs text-gray-700 dark:text-gray-300">Very High (0-10m)</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-4 h-4 rounded-full bg-[#f97316]"></div>
+                                    <span class="text-xs text-gray-700 dark:text-gray-300">High (11-20m)</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-4 h-4 rounded-full bg-[#eab308]"></div>
+                                    <span class="text-xs text-gray-700 dark:text-gray-300">Moderate (21-40m)</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-4 h-4 rounded-full bg-[#22c55e]"></div>
+                                    <span class="text-xs text-gray-700 dark:text-gray-300">Low (>40m)</span>
+                                </div>
                             </div>
                         </div>
 
@@ -273,7 +566,7 @@ onMounted(() => {
     z-index: 0;
 }
 
-:deep(.map-label), :deep(.river-label) {
+:deep(.map-label), :deep(.river-label), :deep(.contour-label) {
     background: transparent;
     border: none;
     box-shadow: none;

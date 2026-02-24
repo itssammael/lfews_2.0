@@ -120,6 +120,28 @@ watch(() => props.showOnMobile, (val) => {
              <span class="text-xs font-bold" :class="{'block': showSidebar, 'hidden': ! showSidebar}">Rivers</span>
         </div>
       </ResponsiveNavLink>
+      
+      <ResponsiveNavLink
+        :href="route('hazard-map.index')"
+        :active="route().current('hazard-map.*')"
+        @click="$emit('closeMobile')"
+      >
+        <div class="flex items-center">
+             <img src="/images/landscape.png" alt="Contour Map" class="w-8 h-8 mr-2" />
+             <span class="text-xs font-bold" :class="{'block': showSidebar, 'hidden': ! showSidebar}">Contour Map</span>
+        </div>
+      </ResponsiveNavLink>
+
+      <ResponsiveNavLink
+        :href="route('flood_risks.index')"
+        :active="route().current('flood_risks.*')"
+        @click="$emit('closeMobile')"
+      >
+        <div class="flex items-center">
+             <img src="/images/water-level.png" alt="Flood Hazard Map" class="w-8 h-8 mr-2" />
+             <span class="text-xs font-bold" :class="{'block': showSidebar, 'hidden': ! showSidebar}">Flood Hazard Map</span>
+        </div>
+      </ResponsiveNavLink>
 
       <ResponsiveNavLink
         :href="route('evacuation-center.index')"
