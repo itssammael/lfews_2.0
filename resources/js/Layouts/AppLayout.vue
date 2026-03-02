@@ -366,7 +366,7 @@ const currentDate = new Date().toLocaleDateString('en-US', {
                     </div>
                 </nav>
 
-                <div class="flex h-screen mb-6 relative overflow-hidden">
+                <div class="flex h-screen relative overflow-hidden">
                     <Sidebar :show-on-mobile="false" @close-mobile="showingNavigationDropdown = false" />
                 
                     <!-- Page Content -->

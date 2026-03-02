@@ -5,6 +5,7 @@ import { onMounted, ref, watch } from 'vue';
 import L from 'leaflet';
 // @ts-ignore
 import Checkbox from '@/Components/Checkbox.vue';
+import axios from 'axios';
 
 import 'leaflet/dist/leaflet.css';
 import proj4 from 'proj4';
@@ -22,22 +23,49 @@ try {
   // @ts-ignore
   delete L.Icon.Default.prototype._getIconUrl;
   L.Icon.Default.mergeOptions({
-    iconRetinaUrl,
-    iconUrl,
-    shadowUrl,
+    iconRetinaUrl: iconRetinaUrl,
+    iconUrl: iconUrl,
+    shadowUrl: shadowUrl,
   });
 } catch (e) {
   console.warn('Leaflet icon fix failed:', e);
 }
+
+// Custom Icons
+const waterLevelIcon = L.icon({
+    iconUrl: '/images/map_marker/water-level.png',
+    iconSize: [40, 52],
+    iconAnchor: [20, 52],
+    popupAnchor: [0, -52],
+    tooltipAnchor: [0, -52]
+});
+
+const weatherStationIcon = L.icon({
+    iconUrl: '/images/map_marker/weather-station.png',
+    iconSize: [40, 52],
+    iconAnchor: [20, 52],
+    popupAnchor: [0, -52],
+    tooltipAnchor: [0, -52]
+});
+
+const evacuationCenterIcon = L.icon({
+    iconUrl: '/images/map_marker/disaster.png',
+    iconSize: [40, 60],
+    iconAnchor: [20, 60],
+    popupAnchor: [0, -60],
+    tooltipAnchor: [0, -60]
+});
 
 const props = defineProps<{
     weatherStations: any[];
     waterLevelSensors: any[];
     locations: any[];
     rivers: any[];
-    contours: any[];
+    contours?: any[];
     floodRisks: any[];
 }>();
+
+const localContours = ref<any[]>([]);
 
 const mapContainer = ref<HTMLElement | null>(null);
 const map = ref<any>(null);
@@ -101,7 +129,7 @@ const toggleCategory = (id: string) => {
         }
     }
 
-    if (selectedCategories.value.includes('contours') && !isContoursProcessed.value && props.contours?.length > 0) {
+    if (selectedCategories.value.includes('contours') && !isContoursProcessed.value) {
         processContours();
     }
     
@@ -121,11 +149,25 @@ const processContours = async () => {
     
     isLoadingContours.value = true;
     contourLoadingProgress.value = 0;
-    totalContours.value = props.contours.length;
     processedContoursCount.value = 0;
 
+    // Fetch data if not already loaded locally
+    if (localContours.value.length === 0) {
+        try {
+            // @ts-ignore
+            const response = await axios.get(route('locator.api.contours'));
+            localContours.value = response.data;
+        } catch (error) {
+            console.error('Failed to load contours:', error);
+            isLoadingContours.value = false;
+            return;
+        }
+    }
+
+    totalContours.value = localContours.value.length;
+
     const chunkSize = 50;
-    const features = props.contours.map(contour => ({
+    const features = localContours.value.map(contour => ({
         type: "Feature",
         properties: contour.properties,
         geometry: contour.geometry
@@ -207,23 +249,23 @@ const processFloodRisks = async () => {
 const getFloodRiskStyle = (feature: any) => {
     const risk = feature.properties?.FS_VH || '';
     
-    let color = '#22c55e'; // Green
-    let fillOpacity = 0.2;
+    let color = '#9eb753'; // Low (Light Green)
+    let fillOpacity = 0.4;
 
     if (risk === 'Very High') {
-        color = '#ef4444'; // Red
-        fillOpacity = 0.5;
+        color = '#9a5f97'; // Purple
+        fillOpacity = 0.6;
     } else if (risk === 'High') {
-        color = '#f97316'; // Orange
-        fillOpacity = 0.4;
+        color = '#526ab1'; // Blue
+        fillOpacity = 0.5;
     } else if (risk === 'Moderate') {
-        color = '#eab308'; // Yellow
-        fillOpacity = 0.3;
+        color = '#6fc0b0'; // Teal
+        fillOpacity = 0.4;
     }
 
     return {
         color: color,
-        weight: 1,
+        weight: 1.5,
         opacity: 0.8,
         fillOpacity: fillOpacity,
     };
@@ -232,23 +274,17 @@ const getFloodRiskStyle = (feature: any) => {
 const getContourStyle = (feature: any) => {
     const height = feature.properties?.height || 0;
     
-    // Risk levels based on height (Lower height = higher risk in coastal/river flooding context)
-    // 0-10: Very High Risk (Red)
-    // 11-20: High Risk (Orange)
-    // 21-40: Moderate Risk (Yellow)
-    // >40: Low Risk (Green)
-    
-    let color = '#22c55e'; // Default Green (Low Risk)
+    let color = '#9eb753'; // Low Risk
     let riskLevel = 'Low Risk';
 
     if (height <= 10) {
-        color = '#ef4444'; // Red (Very High)
+        color = '#9a5f97'; // Very High Risk
         riskLevel = 'Very High Risk';
     } else if (height <= 20) {
-        color = '#f97316'; // Orange (High)
+        color = '#526ab1'; // High Risk
         riskLevel = 'High Risk';
     } else if (height <= 40) {
-        color = '#eab308'; // Yellow (Moderate)
+        color = '#6fc0b0'; // Moderate Risk
         riskLevel = 'Moderate Risk';
     }
 
@@ -256,7 +292,7 @@ const getContourStyle = (feature: any) => {
         color: color,
         weight: 1.5,
         opacity: 0.7,
-        fillOpacity: 0.1,
+        fillOpacity: 0.2,
         riskLevel: riskLevel, // Store for use in tooltip
         height: height
     };
@@ -321,18 +357,19 @@ onMounted(() => {
         const bounds = L.latLngBounds([]);
         let hasPoints = false;
 
-        // Add Weather Stations (Blue Marker)
+        // Add Weather Stations
         props.weatherStations.forEach(station => {
             if (station.location) {
                 const marker = L.marker([station.location.latitude, station.location.longitude], {
-                    title: station.name
+                    title: station.name,
+                    icon: weatherStationIcon
                 });
                 
                 
                 marker.bindTooltip(`<b>${station.name}</b>`, {
-                    permanent: true,
+                    permanent: false,
                     direction: 'top',
-                    className: 'map-label'
+                    className: 'map-tooltip'
                 });
                 weatherStationsGroup.addLayer(marker);
                 bounds.extend([station.location.latitude, station.location.longitude]);
@@ -344,14 +381,15 @@ onMounted(() => {
         props.waterLevelSensors.forEach(sensor => {
              if (sensor.location) {
                 const marker = L.marker([sensor.location.latitude, sensor.location.longitude], {
-                    title: sensor.name
+                    title: sensor.name,
+                    icon: waterLevelIcon
                 });
                 
                 
                 marker.bindTooltip(`<b>${sensor.name}</b>`, {
-                    permanent: true,
+                    permanent: false,
                     direction: 'top',
-                    className: 'map-label'
+                    className: 'map-tooltip'
                 });
                  waterLevelSensorsGroup.addLayer(marker);
                  bounds.extend([sensor.location.latitude, sensor.location.longitude]);
@@ -368,14 +406,14 @@ onMounted(() => {
                 
                 
                 marker.bindTooltip(`<b>${title}</b>`, {
-                    permanent: true,
+                    permanent: false,
                     direction: 'top',
-                    className: 'map-label'
+                    className: 'map-tooltip'
                 });
-                
-                if (loc.location_type?.description === 'River') {
+                                if (loc.location_type?.description === 'River') {
                     riversGroup.addLayer(marker);
                 } else if (loc.location_type?.description === 'Evacuation Centers') {
+                    marker.setIcon(evacuationCenterIcon);
                     evacuationCentersGroup.addLayer(marker);
                 } else {
                     // Default to evacuation centers group or maybe needs a 'General' group? 
@@ -387,6 +425,7 @@ onMounted(() => {
                     // Or better, creating a 'Others' group but the menu doesn't have 'Others'.
                     // I will leave them out of specific groups for now unless they match 'Evacuation Centers' to be precise.
                      if (title.includes('Evacuation') || loc.location_type?.description.includes('Evacuation')) {
+                         marker.setIcon(evacuationCenterIcon);
                          evacuationCentersGroup.addLayer(marker);
                      }
                 }
@@ -426,9 +465,9 @@ onMounted(() => {
                 onEachFeature: (feature, layer) => {
                     if (feature.properties && feature.properties.seg_name) {
                         layer.bindTooltip(`<b>${feature.properties.seg_name}</b>`, {
-                            permanent: true,
+                            permanent: false,
                             direction: 'center',
-                            className: 'river-label'
+                            className: 'map-tooltip'
                         });
                     }
                 }
@@ -438,7 +477,7 @@ onMounted(() => {
 
 
         if (selectedCategories.value.includes('contours')) {
-            if (!isContoursProcessed.value && props.contours?.length > 0) {
+            if (!isContoursProcessed.value) {
                  processContours();
             }
         }
@@ -459,8 +498,8 @@ onMounted(() => {
                 <div class="bg-white dark:bg-gray-800 rounded-[2rem] p-8 shadow-2xl w-full max-w-md mx-4 transform transition-all">
                     <div class="flex justify-between items-start mb-2">
                         <div>
-                            <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Parsing Data</h2>
-                            <p class="text-gray-500 dark:text-gray-400 text-sm">Processing Row Records</p>
+                            <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Loading Map Data</h2>
+                            <p class="text-gray-500 dark:text-gray-400 text-sm">Plotting Coordinates</p>
                         </div>
                         <div class="text-3xl font-bold text-orange-500">
                             {{ contourLoadingProgress }}%
@@ -492,25 +531,25 @@ onMounted(() => {
             </div>
         </Teleport>
 
-        <template #header>
-            <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
-                Locator
-            </h2>
-        </template>
-
-        <div class="pt-0 mb-12">
-            <div class="w-full ">
-                <div class=" bg-gray-200/[0.25] overflow-hidden shadow-xl sm:rounded-lg">
-                    <div class="p-6 lg:p-8 bg-transparent border-b border-gray-200 dark:border-gray-700">
-                        
+        <div class="h-[calc(100vh-82px)] overflow-hidden">
+            <div class="h-full w-full">
+                <div class="h-full bg-gray-200/[0.25] overflow-hidden">
+                    <div class="flex h-full bg-transparent border-b border-gray-200 dark:border-gray-700">
+                        <div class="w-[300px] flex flex-col h-full overflow-y-auto no-scrollbar">
+                             <div class="mb-4 bg-white p-4">
+                                    <h2 class="font-semibold uppercase text-xl text-gray-800 dark:text-gray-200 leading-tight">
+                                        Locator
+                                    </h2>
+                                </div>
                         <!-- Filtering Menu -->
-                        <div class="mb-6">
-                            <h3 class="text-sm font-bold text-red-400 mb-4 tracking-wider uppercase">Select an item to locate</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
+                        <div class="mb-6 px-2">
+                             
+                            <h3 class="text-xs font-bold text-red-500 mb-4 tracking-wider uppercase opacity-80">MAP LAYERS</h3>
+                            <div class="space-y-3">
                                 <div 
                                     v-for="category in categories" 
                                     :key="category.id"
-                                    class="flex items-center gap-3"
+                                    class="flex items-center gap-3 bg-white/50 dark:bg-gray-800/50 p-2 rounded-lg border border-transparent hover:border-orange-200 transition-all duration-200"
                                 >
                                     <Checkbox 
                                         :id="category.id"
@@ -520,7 +559,7 @@ onMounted(() => {
                                     />
                                     <label 
                                         :for="category.id" 
-                                        class="cursor-pointer transition-colors duration-200"
+                                        class="cursor-pointer text-sm transition-colors duration-200"
                                         :class="selectedCategories.includes(category.id) ? 'text-gray-900 dark:text-gray-100 font-bold' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
                                     >
                                         {{ category.label }}
@@ -530,29 +569,29 @@ onMounted(() => {
                         </div>
 
                         <!-- Hazard Risk Legend -->
-                        <div v-if="selectedCategories.includes('flood_risk') || selectedCategories.includes('contours')" class="mb-6 bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
-                            <h4 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Hazard risk levels</h4>
-                            <div class="flex flex-wrap gap-4">
+                        <div v-if="selectedCategories.includes('flood_risk') || selectedCategories.includes('contours')" class="mt-auto bg-white dark:bg-gray-800 p-4  rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+                            <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Hazard risk levels</h4>
+                            <div class="grid grid-cols-2 gap-3">
                                 <div class="flex items-center gap-2">
-                                    <div class="w-4 h-4 rounded-full bg-[#ef4444]"></div>
-                                    <span class="text-xs text-gray-700 dark:text-gray-300">Very High (0-10m)</span>
+                                    <div class="w-5 h-3 rounded-sm bg-[#9eb753] border border-gray-400"></div>
+                                    <span class="text-[10px] font-semibold text-gray-600 dark:text-gray-400">Low</span>
                                 </div>
                                 <div class="flex items-center gap-2">
-                                    <div class="w-4 h-4 rounded-full bg-[#f97316]"></div>
-                                    <span class="text-xs text-gray-700 dark:text-gray-300">High (11-20m)</span>
+                                    <div class="w-5 h-3 rounded-sm bg-[#6fc0b0] border border-gray-400"></div>
+                                    <span class="text-[10px] font-semibold text-gray-600 dark:text-gray-400">Moderate</span>
                                 </div>
                                 <div class="flex items-center gap-2">
-                                    <div class="w-4 h-4 rounded-full bg-[#eab308]"></div>
-                                    <span class="text-xs text-gray-700 dark:text-gray-300">Moderate (21-40m)</span>
+                                    <div class="w-5 h-3 rounded-sm bg-[#526ab1] border border-gray-400"></div>
+                                    <span class="text-[10px] font-semibold text-gray-600 dark:text-gray-400">High</span>
                                 </div>
                                 <div class="flex items-center gap-2">
-                                    <div class="w-4 h-4 rounded-full bg-[#22c55e]"></div>
-                                    <span class="text-xs text-gray-700 dark:text-gray-300">Low (>40m)</span>
+                                    <div class="w-5 h-3 rounded-sm bg-[#9a5f97] border border-gray-400"></div>
+                                    <span class="text-[10px] font-semibold text-gray-600 dark:text-gray-400">Very High</span>
                                 </div>
                             </div>
                         </div>
-
-                        <div ref="mapContainer" class="w-full h-[600px] z-0  border-2 border-orange-500 rounded-2xl shadow-md"></div>
+                        </div>
+                        <div ref="mapContainer" class="flex-1 h-full z-0 border-l border-orange-500/20 shadow-inner"></div>
                     </div>
                 </div>
             </div>
@@ -566,16 +605,43 @@ onMounted(() => {
     z-index: 0;
 }
 
-:deep(.map-label), :deep(.river-label), :deep(.contour-label) {
+:deep(.leaflet-marker-icon) {
+    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3));
+    transition: transform 0.2s ease-in-out;
+}
+
+:deep(.leaflet-marker-icon:hover) {
+    transform: scale(1.1);
+    z-index: 1000 !important;
+}
+
+:deep(.map-tooltip), :deep(.river-label), :deep(.contour-label) {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 4px 8px;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    font-weight: bold;
+    font-size: 12px;
+    color: #1e293b;
+}
+
+:deep(.river-label), :deep(.contour-label) {
     background: transparent;
     border: none;
     box-shadow: none;
-    font-weight: bold;
-    font-size: 12px;
     text-shadow: 
         -1px -1px 0 #fff,  
          1px -1px 0 #fff,
         -1px  1px 0 #fff,
          1px  1px 0 #fff;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
 }
 </style>

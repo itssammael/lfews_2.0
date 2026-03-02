@@ -18,16 +18,19 @@ class LocatorController extends Controller
         $waterLevelSensors = WaterLevelSensor::with('location')->get();
         $locations = Location::with('locationType')->whereHas('locationType')->get();
         $rivers = \App\Models\River::all();
-        $contours = \App\Models\Contour::all();
         $floodRisks = \App\Models\FloodRisk::all();
-        
+
         return Inertia::render('LFEWS/Locator', [
             'weatherStations' => $weatherStations,
             'waterLevelSensors' => $waterLevelSensors,
             'locations' => $locations,
             'rivers' => $rivers,
-            'contours' => $contours,
             'floodRisks' => $floodRisks,
         ]);
+    }
+
+    public function apiContours()
+    {
+        return response()->json(\App\Models\Contour::all());
     }
 }

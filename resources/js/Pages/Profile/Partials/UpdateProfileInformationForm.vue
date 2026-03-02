@@ -16,6 +16,7 @@ const props = defineProps({
 const form = useForm({
     _method: 'PUT',
     name: props.user.name,
+    username: props.user.username,
     email: props.user.email,
     photo: null,
 });
@@ -144,6 +145,22 @@ const clearPhotoFileInput = () => {
                     autocomplete="name"
                 />
                 <InputError :message="form.errors.name" class="mt-2" />
+            </div>
+
+            <!-- Username -->
+            <div class="col-span-6 sm:col-span-4">
+                <InputLabel for="username" value="Username" />
+                <TextInput
+                    id="username"
+                    v-model="form.username"
+                    type="text"
+                    class="mt-1 block w-full"
+                    :class="{ 'bg-gray-100 dark:bg-gray-700 opacity-75 cursor-not-allowed': !$page.props.auth.can.admin }"
+                    :readonly="!$page.props.auth.can.admin"
+                    required
+                    autocomplete="username"
+                />
+                <InputError :message="form.errors.username" class="mt-2" />
             </div>
 
             <!-- Email -->

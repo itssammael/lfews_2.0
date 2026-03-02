@@ -80,10 +80,12 @@ Route::middleware([
 
     Route::get('/locator', [\App\Http\Controllers\LocatorController::class, 'index'])->name('locator')
         ->middleware('can:can-read');
+    Route::get('/locator/api/contours', [\App\Http\Controllers\LocatorController::class, 'apiContours'])->name('locator.api.contours')
+        ->middleware('can:can-read');
 
     Route::get('/hazard-map', [\App\Http\Controllers\HazardMapController::class, 'index'])->name('hazard-map.index')
         ->middleware('can:can-read');
-    
+
     Route::middleware('can:can-read')->group(function () {
         Route::resource('hazard-map', \App\Http\Controllers\HazardMapController::class)->except(['index']);
     });

@@ -13,27 +13,31 @@ class ContourSeeder extends Seeder
     public function run(): void
     {
         $path = base_path('resources/js/Geojson/BayawanContour.json');
-        
+
         if (!file_exists($path)) {
             $this->command->error("File not found: {$path}");
             return;
         }
 
-        ini_set('memory_limit', '1024M'); // Increase memory limit for large file
+        ini_set('memory_limit', '2048M'); // Increase memory limit for large file
 
         $json = file_get_contents($path);
         $data = json_decode($json, true);
+        unset($json); // Free up memory
 
         if (!isset($data['features'])) {
             $this->command->error("Invalid GeoJSON format.");
             return;
         }
 
-        $this->command->info("Seeding contours...");
+        $this->command->info("Seeding contours (Optimized)...");
         $bar = $this->command->getOutput()->createProgressBar(count($data['features']));
         $bar->start();
 
-        foreach (collect($data['features'])->chunk(100) as $chunk) {
+        $chunks = array_chunk($data['features'], 50);
+        unset($data); // Free the large features array
+
+        foreach ($chunks as $chunk) {
             $contours = [];
             foreach ($chunk as $feature) {
                 $contours[] = [
@@ -45,7 +49,11 @@ class ContourSeeder extends Seeder
                 ];
                 $bar->advance();
             }
-            \App\Models\Contour::insert($contours);
+
+            \Illuminate\Support\Facades\DB::table('contours')->insert($contours);
+
+            unset($contours);
+            gc_collect_cycles(); // Force garbage collection
         }
 
         $bar->finish();
