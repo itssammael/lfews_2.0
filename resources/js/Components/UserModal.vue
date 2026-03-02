@@ -27,6 +27,7 @@ const emit = defineEmits(['close']);
 
 const form = useForm({
     name: '',
+    username: '',
     email: '',
     password: '',
     password_confirmation: '',
@@ -36,6 +37,7 @@ const form = useForm({
 watch(() => props.user, (newUser) => {
     if (newUser) {
         form.name = newUser.name;
+        form.username = newUser.username || '';
         form.email = newUser.email;
         form.role_id = newUser.roles?.[0]?.id || '';
         form.password = '';
@@ -92,6 +94,19 @@ const close = () => {
                         autofocus
                     />
                     <InputError :message="form.errors.name" class="mt-2" />
+                </div>
+
+                <!-- Username -->
+                <div>
+                    <InputLabel for="username" value="Username" />
+                    <TextInput
+                        id="username"
+                        v-model="form.username"
+                        type="text"
+                        class="mt-1 block w-full"
+                        required
+                    />
+                    <InputError :message="form.errors.username" class="mt-2" />
                 </div>
 
                 <!-- Email -->

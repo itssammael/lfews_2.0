@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 use Tighten\Ziggy\Ziggy;
+use App\Models\SystemSetting;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -43,6 +44,7 @@ class HandleInertiaRequests extends Middleware
                 'modbusResult' => $request->session()->get('modbusResult'),
                 'weatherResult' => $request->session()->get('weatherResult'),
             ],
+            'system_settings' => fn() => SystemSetting::all()->pluck('value', 'name'),
             'auth' => [
                 'user' => $request->user() ? [
                     'id' => $request->user()->id,

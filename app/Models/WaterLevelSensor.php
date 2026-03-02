@@ -38,4 +38,9 @@ class WaterLevelSensor extends Model
     {
         return $this->belongsTo(Location::class);
     }
+
+    public function latestData()
+    {
+        return $this->hasOne(WaterLevelSensorData::class)->latestOfMany('date');
+    }
 }

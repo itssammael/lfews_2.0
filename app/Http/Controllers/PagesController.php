@@ -38,10 +38,20 @@ class PagesController extends Controller
             'value' => 'required',
         ]);
 
+        $value = $validated['value'];
+
+        // Handle file uploads if the value is a file (e.g., from Branding configuration)
+        if ($request->hasFile('value')) {
+            $file = $request->file('value');
+            $filename = time() . '_' . $file->getClientOriginalName();
+            $file->move(public_path('system'), $filename);
+            $value = '/system/' . $filename;
+        }
+
         SystemSetting::updateOrCreate(
             ['name' => $validated['name']],
             [
-                'value' => $validated['value'],
+                'value' => $value,
                 'updated_by' => auth()->id(),
             ]
         );

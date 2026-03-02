@@ -29,7 +29,14 @@ watch(() => props.showOnMobile, (val) => {
     class="flex flex-col bg-white dark:bg-gray-800 border-r border-gray-100 dark:border-gray-700 min-h-screen transition-transform duration-300 ease-in-out"
   >
       <div class="flex items-center justify-center p-2">
-          <div class="font-bold text-xl w-3/4 text-center" :class="{'inline-block': showSidebar, 'hidden': ! showSidebar }">LFEWS</div>
+          <div class="font-bold text-xl w-3/4 text-center" :class="{'inline-block': showSidebar, 'hidden': ! showSidebar }">
+            <template v-if="$page.props.system_settings?.system_logo">
+                <img :src="$page.props.system_settings.system_logo" alt="Logo" class="max-h-12 w-auto mx-auto" />
+            </template>
+            <template v-else>
+                LFEWS
+            </template>
+          </div>
           <div class="lg:block">
             <button class="w-fit inline-flex items-right justify-center p-2 rounded-md text-gray-800 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-800 hover:bg-orange-100 dark:hover:bg-orange-900 focus:outline-none dark:focus:bg-orange-900 focus:text-gray-800 dark:focus:text-gray-800 transition duration-150 ease-in-out" @click="showSidebar = ! showSidebar">
               <svg
@@ -116,7 +123,7 @@ watch(() => props.showOnMobile, (val) => {
         @click="$emit('closeMobile')"
       >
         <div class="flex items-center">
-             <img src="/images/landscape.png" alt="Rivers" class="w-8 h-8 mr-2" />
+             <img src="/images/river.png" alt="Rivers" class="w-8 h-8 mr-2" />
              <span class="text-xs font-bold" :class="{'block': showSidebar, 'hidden': ! showSidebar}">Rivers</span>
         </div>
       </ResponsiveNavLink>
@@ -127,7 +134,7 @@ watch(() => props.showOnMobile, (val) => {
         @click="$emit('closeMobile')"
       >
         <div class="flex items-center">
-             <img src="/images/landscape.png" alt="Contour Map" class="w-8 h-8 mr-2" />
+             <img src="/images/contour.png" alt="Contour Map" class="w-8 h-8 mr-2" />
              <span class="text-xs font-bold" :class="{'block': showSidebar, 'hidden': ! showSidebar}">Contour Map</span>
         </div>
       </ResponsiveNavLink>
@@ -138,7 +145,7 @@ watch(() => props.showOnMobile, (val) => {
         @click="$emit('closeMobile')"
       >
         <div class="flex items-center">
-             <img src="/images/water-level.png" alt="Flood Hazard Map" class="w-8 h-8 mr-2" />
+             <img src="/images/flood.png" alt="Flood Hazard Map" class="w-8 h-8 mr-2" />
              <span class="text-xs font-bold" :class="{'block': showSidebar, 'hidden': ! showSidebar}">Flood Hazard Map</span>
         </div>
       </ResponsiveNavLink>

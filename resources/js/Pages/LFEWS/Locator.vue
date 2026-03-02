@@ -371,6 +371,35 @@ onMounted(() => {
                     direction: 'top',
                     className: 'map-tooltip'
                 });
+
+                const latest = station.latest_observation;
+                const status = station.state == 1 ? '<span class="text-green-500">Online</span>' : '<span class="text-red-500">Offline</span>';
+                let dataHtml = '<div class="text-xs text-gray-500 mt-1">No recent data</div>';
+
+                if (latest) {
+                    dataHtml = `
+                        <div class="mt-2 space-y-1">
+                            <div class="flex justify-between gap-4">
+                                <span class="text-gray-500">Temperature:</span>
+                                <span class="font-bold">${latest.temperature}°C</span>
+                            </div>
+                            <div class="flex justify-between gap-4">
+                                <span class="text-gray-500">Rain Rate:</span>
+                                <span class="font-bold">${latest.precipitation_rate} mm/hr</span>
+                            </div>
+                            <div class="text-[10px] text-gray-400 mt-1">As of: ${latest.date_time}</div>
+                        </div>
+                    `;
+                }
+
+                marker.bindPopup(`
+                    <div class="p-1 min-w-[150px]">
+                        <div class="font-bold text-sm border-b pb-1 mb-1">${station.name}</div>
+                        <div class="text-xs">Status: ${status}</div>
+                        ${dataHtml}
+                    </div>
+                `);
+
                 weatherStationsGroup.addLayer(marker);
                 bounds.extend([station.location.latitude, station.location.longitude]);
                 hasPoints = true;
@@ -391,6 +420,31 @@ onMounted(() => {
                     direction: 'top',
                     className: 'map-tooltip'
                 });
+
+                const latest = sensor.latest_data;
+                const status = sensor.state == 1 ? '<span class="text-green-500">Online</span>' : '<span class="text-red-500">Offline</span>';
+                let dataHtml = '<div class="text-xs text-gray-500 mt-1">No recent data</div>';
+
+                if (latest) {
+                    dataHtml = `
+                        <div class="mt-2 space-y-1">
+                            <div class="flex justify-between gap-4">
+                                <span class="text-gray-500">Water Level:</span>
+                                <span class="font-bold">${latest.sensor_data} m</span>
+                            </div>
+                            <div class="text-[10px] text-gray-400 mt-1">As of: ${latest.date}</div>
+                        </div>
+                    `;
+                }
+
+                marker.bindPopup(`
+                    <div class="p-1 min-w-[150px]">
+                        <div class="font-bold text-sm border-b pb-1 mb-1">${sensor.name}</div>
+                        <div class="text-xs">Status: ${status}</div>
+                        ${dataHtml}
+                    </div>
+                `);
+
                  waterLevelSensorsGroup.addLayer(marker);
                  bounds.extend([sensor.location.latitude, sensor.location.longitude]);
                  hasPoints = true;

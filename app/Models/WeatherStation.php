@@ -25,4 +25,9 @@ class WeatherStation extends Model
     {
         return $this->hasMany(WeatherStationObservationData::class);
     }
+
+    public function latestObservation()
+    {
+        return $this->hasOne(WeatherStationObservationData::class)->latestOfMany('date_time');
+    }
 }

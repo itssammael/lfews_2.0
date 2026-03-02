@@ -14,8 +14,8 @@ class LocatorController extends Controller
 {
     public function index()
     {
-        $weatherStations = WeatherStation::with('location')->get();
-        $waterLevelSensors = WaterLevelSensor::with('location')->get();
+        $weatherStations = WeatherStation::with(['location', 'latestObservation'])->get();
+        $waterLevelSensors = WaterLevelSensor::with(['location', 'latestData'])->get();
         $locations = Location::with('locationType')->whereHas('locationType')->get();
         $rivers = \App\Models\River::all();
         $floodRisks = \App\Models\FloodRisk::all();
