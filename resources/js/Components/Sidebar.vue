@@ -151,6 +151,17 @@ watch(() => props.showOnMobile, (val) => {
       </ResponsiveNavLink>
 
       <ResponsiveNavLink
+        :href="route('lunar-tides')"
+        :active="route().current('lunar-tides')"
+        @click="$emit('closeMobile')"
+      >
+        <div class="flex items-center">
+             <img src="/images/moon.png" alt="Lunar Tides" class="w-8 h-8 mr-2" />
+             <span class="text-xs font-bold" :class="{'block': showSidebar, 'hidden': ! showSidebar}">Lunar Tides</span>
+        </div>
+      </ResponsiveNavLink>
+
+      <ResponsiveNavLink
         :href="route('evacuation-center.index')"
         :active="route().current('evacuation-center.*')"
         @click="$emit('closeMobile')"

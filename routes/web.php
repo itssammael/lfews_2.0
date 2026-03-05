@@ -114,6 +114,11 @@ Route::middleware([
         Route::resource('flood_risks', \App\Http\Controllers\FloodRiskController::class)->except(['index']);
     });
 
+    Route::get('/lunar-tides', [\App\Http\Controllers\TideController::class, 'index'])->name('lunar-tides')
+        ->middleware('can:can-read');
+    Route::post('/lunar-tides/sync', [\App\Http\Controllers\TideController::class, 'syncTides'])->name('lunar-tides.sync')
+        ->middleware('can:can-create');
+
     Route::get('/system-settings', [\App\Http\Controllers\PagesController::class, 'systemSettings'])
         ->name('system-settings')
         ->middleware('auth:sanctum');

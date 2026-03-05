@@ -39,6 +39,18 @@ class DashboardController extends Controller
             }
         }
 
+        $tides = \App\Models\Tide::where('dt', '>=', time() - 86400) // Keep 24h history
+            ->orderBy('dt', 'asc')
+            ->get()
+            ->groupBy(function ($tide) {
+                return \Illuminate\Support\Carbon::parse($tide->date)->format('Y-m-d');
+            });
+
+        $tideHeights = \App\Models\TideHeight::where('dt', '>=', time() - 86400)
+            ->where('dt', '<=', time() + (86400 * 7))
+            ->orderBy('dt', 'asc')
+            ->get();
+
         return Inertia::render('LFEWS/Dashboard', [
             'sensors' => \App\Models\WaterLevelSensor::all(),
             'stations' => $stations,
@@ -47,6 +59,8 @@ class DashboardController extends Controller
             'latestWeatherData' => \Illuminate\Support\Facades\Cache::get('latest_weather_observation_data'),
             'historyWeatherData' => $historyWeatherData,
             'evacuationCenters' => \Illuminate\Support\Facades\Cache::get('evacuation_centers'),
+            'tides' => $tides,
+            'tideHeights' => $tideHeights,
         ]);
     }
 

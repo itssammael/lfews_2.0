@@ -8,6 +8,7 @@ import WeatherStationChart from "@/Components/WeatherStationChart.vue";
 import WindCompass from "@/Components/WindCompass.vue";
 import Checkbox from "@/Components/Checkbox.vue";
 import InputLabel from "@/Components/InputLabel.vue";
+import TidalExtremes from "@/Components/TidalExtremes.vue";
 import { useDashboardSettings } from "@/Composables/useDashboardSettings";
 
 declare function route(name: string, params?: any, absolute?: boolean): string;
@@ -71,6 +72,18 @@ const props = defineProps<{
     longitude: string;
     max_capacity: string | number;
     curren_resident: string | number;
+  }>;
+  tides?: Record<string, Array<{
+    id: number;
+    dt: number;
+    date: string;
+    height: number;
+    type: string;
+  }>>;
+  tideHeights?: Array<{
+    dt: number;
+    date: string;
+    height: number;
   }>;
 }>();
 
@@ -962,6 +975,11 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters } =
             </div>
           </div>
         </div>
+
+        <div v-if="tides" class="bg-transparent p-4 sm:p-8 pt-2">
+            <TidalExtremes :tides="tides" :tideHeights="tideHeights" />
+        </div>
+
         <div
           v-if="showEvacuationCenters"
           class="bg-transparent p-4 sm:p-8 pt-2"
