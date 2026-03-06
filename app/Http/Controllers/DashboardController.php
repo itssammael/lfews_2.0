@@ -39,15 +39,17 @@ class DashboardController extends Controller
             }
         }
 
-        $tides = \App\Models\Tide::where('dt', '>=', time() - 86400) // Keep 24h history
+        $startTimestamp = \Carbon\Carbon::yesterday()->timestamp;
+        
+        $tides = \App\Models\Tide::where('dt', '>=', $startTimestamp)
             ->orderBy('dt', 'asc')
             ->get()
             ->groupBy(function ($tide) {
                 return \Illuminate\Support\Carbon::parse($tide->date)->format('Y-m-d');
             });
 
-        $tideHeights = \App\Models\TideHeight::where('dt', '>=', time() - 86400)
-            ->where('dt', '<=', time() + (86400 * 7))
+        $tideHeights = \App\Models\TideHeight::where('dt', '>=', $startTimestamp)
+            ->where('dt', '<=', \Carbon\Carbon::today()->addDays(5)->timestamp)
             ->orderBy('dt', 'asc')
             ->get();
 

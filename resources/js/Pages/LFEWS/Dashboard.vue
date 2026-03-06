@@ -248,6 +248,16 @@ const isAlertDismissed = (sensorId: number, level: number) => {
   return dismissedAlerts.value[sensorId] === level;
 };
 
+const dismissedWeatherAlerts = ref<Record<number, boolean>>({});
+
+const dismissWeatherAlert = (stationId: number) => {
+  dismissedWeatherAlerts.value[stationId] = true;
+};
+
+const isWeatherAlertDismissed = (stationId: number) => {
+  return dismissedWeatherAlerts.value[stationId] === true;
+};
+
 const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters } =
   useDashboardSettings();
 </script>
@@ -666,9 +676,65 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters } =
               <div
                 v-for="station in stations"
                 :key="station.id"
-                class="bg-white dark:bg-gray-800 border-2 border-orange-500 rounded-[2rem] overflow-hidden shadow-lg w-full flex flex-col md:flex-row"
+                class="bg-white dark:bg-gray-800 border-2 border-orange-500 rounded-[2rem] overflow-hidden shadow-lg w-full flex flex-col md:flex-row relative"
               >
                 <template v-if="weatherResult?.[station.id]">
+                  <!-- Alert Overlay -->
+                  <div
+                    v-if="
+                      weatherResult[station.id].success &&
+                      Number(weatherResult[station.id].data?.heat_index) >= 39 &&
+                      !isWeatherAlertDismissed(station.id)
+                    "
+                    class="absolute inset-x-2 top-2 z-10 rounded-[1.5rem] shadow-2xl p-4 flex flex-col border-2 bg-red-600 border-red-500 text-white"
+                  >
+                    <div class="flex items-start justify-between">
+                      <div class="flex items-center space-x-2">
+                        <svg
+                          class="w-8 h-8 flex-shrink-0"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fill-rule="evenodd"
+                            d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                            clip-rule="evenodd"
+                          />
+                        </svg>
+                        <h5
+                          class="text-xl font-black uppercase tracking-tighter italic"
+                        >
+                          DANGER
+                        </h5>
+                      </div>
+                      <button
+                        @click="dismissWeatherAlert(station.id)"
+                        class="hover:opacity-75 transition-opacity"
+                      >
+                        <svg
+                          class="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="3"
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+
+                    <div class="mt-2 text-sm font-bold leading-tight uppercase">
+                      <p>EXTREME HEAT ALERT.</p>
+                      <p class="mt-1">
+                        Heat index is {{ Number(weatherResult[station.id].data.heat_index).toFixed(1) }}°C. Take necessary precautions.
+                      </p>
+                    </div>
+                  </div>
+
                   <!-- Left Column: Chart -->
                   <div
                     class="w-full md:w-4/5 p-4 border-r dark:border-gray-700 flex flex-col"

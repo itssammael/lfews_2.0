@@ -21,6 +21,7 @@ const props = defineProps<{
 const chartDiv = ref<HTMLElement | null>(null);
 let root: am5.Root | null = null;
 let series: am5xy.LineSeries | null = null;
+let extremeSeries: am5xy.LineSeries | null = null;
 let xAxis: am5xy.DateAxis<am5xy.AxisRenderer> | null = null;
 
 onMounted(() => {
@@ -78,7 +79,7 @@ onMounted(() => {
             stroke: am5.color(0x3b82f6), // Blue-500
             fill: am5.color(0x3b82f6),
             tooltip: am5.Tooltip.new(root, {
-                labelText: "{valueY}m\n{valueX.formatDate('MMM d, HH:mm')}"
+                labelText: "[bold]{valueY}m[/]\n{valueX.formatDate('MMM dd, HH:mm')}"
             })
         })
     );
@@ -92,38 +93,55 @@ onMounted(() => {
         strokeWidth: 3
     });
 
-    // Add extremes as bullets if provided
-    if (props.extremes) {
-        series.bullets.push((root, series, dataItem) => {
-            const dt = dataItem.get("valueX") as number;
-            const extreme = props.extremes?.find(e => e.dt * 1000 === dt);
+    // Add extremes as a separate series to guarantee bullet rendering
+    if (props.extremes && props.extremes.length > 0) {
+        extremeSeries = chart.series.push(
+            am5xy.LineSeries.new(root, {
+                xAxis: xAxis,
+                yAxis: yAxis,
+                valueYField: "height",
+                valueXField: "dt"
+            })
+        );
+        extremeSeries.strokes.template.set("strokeOpacity", 0);
+
+        extremeSeries.bullets.push((root, extremeLineSeries, dataItem) => {
+            const extreme = dataItem.dataContext as any;
+            if (!extreme) return undefined;
             
-            if (extreme) {
-                const container = am5.Container.new(root, {});
-                
-                container.children.push(am5.Circle.new(root, {
-                    radius: 5,
-                    fill: extreme.type === 'High' ? am5.color(0x2563eb) : am5.color(0x0d9488),
-                    stroke: root.interfaceColors.get("background"),
-                    strokeWidth: 2
-                }));
+            const container = am5.Container.new(root, {});
+            const isHigh = extreme.type === 'High';
+            
+            container.children.push(am5.Circle.new(root, {
+                radius: 5,
+                fill: isHigh ? am5.color(0x2563eb) : am5.color(0x0d9488),
+                stroke: root.interfaceColors.get("background"),
+                strokeWidth: 2
+            }));
 
-                container.children.push(am5.Label.new(root, {
-                    text: `${extreme.type === 'High' ? '↑' : '↓'} ${extreme.height.toFixed(2)}m`,
-                    fontSize: 10,
-                    fontWeight: "bold",
-                    centerX: am5.p50,
-                    centerY: extreme.type === 'High' ? am5.p100 : am5.p0,
-                    dy: extreme.type === 'High' ? -10 : 10,
-                    fill: extreme.type === 'High' ? am5.color(0x2563eb) : am5.color(0x0d9488)
-                }));
+            container.children.push(am5.Label.new(root, {
+                text: `${isHigh ? '↑' : '↓'} ${Number(extreme.height).toFixed(2)}m`,
+                fontSize: 10,
+                fontWeight: "bold",
+                centerX: am5.p50,
+                centerY: isHigh ? am5.p100 : am5.p0,
+                dy: isHigh ? -8 : 8,
+                fill: isHigh ? am5.color(0x2563eb) : am5.color(0x0d9488)
+            }));
 
-                return am5.Bullet.new(root, {
-                    sprite: container
-                });
-            }
-            return undefined;
+            return am5.Bullet.new(root, {
+                sprite: container
+            });
         });
+        
+        const extremeData = props.extremes.map(e => ({
+            dt: e.dt * 1000,
+            height: e.height,
+            type: e.type
+        })).sort((a, b) => a.dt - b.dt);
+        
+        extremeSeries.data.setAll(extremeData);
+        extremeSeries.appear(1000);
     }
 
     const data = props.heights.map(h => ({
@@ -149,6 +167,17 @@ watch(() => props.heights, (newHeights) => {
             height: h.height
         }));
         series.data.setAll(data);
+    }
+}, { deep: true });
+
+watch(() => props.extremes, (newExtremes) => {
+    if (extremeSeries && newExtremes) {
+        const extremeData = newExtremes.map(e => ({
+            dt: e.dt * 1000,
+            height: e.height,
+            type: e.type
+        })).sort((a, b) => a.dt - b.dt);
+        extremeSeries.data.setAll(extremeData);
     }
 }, { deep: true });
 </script>
