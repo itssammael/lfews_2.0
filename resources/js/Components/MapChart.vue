@@ -50,7 +50,7 @@ const updatePointsData = () => {
             const color = getHeatIndexColor(heatIndex);
             
             // Determine if the marker should blink (Danger or Extreme Danger)
-            const isDanger = heatIndex >= 39;
+            const isDanger = heatIndex >= 42;
             const animationClass = isDanger ? 'pulse-danger' : '';
 
         // Create a custom DivIcon
@@ -141,8 +141,8 @@ onMounted(() => {
             const labels = [
                 { color: '#33cc33', text: 'Normal (< 27°C)' },
                 { color: '#ffcc00', text: 'Caution (27°C - 32°C)' },
-                { color: '#ff9900', text: 'Ext. Caution (32°C - 39°C)' },
-                { color: '#cc0000', text: 'Danger (39°C - 52°C)' },
+                { color: '#ff9900', text: 'Ext. Caution (33°C - 41°C)' },
+                { color: '#cc0000', text: 'Danger (42°C - 51°C)' },
                 { color: '#990000', text: 'Ext. Danger (>= 52°C)' }
             ];
 
