@@ -7,6 +7,7 @@ use Inertia\Inertia;
 Route::get('/', [\App\Http\Controllers\PagesController::class, 'index'])->name('home');
 Route::get('/awards', [\App\Http\Controllers\PagesController::class, 'awards'])->name('awards');
 Route::get('/services', [\App\Http\Controllers\PagesController::class, 'services'])->name('services');
+Route::get('/heat-index-map', [\App\Http\Controllers\PagesController::class, 'heatIndexMap'])->name('heat-index-map');
 
 Route::middleware([
     'auth:sanctum',

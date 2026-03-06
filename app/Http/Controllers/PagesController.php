@@ -23,6 +23,37 @@ class PagesController extends Controller
         return Inertia::render('Guest/Services');
     }
 
+    public function heatIndexMap()
+    {
+        $stations = \App\Models\WeatherStation::with('location')->get();
+        
+        $latestWeatherData = [];
+        foreach ($stations as $station) {
+            $latestEntry = \App\Models\WeatherStationObservationData::where('weather_station_id', $station->id)
+                ->orderBy('date_time', 'desc')
+                ->first();
+
+            if ($latestEntry) {
+                $latestWeatherData[$station->id] = [
+                    'id' => $station->id,
+                    'station_id' => $station->station_id,
+                    'name' => $station->name,
+                    'success' => true,
+                    'data' => [
+                        'heat_index' => $latestEntry->heat_index,
+                        'date_time' => $latestEntry->date_time,
+                    ],
+                    'timestamp' => $latestEntry->created_at->toDateTimeString(),
+                ];
+            }
+        }
+
+        return Inertia::render('Guest/HeatIndexMap', [
+            'stations' => $stations,
+            'latestWeatherData' => $latestWeatherData,
+        ]);
+    }
+
     public function systemSettings()
     {
         $settings = SystemSetting::with('updatedBy')->get()->pluck('value', 'name');

@@ -12,7 +12,7 @@ class DashboardController extends Controller
     {
         \Illuminate\Support\Facades\Gate::authorize('can-read');
 
-        $stations = \App\Models\WeatherStation::all();
+        $stations = \App\Models\WeatherStation::with('location')->get();
         $historyWeatherData = [];
 
         foreach ($stations as $station) {
@@ -135,7 +135,7 @@ class DashboardController extends Controller
     {
         \Illuminate\Support\Facades\Gate::authorize('can-read');
 
-        $stations = \App\Models\WeatherStation::where('state', 1)->get();
+        $stations = \App\Models\WeatherStation::with('location')->where('state', 1)->get();
         $observations = [];
         $history = \Illuminate\Support\Facades\Cache::get('weather_observation_history', []);
 

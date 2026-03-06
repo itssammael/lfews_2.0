@@ -1,98 +1,463 @@
-<h1>LFEWS 2.0 - Local Flood Early Warning System</h1>
-<h2>User Manual</h2>
-<hr>
-<h3>Table of Contents</h3>
-<ol>
-<li><a href="#1-introduction">Introduction</a></li>
-<li><a href="#2-getting-started">Getting Started</a></li>
-<li><a href="#3-dashboard">Dashboard</a></li>
-<li><a href="#4-monitoring-system">Monitoring System</a><ul>
-<li>Water Level Sensors</li>
-<li>Weather Stations</li>
-<li>Lunar Tides</li>
-</ul>
-</li>
-<li><a href="#5-maps-and-geolocation">Maps and Geolocation</a><ul>
-<li>Locator Map</li>
-<li>Hazard &amp; Flood Risk Maps</li>
-<li>Evacuation Centers</li>
-</ul>
-</li>
-<li><a href="#6-reports">Reports</a></li>
-<li><a href="#7-administration--settings">Administration &amp; Settings</a><ul>
-<li>System Settings</li>
-<li>Users &amp; Roles Configuration</li>
-</ul>
-</li>
-</ol>
-<hr>
-<h3>1. Introduction</h3>
-<p>Welcome to the LFEWS 2.0 (Local Flood Early Warning System) User Manual. LFEWS is a comprehensive platform designed to provide real-time updates and historical data regarding flood monitoring, weather observations, tidal behaviors, and critical mappings for evacuation and hazard risk reduction.</p>
-<h3>2. Getting Started</h3>
-<p>To access the system, navigate to the application URL provided by your administrator. You will need a registered account with the appropriate role (e.g., Administrator, Reviewer) to access secured modules.</p>
-<ul>
-<li><strong>Login</strong>: Use your assigned credentials (email and password) to log in securely.</li>
-<li><strong>Roles</strong>: Depending on your user role, you might have restricted access to certain management or settings panels.</li>
-</ul>
-<h3>3. Dashboard</h3>
-<p>The <strong>Dashboard</strong> is the main overview screen presented after logging in. It features:</p>
-<ul>
-<li><strong>Summary Visualizations</strong>: High-level representations of current system status.</li>
-<li><strong>Budget Visualizations</strong>: amCharts displaying MOOE and Capital Outlay allocations for the current operational year.</li>
-<li><strong>Quick Controls</strong>: Buttons to manually pull or refresh recent data for Water and Weather parameters instantly.</li>
-</ul>
-<h3>4. Monitoring System</h3>
-<p>The core operation of LFEWS relies on active data collection endpoints seamlessly integrated into the application.</p>
-<h4>Water Level Sensors</h4>
-<ul>
-<li><strong>Overview</strong>: View all connected water level sensors deployed across the designated river systems.</li>
-<li><strong>Management</strong>: Administrators can Create, Edit, or Delete sensors.</li>
-<li><strong>Data Pull</strong>: Authorized personnel can manually trigger data pulls to reflect real-time river conditions.</li>
-</ul>
-<h4>Weather Stations</h4>
-<ul>
-<li><strong>Overview</strong>: Lists all weather monitoring equipment synced with the platform.</li>
-<li><strong>Management</strong>: You can add new stations, update current details, or remove obsolete configurations.</li>
-<li><strong>Data Pull</strong>: Similar to water sensors, users can initiate manual synchronization for latest weather reading metrics like precipitation, temperature, and wind speed.</li>
-</ul>
-<h4>Lunar Tides</h4>
-<ul>
-<li><strong>Tide Graphing</strong>: Visual representation of &quot;Tidal Extremes&quot; utilizing the WorldTides API integration. Keep track of incoming high and low tide phases relative to the coastline.</li>
-<li><strong>Synchronization</strong>: Sync the tide projections within the system for updated graphing calculations.</li>
-</ul>
-<h3>5. Maps and Geolocation</h3>
-<p>LFEWS emphasizes visualized locational data for better response coordination during calamity scenarios.</p>
-<h4>Locator Map</h4>
-<p>A consolidated view of all available devices and stations pinged onto an interactive map area.</p>
-<ul>
-<li>Click on any specific sensor or station marker to view a <strong>Device Status Popover</strong>, reflecting its current online visibility and its latest recorded reading limit.</li>
-</ul>
-<h4>Hazard &amp; Flood Risk Maps</h4>
-<p>Provides multi-layered map configurations to outline areas that are highly susceptible to flood hazards and other topographical risks. </p>
-<ul>
-<li>You can manage recorded risk areas within the &quot;Hazard Maps&quot; and &quot;Flood Risks&quot; modules.</li>
-</ul>
-<h4>Evacuation Centers</h4>
-<p>An accessible view charting all identified Evacuation Centers in the region, aiding in strategic disaster response deployment.</p>
-<h3>6. Reports</h3>
-<p>The <strong>Reports</strong> module serves as the primary tool for archiving and exporting metric histories.</p>
-<ul>
-<li><strong>Water Level Data</strong>: Retrieve historical flood depths corresponding to specific timeframes or sensor nodes.</li>
-<li><strong>Weather Observation Data</strong>: Pull out past weather conditions recorded over time for accurate forecasting references.</li>
-</ul>
-<h3>7. Administration &amp; Settings</h3>
-<p>Reserved primarily for system administrators, these menus dictate the core structure of LFEWS 2.0.</p>
-<h4>System Settings</h4>
-<ul>
-<li><strong>Categories</strong>: Configure core metadata like Appropriation Categories.</li>
-<li><strong>Budget Config</strong>: Manage active &quot;Budget Years&quot; and designated &quot;Fund Sources&quot;.</li>
-<li><strong>Rivers Modules</strong>: Manage predefined target rivers aligned with sensor installations.</li>
-</ul>
-<h4>Users &amp; Roles Configuration</h4>
-<ul>
-<li>Navigate to the <strong>Users Management</strong> screen to add, revoke, or edit user profiles.</li>
-<li><strong>Roles Manager</strong>: Directly create and customize User Roles defining exact permissions across the platform interface. Users can be selectively switched between respective access levels easily.</li>
-</ul>
-<hr>
-<p><em>System Document generated for LFEWS 2.0</em></p>
+<!DOCTYPE html>
+<html lang="en">
 
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LFEWS 2.0 User Manual</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            scroll-behavior: smooth;
+        }
+
+        .glass-sidebar {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-right: 1px solid #e5e7eb;
+        }
+
+        .section-card {
+            transition: all 0.3s ease;
+            border-left: 4px solid transparent;
+        }
+
+        .section-card:hover {
+            border-left-color: #3b82f6;
+            background: #f8fafc;
+        }
+
+        .toc-link {
+            transition: color 0.2s ease;
+        }
+
+        .toc-link:hover {
+            color: #3b82f6;
+        }
+
+        @media print {
+            .no-print {
+                display: none;
+            }
+
+            .print-break {
+                page-break-before: always;
+            }
+
+            body {
+                background: white;
+            }
+
+            .main-content {
+                margin-left: 0 !important;
+                width: 100% !important;
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50 text-slate-800">
+
+    <!-- Sidebar Navigation -->
+    <aside class="no-print fixed top-0 left-0 h-full w-72 glass-sidebar z-50 hidden lg:block overflow-y-auto p-6">
+        <div class="flex items-center gap-3 mb-10">
+            <div class="bg-blue-600 p-2 rounded-lg">
+                <i class="fas fa-droplet text-white text-xl"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-xl leading-tight">LFEWS 2.0</h1>
+                <p class="text-xs text-slate-500 font-medium tracking-wider uppercase">User Manual</p>
+            </div>
+        </div>
+
+        <nav class="space-y-1">
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 px-3">Table of Contents</p>
+            <a href="#introduction"
+                class="toc-link flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-blue-50">
+                <span class="w-6 text-center">1</span> Introduction
+            </a>
+            <a href="#getting-started"
+                class="toc-link flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-blue-50">
+                <span class="w-6 text-center">2</span> Getting Started
+            </a>
+            <a href="#dashboard"
+                class="toc-link flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-blue-50">
+                <span class="w-6 text-center">3</span> Dashboard
+            </a>
+            <a href="#monitoring"
+                class="toc-link flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-blue-50">
+                <span class="w-6 text-center">4</span> Monitoring System
+            </a>
+            <a href="#maps"
+                class="toc-link flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-blue-50">
+                <span class="w-6 text-center">5</span> Maps & Geolocation
+            </a>
+            <a href="#reports"
+                class="toc-link flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-blue-50">
+                <span class="w-6 text-center">6</span> Reports
+            </a>
+            <a href="#admin"
+                class="toc-link flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-blue-50">
+                <span class="w-6 text-center">7</span> Administration
+            </a>
+        </nav>
+
+        <div class="mt-12 p-4 bg-blue-50 rounded-xl">
+            <p class="text-xs text-blue-700 font-semibold mb-1">Need Support?</p>
+            <p class="text-[11px] text-blue-600 leading-relaxed">Contact your system administrator for technical
+                assistance or credential issues.</p>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="lg:ml-72 min-h-screen p-6 md:p-12 max-w-5xl mx-auto">
+
+        <!-- Header / Cover Section -->
+        <header class="mb-16 border-b border-slate-200 pb-10">
+            <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div>
+                    <span
+                        class="inline-block bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded mb-4 uppercase tracking-widest">Official
+                        Documentation</span>
+                    <h1 class="text-4xl font-extrabold text-slate-900 mb-2">Local Flood Early Warning System</h1>
+                    <p class="text-lg text-slate-600 font-light">Comprehensive operational guide for LFEWS 2.0</p>
+                </div>
+                <div class="text-left md:text-right text-sm text-slate-400">
+                    <p>Revision: 2.0.1</p>
+                    <p>Updated: March 6, 2026</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- 1. Introduction -->
+        <section id="introduction" class="mb-16 scroll-mt-10">
+            <div class="flex items-center gap-4 mb-6">
+                <span
+                    class="flex items-center justify-center w-10 h-10 rounded-full bg-slate-900 text-white font-bold text-sm">01</span>
+                <h2 class="text-2xl font-bold text-slate-900">Introduction</h2>
+            </div>
+            <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 leading-relaxed text-slate-600">
+                <p class="mb-4">
+                    Welcome to the <strong>LFEWS 2.0</strong> User Manual. This platform is a critical infrastructure
+                    component designed to safeguard communities by providing real-time intelligence on environmental
+                    conditions.
+                </p>
+                <p>
+                    LFEWS integrates advanced sensor networks with intuitive visualization tools to deliver a unified
+                    view of flood monitoring, weather patterns, and tidal movements, enabling data-driven disaster risk
+                    reduction.
+                </p>
+            </div>
+        </section>
+
+        <!-- 2. Getting Started -->
+        <section id="getting-started" class="mb-16 scroll-mt-10">
+            <div class="flex items-center gap-4 mb-6">
+                <span
+                    class="flex items-center justify-center w-10 h-10 rounded-full bg-slate-900 text-white font-bold text-sm">02</span>
+                <h2 class="text-2xl font-bold text-slate-900">Getting Started</h2>
+            </div>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                    <div class="w-10 h-10 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center mb-4">
+                        <i class="fas fa-right-to-bracket"></i>
+                    </div>
+                    <h3 class="font-bold text-slate-900 mb-2">Access & Login</h3>
+                    <p class="text-sm text-slate-600 leading-relaxed">
+                        Navigate to the application URL provided by your IT department. Enter your assigned email and
+                        password to securely enter the system.
+                    </p>
+                </div>
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                    <div
+                        class="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center mb-4">
+                        <i class="fas fa-user-shield"></i>
+                    </div>
+                    <h3 class="font-bold text-slate-900 mb-2">Role-Based Access</h3>
+                    <p class="text-sm text-slate-600 leading-relaxed">
+                        Features are restricted based on roles (e.g., Administrator, Reviewer). If a module is missing,
+                        check your permissions with your administrator.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. Dashboard -->
+        <section id="dashboard" class="mb-16 scroll-mt-10">
+            <div class="flex items-center gap-4 mb-6">
+                <span
+                    class="flex items-center justify-center w-10 h-10 rounded-full bg-slate-900 text-white font-bold text-sm">03</span>
+                <h2 class="text-2xl font-bold text-slate-900">Dashboard</h2>
+            </div>
+            <div class="bg-slate-900 text-white p-8 rounded-2xl shadow-xl overflow-hidden relative">
+                <div class="relative z-10">
+                    <h3 class="text-xl font-bold mb-6">Command Center Overview</h3>
+                    <ul class="space-y-4">
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check-circle text-emerald-400 mt-1"></i>
+                            <div>
+                                <span class="font-semibold block">Summary Visualizations</span>
+                                <span class="text-sm text-slate-300">Instant high-level status of all system
+                                    endpoints.</span>
+                            </div>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-chart-pie text-blue-400 mt-1"></i>
+                            <div>
+                                <span class="font-semibold block">Budget Visualizations (amCharts)</span>
+                                <span class="text-sm text-slate-300">Track MOOE and Capital Outlay allocations for the
+                                    current year.</span>
+                            </div>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-bolt text-amber-400 mt-1"></i>
+                            <div>
+                                <span class="font-semibold block">Quick Controls</span>
+                                <span class="text-sm text-slate-300">Manual trigger buttons to refresh Water and Weather
+                                    data instantly.</span>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+                <i class="fas fa-gauge-high absolute -right-10 -bottom-10 text-[180px] text-white/5 rotate-12"></i>
+            </div>
+        </section>
+
+        <!-- 4. Monitoring System -->
+        <section id="monitoring" class="mb-16 scroll-mt-10 print-break">
+            <div class="flex items-center gap-4 mb-6">
+                <span
+                    class="flex items-center justify-center w-10 h-10 rounded-full bg-slate-900 text-white font-bold text-sm">04</span>
+                <h2 class="text-2xl font-bold text-slate-900">Monitoring System</h2>
+            </div>
+
+            <div class="space-y-6">
+                <!-- Water Sensors -->
+                <div class="section-card bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                    <div class="flex justify-between items-start mb-4">
+                        <h3 class="text-lg font-bold text-blue-700 flex items-center gap-2">
+                            <i class="fas fa-water"></i> Water Level Sensors
+                        </h3>
+                    </div>
+                    <div class="grid md:grid-cols-3 gap-4 text-sm">
+                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                            <span class="font-bold block mb-1">Overview</span>
+                            Monitor connected sensors across river systems.
+                        </div>
+                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                            <span class="font-bold block mb-1">Management</span>
+                            Admins can Create, Edit, or Delete sensors.
+                        </div>
+                        <div class="p-3 bg-blue-50 rounded-lg border border-blue-100">
+                            <span class="font-bold block mb-1">Data Pull</span>
+                            Manual triggers available for real-time syncing.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Weather Stations -->
+                <div class="section-card bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                    <h3 class="text-lg font-bold text-amber-600 flex items-center gap-2 mb-4">
+                        <i class="fas fa-cloud-sun-rain"></i> Weather Stations
+                    </h3>
+                    <p class="text-sm text-slate-600 mb-4">Lists all synced equipment monitoring precipitation,
+                        temperature, and wind metrics.</p>
+                    <div class="flex flex-wrap gap-2">
+                        <span
+                            class="px-3 py-1 bg-slate-100 rounded-full text-[11px] font-bold text-slate-500 uppercase">Synchronization</span>
+                        <span
+                            class="px-3 py-1 bg-slate-100 rounded-full text-[11px] font-bold text-slate-500 uppercase">Station
+                            Metrics</span>
+                        <span
+                            class="px-3 py-1 bg-slate-100 rounded-full text-[11px] font-bold text-slate-500 uppercase">Deployment
+                            Map</span>
+                    </div>
+                </div>
+
+                <!-- Lunar Tides -->
+                <div class="section-card bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                    <h3 class="text-lg font-bold text-indigo-700 flex items-center gap-2 mb-4">
+                        <i class="fas fa-moon"></i> Lunar Tides
+                    </h3>
+                    <div class="flex gap-4 items-center">
+                        <div class="flex-1">
+                            <p class="text-sm text-slate-600 leading-relaxed">
+                                Integrated with <strong>WorldTides API</strong>. This module graphs "Tidal Extremes,"
+                                allowing users to anticipate high and low tide phases impacting coastal flood risk.
+                            </p>
+                        </div>
+                        <div
+                            class="hidden md:block w-32 h-20 bg-indigo-50 rounded-lg border border-indigo-100 flex items-center justify-center">
+                            <i class="fas fa-chart-line text-indigo-300 text-2xl"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. Maps and Geolocation -->
+        <section id="maps" class="mb-16 scroll-mt-10">
+            <div class="flex items-center gap-4 mb-6">
+                <span
+                    class="flex items-center justify-center w-10 h-10 rounded-full bg-slate-900 text-white font-bold text-sm">05</span>
+                <h2 class="text-2xl font-bold text-slate-900">Maps and Geolocation</h2>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between">
+                    <div>
+                        <h3 class="font-bold text-lg mb-4 text-slate-900 flex items-center gap-2">
+                            <i class="fas fa-map-location-dot text-rose-500"></i> Locator Map
+                        </h3>
+                        <p class="text-sm text-slate-600 mb-4 leading-relaxed">
+                            Interactive map displaying all active devices. Click markers to view the <strong>Device
+                                Status Popover</strong>, showing real-time visibility and safety limit records.
+                        </p>
+                    </div>
+                    <div class="mt-4 p-3 bg-rose-50 text-rose-700 text-xs rounded-lg font-medium">
+                        <i class="fas fa-info-circle mr-1"></i> Markers change color based on sensor status.
+                    </div>
+                </div>
+
+                <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
+                    <h3 class="font-bold text-lg mb-4 text-slate-900 flex items-center gap-2">
+                        <i class="fas fa-triangle-exclamation text-amber-500"></i> Risk & Hazard Maps
+                    </h3>
+                    <ul class="text-sm text-slate-600 space-y-3">
+                        <li class="flex items-start gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5"></span>
+                            Multi-layered configurations for flood hazard outlines.
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5"></span>
+                            Topographical risk assessment.
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5"></span>
+                            Evacuation Center charting for strategic deployment.
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- 6. Reports -->
+        <section id="reports" class="mb-16 scroll-mt-10">
+            <div class="flex items-center gap-4 mb-6">
+                <span
+                    class="flex items-center justify-center w-10 h-10 rounded-full bg-slate-900 text-white font-bold text-sm">06</span>
+                <h2 class="text-2xl font-bold text-slate-900">Reports</h2>
+            </div>
+            <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
+                <div class="flex flex-col md:flex-row gap-8">
+                    <div class="flex-1">
+                        <h3 class="font-bold text-slate-900 mb-3">Historical Archiving</h3>
+                        <p class="text-sm text-slate-600 leading-relaxed mb-6">
+                            Export metric histories for analysis and forecasting. Data can be filtered by timeframe or
+                            specific hardware nodes.
+                        </p>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+                                <i class="fas fa-file-export text-slate-400"></i>
+                                <span class="text-xs font-bold text-slate-700 uppercase">Export PDF/CSV</span>
+                            </div>
+                            <div class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+                                <i class="fas fa-filter text-slate-400"></i>
+                                <span class="text-xs font-bold text-slate-700 uppercase">Custom Filters</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="md:w-px bg-slate-100"></div>
+                    <div class="flex-1 space-y-4">
+                        <div class="flex items-center gap-3">
+                            <div
+                                class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs">
+                                <i class="fas fa-ruler-vertical"></i>
+                            </div>
+                            <span class="text-sm font-medium text-slate-700">Water Level History</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <div
+                                class="w-8 h-8 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center text-xs">
+                                <i class="fas fa-temperature-half"></i>
+                            </div>
+                            <span class="text-sm font-medium text-slate-700">Weather Observations</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 7. Administration -->
+        <section id="admin" class="mb-24 scroll-mt-10 print-break">
+            <div class="flex items-center gap-4 mb-6">
+                <span
+                    class="flex items-center justify-center w-10 h-10 rounded-full bg-slate-900 text-white font-bold text-sm">07</span>
+                <h2 class="text-2xl font-bold text-slate-900">Administration & Settings</h2>
+            </div>
+
+            <div class="bg-slate-50 border border-slate-200 rounded-3xl p-1 text-sm overflow-hidden">
+                <div class="bg-white p-8 rounded-[calc(1.5rem-4px)] shadow-sm">
+                    <h3 class="font-bold text-slate-900 mb-6 flex items-center gap-2">
+                        <i class="fas fa-gears text-slate-400"></i> System Core Configuration
+                    </h3>
+
+                    <div class="grid md:grid-cols-2 gap-8">
+                        <div>
+                            <h4 class="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-4">Core
+                                Settings</h4>
+                            <ul class="space-y-4">
+                                <li>
+                                    <span class="block font-bold text-slate-800">Budget Config</span>
+                                    <span class="text-slate-500">Manage Budget Years and Fund Sources (MOOE/CO).</span>
+                                </li>
+                                <li>
+                                    <span class="block font-bold text-slate-800">Rivers Module</span>
+                                    <span class="text-slate-500">Define river systems for sensor mapping.</span>
+                                </li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 class="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-4">Users &
+                                Security</h4>
+                            <ul class="space-y-4">
+                                <li>
+                                    <span class="block font-bold text-slate-800">User Management</span>
+                                    <span class="text-slate-500">Add, revoke, or edit staff profiles and
+                                        credentials.</span>
+                                </li>
+                                <li>
+                                    <span class="block font-bold text-slate-800">Roles Manager</span>
+                                    <span class="text-slate-500">Customize granular permissions for each user
+                                        role.</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="border-t border-slate-200 pt-8 text-center text-slate-400 text-xs">
+            <p class="mb-2">System Document generated for <strong>LFEWS 2.0</strong></p>
+            <p>&copy; 2026 Local Flood Early Warning System. All rights reserved.</p>
+        </footer>
+
+    </main>
+
+    <!-- Mobile Navigation Trigger (Optional) -->
+    <div class="lg:hidden fixed bottom-6 right-6 no-print">
+        <button onclick="window.scrollTo({top: 0, behavior: 'smooth'})"
+            class="w-12 h-12 bg-slate-900 text-white rounded-full shadow-2xl flex items-center justify-center">
+            <i class="fas fa-arrow-up"></i>
+        </button>
+    </div>
+
+</body>
+
+</html>

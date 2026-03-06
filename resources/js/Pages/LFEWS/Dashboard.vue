@@ -258,7 +258,7 @@ const isWeatherAlertDismissed = (stationId: number) => {
   return dismissedWeatherAlerts.value[stationId] === true;
 };
 
-const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters } =
+const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters, showTidalExtremes } =
   useDashboardSettings();
 </script>
 
@@ -669,6 +669,8 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters } =
               </div>
             </div>
 
+
+
             <div
               v-if="stations && stations.length > 0"
               class="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-6"
@@ -1042,7 +1044,7 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters } =
           </div>
         </div>
 
-        <div v-if="tides" class="bg-transparent p-4 sm:p-8 pt-2">
+        <div v-if="showTidalExtremes && tides" class="bg-transparent p-4 sm:p-8 pt-2">
             <TidalExtremes :tides="tides" :tideHeights="tideHeights" />
         </div>
 

@@ -11,7 +11,7 @@ const props = defineProps({
 const emit = defineEmits(['closeMobile']);
 
 const showSidebar = ref(false);
-const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters } = useDashboardSettings();
+const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters, showTidalExtremes } = useDashboardSettings();
 
 // When mobile sidebar is shown, we might want to expand it or handle it specifically
 watch(() => props.showOnMobile, (val) => {
@@ -231,6 +231,20 @@ watch(() => props.showOnMobile, (val) => {
                       <div class="absolute cursor-pointer h-3 w-3 left-0.5 bottom-0.5 bg-white rounded-full transition-all duration-300 peer-checked:translate-x-4 shadow-sm"></div>
                   </div>
                   <span :class="{'block': showSidebar, 'hidden': ! showSidebar}" class="text-xs font-medium text-gray-600 dark:text-gray-400">Evac Centers</span>
+              </label>
+          </div>
+           <div class="flex items-center justify-between" v-if="route().current('dashboard')">
+               <label class="flex items-center cursor-pointer">
+                  <div class="relative inline-block w-8 h-4 transition duration-200 ease-in-out mr-2">
+                      <input 
+                          type="checkbox" 
+                          v-model="showTidalExtremes"
+                          class="opacity-0 w-0 h-0 peer"
+                      />
+                      <div class="absolute cursor-pointer top-0 left-0 right-0 bottom-0 bg-gray-300 dark:bg-gray-600 rounded-full transition-all duration-300 peer-checked:bg-orange-500"></div>
+                      <div class="absolute cursor-pointer h-3 w-3 left-0.5 bottom-0.5 bg-white rounded-full transition-all duration-300 peer-checked:translate-x-4 shadow-sm"></div>
+                  </div>
+                  <span :class="{'block': showSidebar, 'hidden': ! showSidebar}" class="text-xs font-medium text-gray-600 dark:text-gray-400">Tidal Extremes</span>
               </label>
           </div>
       </div>
