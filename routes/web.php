@@ -134,4 +134,8 @@ Route::middleware([
     Route::post('/system-settings', [\App\Http\Controllers\PagesController::class, 'updateSystemSettings'])
         ->name('system-settings.update')
         ->middleware('auth:sanctum');
+
+    Route::get('/update-geo-data', [\App\Http\Controllers\PagesController::class, 'updateGeoData'])
+        ->name('update-geo-data')
+        ->middleware('can:can-read');
 });

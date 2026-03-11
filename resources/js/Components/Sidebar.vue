@@ -12,6 +12,8 @@ const emit = defineEmits(['closeMobile']);
 
 const showSidebar = ref(false);
 const showGeoData = ref(false);
+const showGeoDataPopover = ref(false);
+const geoDataContainer = ref<HTMLElement | null>(null);
 const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters, showTidalExtremes, showBarangays, showSitios } = useDashboardSettings();
 
 // When mobile sidebar is shown, we might want to expand it or handle it specifically
@@ -21,14 +23,27 @@ watch(() => props.showOnMobile, (val) => {
 
 // Auto-expand Geo Data if any of its children are active
 onMounted(() => {
-    if (route().current('rivers.*') || route().current('hazard-map.*') || route().current('flood_risks.*') || route().current('barangays-sitios.*')) {
+    if (route().current('rivers.*') || route().current('hazard-map.*') || route().current('flood_risks.*') || route().current('barangays-sitios.*') || route().current('update-geo-data')) {
         showGeoData.value = true;
     }
 });
 
 // Close accordion when sidebar is collapsed
 watch(showSidebar, (val) => {
-    if (!val) showGeoData.value = false;
+    if (!val) {
+        showGeoData.value = false;
+    } else {
+        showGeoDataPopover.value = false;
+    }
+});
+
+// Click outside to close popover
+onMounted(() => {
+    window.addEventListener('click', (e) => {
+        if (geoDataContainer.value && !geoDataContainer.value.contains(e.target as Node)) {
+            showGeoDataPopover.value = false;
+        }
+    });
 });
 
 </script>
@@ -78,7 +93,10 @@ watch(showSidebar, (val) => {
         </div>
       </div>
     <!-- Navigation Links -->
-    <div class="flex-1 overflow-y-auto py-4 space-y-1 uppercase">
+    <div 
+        :class="{'overflow-y-auto': showSidebar, 'overflow-visible': !showSidebar}"
+        class="flex-1 py-4 space-y-1 uppercase"
+    >
       <ResponsiveNavLink
         :href="route('dashboard')"
         :active="route().current('dashboard')"
@@ -137,7 +155,7 @@ watch(showSidebar, (val) => {
         <button 
           @click="showGeoData = !showGeoData"
           class="w-full flex items-center justify-between px-4 py-3 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition duration-150 ease-in-out border-l-4 border-transparent"
-          :class="{'text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/50 border-indigo-400 dark:border-indigo-600': route().current('rivers.*') || route().current('hazard-map.*') || route().current('flood_risks.*') || route().current('barangays-sitios.*')}"
+          :class="{'text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/50 border-indigo-400 dark:border-indigo-600': route().current('rivers.*') || route().current('hazard-map.*') || route().current('flood_risks.*') || route().current('barangays-sitios.*') || route().current('update-geo-data')}"
         >
           <div class="flex items-center">
             <img src="/images/location.png" alt="Geo Data" class="w-8 h-8 mr-2" />
@@ -202,8 +220,19 @@ watch(showSidebar, (val) => {
               @click="$emit('closeMobile')"
             >
               <div class="flex items-center">
-                   <img src="/images/location.png" alt="Barangays & Sitios" class="w-8 h-8 mr-2" />
+                   <img src="/images/map.png" alt="Barangays & Sitios" class="w-8 h-8 mr-2" />
                    <span class="text-[10px] font-bold">Barangays & Sitios</span>
+              </div>
+            </ResponsiveNavLink>
+
+            <ResponsiveNavLink
+              :href="route('update-geo-data')"
+              :active="route().current('update-geo-data')"
+              @click="$emit('closeMobile')"
+            >
+              <div class="flex items-center">
+                   <img src="/images/data-processing.png" alt="Update Geo Data" class="w-8 h-8 mr-2" />
+                   <span class="text-[10px] font-bold">Update Geo Data</span>
               </div>
             </ResponsiveNavLink>
           </div>
@@ -212,46 +241,77 @@ watch(showSidebar, (val) => {
 
       <!-- Fallback icons when sidebar is collapsed -->
       <template v-else>
-        <ResponsiveNavLink
-          :href="route('rivers.index')"
-          :active="route().current('rivers.*')"
-          @click="$emit('closeMobile')"
-          title="Rivers"
-        >
-          <div class="flex items-center">
-               <img src="/images/river.png" alt="Rivers" class="w-8 h-8" />
-          </div>
-        </ResponsiveNavLink>
-        <ResponsiveNavLink
-          :href="route('hazard-map.index')"
-          :active="route().current('hazard-map.*')"
-          @click="$emit('closeMobile')"
-          title="Contour Map"
-        >
-          <div class="flex items-center">
-               <img src="/images/contour.png" alt="Contour Map" class="w-8 h-8" />
-          </div>
-        </ResponsiveNavLink>
-        <ResponsiveNavLink
-          :href="route('flood_risks.index')"
-          :active="route().current('flood_risks.*')"
-          @click="$emit('closeMobile')"
-          title="Flood Hazard Map"
-        >
-          <div class="flex items-center">
-               <img src="/images/flood.png" alt="Flood Hazard Map" class="w-8 h-8" />
-          </div>
-        </ResponsiveNavLink>
-        <ResponsiveNavLink
-          :href="route('barangays-sitios.index')"
-          :active="route().current('barangays-sitios.*')"
-          @click="$emit('closeMobile')"
-          title="Barangays & Sitios"
-        >
-          <div class="flex items-center">
-               <img src="/images/map.png" alt="Barangays & Sitios" class="w-8 h-8" />
-          </div>
-        </ResponsiveNavLink>
+        <div ref="geoDataContainer" class="relative overflow-visible">
+            <button 
+                @click.stop="showGeoDataPopover = !showGeoDataPopover"
+                class="w-full flex items-center justify-center py-3 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition duration-150 ease-in-out border-l-4 border-transparent"
+                :class="{'text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/50 border-indigo-400 dark:border-indigo-600': route().current('rivers.*') || route().current('hazard-map.*') || route().current('flood_risks.*') || route().current('barangays-sitios.*') || route().current('update-geo-data')}"
+                title="Geo Data"
+            >
+                <img src="/images/location.png" alt="Geo Data" class="w-8 h-8" />
+            </button>
+
+            <!-- Popover for Geo Data -->
+            <div 
+                v-if="showGeoDataPopover"
+                class="absolute left-full top-0 ml-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-100 dark:border-gray-700 z-50 py-2 space-y-1 uppercase"
+            >
+                <ResponsiveNavLink
+                    :href="route('rivers.index')"
+                    :active="route().current('rivers.*')"
+                    @click="showGeoDataPopover = false"
+                >
+                    <div class="flex items-center">
+                         <img src="/images/river.png" alt="Rivers" class="w-6 h-6 mr-2" />
+                         <span class="text-[10px] font-bold">Rivers</span>
+                    </div>
+                </ResponsiveNavLink>
+                
+                <ResponsiveNavLink
+                    :href="route('hazard-map.index')"
+                    :active="route().current('hazard-map.*')"
+                    @click="showGeoDataPopover = false"
+                >
+                    <div class="flex items-center">
+                         <img src="/images/contour.png" alt="Contour Map" class="w-6 h-6 mr-2" />
+                         <span class="text-[10px] font-bold">Contour Map</span>
+                    </div>
+                </ResponsiveNavLink>
+
+                <ResponsiveNavLink
+                    :href="route('flood_risks.index')"
+                    :active="route().current('flood_risks.*')"
+                    @click="showGeoDataPopover = false"
+                >
+                    <div class="flex items-center">
+                         <img src="/images/flood.png" alt="Flood Hazard Map" class="w-6 h-6 mr-2" />
+                         <span class="text-[10px] font-bold">Flood Hazard Map</span>
+                    </div>
+                </ResponsiveNavLink>
+
+                <ResponsiveNavLink
+                    :href="route('barangays-sitios.index')"
+                    :active="route().current('barangays-sitios.*')"
+                    @click="showGeoDataPopover = false"
+                >
+                    <div class="flex items-center">
+                         <img src="/images/map.png" alt="Barangays & Sitios" class="w-6 h-6 mr-2" />
+                         <span class="text-[10px] font-bold">Barangays & Sitios</span>
+                    </div>
+                </ResponsiveNavLink>
+
+                <ResponsiveNavLink
+                    :href="route('update-geo-data')"
+                    :active="route().current('update-geo-data')"
+                    @click="showGeoDataPopover = false"
+                >
+                    <div class="flex items-center">
+                         <img src="/images/data-processing.png" alt="Update Geo Data" class="w-6 h-6 mr-2" />
+                         <span class="text-[10px] font-bold">Update Geo Data</span>
+                    </div>
+                </ResponsiveNavLink>
+            </div>
+        </div>
       </template>
 
       <ResponsiveNavLink
@@ -287,6 +347,8 @@ watch(showSidebar, (val) => {
              <span :class="{'block': showSidebar, 'hidden': ! showSidebar}">Data Migration</span>
         </div>
       </ResponsiveNavLink>
+
+
 
 
       <!-- Add more sidebar links here -->

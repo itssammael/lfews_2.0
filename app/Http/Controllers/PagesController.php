@@ -89,7 +89,12 @@ class PagesController extends Controller
                 'updated_by' => auth()->id(),
             ]
         );
-
+        
         return redirect()->back()->with('success', 'Settings updated successfully.');
+    }
+
+    public function updateGeoData()
+    {
+        return Inertia::render('LFEWS/UpdateGeoData');
     }
 }

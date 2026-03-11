@@ -6,7 +6,7 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import DangerButton from '@/Components/DangerButton.vue';
 import TextInput from '@/Components/TextInput.vue';
-import FloodRiskModal from '@/Components/FloodRiskModal.vue';
+import ViewDataModal from '@/Components/ViewDataModal.vue';
 import Pagination from '@/Components/Pagination.vue';
 import debounce from 'lodash/debounce';
 
@@ -23,8 +23,8 @@ const props = defineProps({
 
 const search = ref(props.filters.search);
 
-const showingFloodRiskModal = ref(false);
-const floodRiskToEdit = ref<any>(null);
+const showingViewModal = ref(false);
+const dataToView = ref<any>(null);
 
 watch(search, debounce((value) => {
     router.get(route('flood_risks.index'), { search: value }, {
@@ -33,25 +33,14 @@ watch(search, debounce((value) => {
     });
 }, 300));
 
-const openCreateModal = () => {
-    floodRiskToEdit.value = null;
-    showingFloodRiskModal.value = true;
+const openViewModal = (floodRisk: any) => {
+    dataToView.value = floodRisk;
+    showingViewModal.value = true;
 };
 
-const openEditModal = (floodRisk: any) => {
-    floodRiskToEdit.value = floodRisk;
-    showingFloodRiskModal.value = true;
-};
-
-const closeFloodRiskModal = () => {
-    showingFloodRiskModal.value = false;
-    floodRiskToEdit.value = null;
-};
-
-const deleteFloodRisk = (floodRisk: any) => {
-    if (confirm(`Are you sure you want to delete ${floodRisk.name}?`)) {
-        router.delete(route('flood_risks.destroy', floodRisk.id));
-    }
+const closeViewModal = () => {
+    showingViewModal.value = false;
+    dataToView.value = null;
 };
 </script>
 
@@ -70,12 +59,7 @@ const deleteFloodRisk = (floodRisk: any) => {
                         <h3 class="text-xl font-semibold text-gray-900 dark:text-gray-100 uppercase">
                             Flood Hazard List
                         </h3>
-                        <PrimaryButton 
-                            v-if="$page.props.auth.can.create"
-                            @click="openCreateModal"
-                        >
-                            Add Flood Risk Area
-                        </PrimaryButton>
+
                         <div class="hidden sm:block flex-grow"></div>
                         <div class="w-full sm:w-64">
                             <TextInput
@@ -112,18 +96,10 @@ const deleteFloodRisk = (floodRisk: any) => {
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                         <SecondaryButton 
-                                            v-if="$page.props.auth.can.update"
-                                            @click="openEditModal(floodRisk)" 
-                                            class="mr-2"
+                                            @click="openViewModal(floodRisk)"
                                         >
-                                            Edit
+                                            View
                                         </SecondaryButton>
-                                        <DangerButton 
-                                            v-if="$page.props.auth.can.delete"
-                                            @click="deleteFloodRisk(floodRisk)"
-                                        >
-                                            Delete
-                                        </DangerButton>
                                     </td>
                                 </tr>
                                 <tr v-if="floodRisks.data.length === 0">
@@ -140,10 +116,11 @@ const deleteFloodRisk = (floodRisk: any) => {
             </div>
         </div>
 
-        <FloodRiskModal
-            :show="showingFloodRiskModal"
-            :floodRisk="floodRiskToEdit"
-            @close="closeFloodRiskModal"
+        <ViewDataModal
+            :show="showingViewModal"
+            :data="dataToView"
+            title="Flood Risk Details"
+            @close="closeViewModal"
         />
     </AppLayout>
 </template>

@@ -6,7 +6,7 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import DangerButton from '@/Components/DangerButton.vue';
 import TextInput from '@/Components/TextInput.vue';
-import RiverModal from '@/Components/RiverModal.vue';
+import ViewDataModal from '@/Components/ViewDataModal.vue';
 import Pagination from '@/Components/Pagination.vue';
 import debounce from 'lodash/debounce';
 
@@ -23,8 +23,8 @@ const props = defineProps({
 
 const search = ref(props.filters.search);
 
-const showingRiverModal = ref(false);
-const riverToEdit = ref<any>(null);
+const showingViewModal = ref(false);
+const dataToView = ref<any>(null);
 
 watch(search, debounce((value) => {
     router.get(route('rivers.index'), { search: value }, {
@@ -33,25 +33,14 @@ watch(search, debounce((value) => {
     });
 }, 300));
 
-const openCreateModal = () => {
-    riverToEdit.value = null;
-    showingRiverModal.value = true;
+const openViewModal = (river: any) => {
+    dataToView.value = river;
+    showingViewModal.value = true;
 };
 
-const openEditModal = (river: any) => {
-    riverToEdit.value = river;
-    showingRiverModal.value = true;
-};
-
-const closeRiverModal = () => {
-    showingRiverModal.value = false;
-    riverToEdit.value = null;
-};
-
-const deleteRiver = (river: any) => {
-    if (confirm(`Are you sure you want to delete ${river.name}?`)) {
-        router.delete(route('rivers.destroy', river.id));
-    }
+const closeViewModal = () => {
+    showingViewModal.value = false;
+    dataToView.value = null;
 };
 </script>
 
@@ -70,12 +59,7 @@ const deleteRiver = (river: any) => {
                         <h3 class="text-xl font-semibold text-gray-900 dark:text-gray-100 uppercase">
                             Rivers List
                         </h3>
-                        <PrimaryButton 
-                            v-if="$page.props.auth.can.create"
-                            @click="openCreateModal"
-                        >
-                            Add River
-                        </PrimaryButton>
+
                         <div class="hidden sm:block flex-grow"></div>
                         <div class="w-full sm:w-64">
                             <TextInput
@@ -112,18 +96,10 @@ const deleteRiver = (river: any) => {
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                         <SecondaryButton 
-                                            v-if="$page.props.auth.can.update"
-                                            @click="openEditModal(river)" 
-                                            class="mr-2"
+                                            @click="openViewModal(river)"
                                         >
-                                            Edit
+                                            View
                                         </SecondaryButton>
-                                        <DangerButton 
-                                            v-if="$page.props.auth.can.delete"
-                                            @click="deleteRiver(river)"
-                                        >
-                                            Delete
-                                        </DangerButton>
                                     </td>
                                 </tr>
                                 <tr v-if="rivers.data.length === 0">
@@ -140,10 +116,11 @@ const deleteRiver = (river: any) => {
             </div>
         </div>
 
-        <RiverModal
-            :show="showingRiverModal"
-            :river="riverToEdit"
-            @close="closeRiverModal"
+        <ViewDataModal
+            :show="showingViewModal"
+            :data="dataToView"
+            title="River Details"
+            @close="closeViewModal"
         />
     </AppLayout>
 </template>

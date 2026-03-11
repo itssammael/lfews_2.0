@@ -7,6 +7,7 @@ import SecondaryButton from '@/Components/SecondaryButton.vue';
 import DangerButton from '@/Components/DangerButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import Pagination from '@/Components/Pagination.vue';
+import ViewDataModal from '@/Components/ViewDataModal.vue';
 import debounce from 'lodash/debounce';
 
 const props = defineProps({
@@ -27,6 +28,9 @@ const props = defineProps({
 const search = ref(props.filters.search);
 const activeTab = ref('barangays');
 
+const showingViewModal = ref(false);
+const dataToView = ref<any>(null);
+
 watch(search, debounce((value) => {
     router.get(route('barangays-sitios.index'), { search: value }, {
         preserveState: true,
@@ -34,18 +38,14 @@ watch(search, debounce((value) => {
     });
 }, 300));
 
-const deleteBarangay = (barangay: any) => {
-    if (confirm(`Are you sure you want to delete Barangay ${barangay.name}? This will NOT delete associated geometry from GeoJSON file but will remove it from the database.`)) {
-        // router.delete(route('barangays.destroy', barangay.id));
-        alert('Delete functionality not implemented yet for this new module.');
-    }
+const openViewModal = (data: any) => {
+    dataToView.value = data;
+    showingViewModal.value = true;
 };
 
-const deleteSitio = (sitio: any) => {
-    if (confirm(`Are you sure you want to delete Sitio ${sitio.name}?`)) {
-        // router.delete(route('sitios.destroy', sitio.id));
-        alert('Delete functionality not implemented yet for this new module.');
-    }
+const closeViewModal = () => {
+    showingViewModal.value = false;
+    dataToView.value = null;
 };
 </script>
 
@@ -118,14 +118,9 @@ const deleteSitio = (sitio: any) => {
                                     <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">
                                         <pre class="text-xs overflow-auto max-w-xs max-h-20">{{ JSON.stringify(barangay.properties, null, 2) }}</pre>
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <SecondaryButton disabled class="opacity-50 cursor-not-allowed mr-2">
-                                            Edit
+                                        <SecondaryButton @click="openViewModal(barangay)">
+                                            View
                                         </SecondaryButton>
-                                        <DangerButton @click="deleteBarangay(barangay)">
-                                            Delete
-                                        </DangerButton>
-                                    </td>
                                 </tr>
                                 <tr v-if="barangays.data.length === 0">
                                     <td colspan="3" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
@@ -167,14 +162,9 @@ const deleteSitio = (sitio: any) => {
                                     <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">
                                         <pre class="text-xs overflow-auto max-w-xs max-h-20">{{ JSON.stringify(sitio.properties, null, 2) }}</pre>
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <SecondaryButton disabled class="opacity-50 cursor-not-allowed mr-2">
-                                            Edit
+                                        <SecondaryButton @click="openViewModal(sitio)">
+                                            View
                                         </SecondaryButton>
-                                        <DangerButton @click="deleteSitio(sitio)">
-                                            Delete
-                                        </DangerButton>
-                                    </td>
                                 </tr>
                                 <tr v-if="sitios.data.length === 0">
                                     <td colspan="4" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
@@ -189,5 +179,12 @@ const deleteSitio = (sitio: any) => {
                 </div>
             </div>
         </div>
+
+        <ViewDataModal
+            :show="showingViewModal"
+            :data="dataToView"
+            :title="activeTab === 'barangays' ? 'Barangay Details' : 'Sitio Details'"
+            @close="closeViewModal"
+        />
     </AppLayout>
 </template>

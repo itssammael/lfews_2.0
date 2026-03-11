@@ -6,7 +6,7 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import DangerButton from '@/Components/DangerButton.vue';
 import TextInput from '@/Components/TextInput.vue';
-import ContourModal from '@/Components/ContourModal.vue';
+import ViewDataModal from '@/Components/ViewDataModal.vue';
 import Pagination from '@/Components/Pagination.vue';
 import debounce from 'lodash/debounce';
 
@@ -23,8 +23,8 @@ const props = defineProps({
 
 const search = ref(props.filters.search);
 
-const showingContourModal = ref(false);
-const contourToEdit = ref<any>(null);
+const showingViewModal = ref(false);
+const dataToView = ref<any>(null);
 
 watch(search, debounce((value) => {
     router.get(route('hazard-map.index'), { search: value }, {
@@ -33,25 +33,14 @@ watch(search, debounce((value) => {
     });
 }, 300));
 
-const openCreateModal = () => {
-    contourToEdit.value = null;
-    showingContourModal.value = true;
+const openViewModal = (contour: any) => {
+    dataToView.value = contour;
+    showingViewModal.value = true;
 };
 
-const openEditModal = (contour: any) => {
-    contourToEdit.value = contour;
-    showingContourModal.value = true;
-};
-
-const closeContourModal = () => {
-    showingContourModal.value = false;
-    contourToEdit.value = null;
-};
-
-const deleteContour = (contour: any) => {
-    if (confirm(`Are you sure you want to delete ${contour.name}?`)) {
-        router.delete(route('hazard-map.destroy', contour.id));
-    }
+const closeViewModal = () => {
+    showingViewModal.value = false;
+    dataToView.value = null;
 };
 </script>
 
@@ -70,12 +59,7 @@ const deleteContour = (contour: any) => {
                         <h3 class="text-xl font-semibold text-gray-900 dark:text-gray-100 uppercase">
                             Contours List
                         </h3>
-                        <PrimaryButton 
-                            v-if="$page.props.auth.can.create"
-                            @click="openCreateModal"
-                        >
-                            Add Contour
-                        </PrimaryButton>
+
                         <div class="hidden sm:block flex-grow"></div>
                         <div class="w-full sm:w-64">
                             <TextInput
@@ -112,18 +96,10 @@ const deleteContour = (contour: any) => {
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                         <SecondaryButton 
-                                            v-if="$page.props.auth.can.update"
-                                            @click="openEditModal(contour)" 
-                                            class="mr-2"
+                                            @click="openViewModal(contour)"
                                         >
-                                            Edit
+                                            View
                                         </SecondaryButton>
-                                        <DangerButton 
-                                            v-if="$page.props.auth.can.delete"
-                                            @click="deleteContour(contour)"
-                                        >
-                                            Delete
-                                        </DangerButton>
                                     </td>
                                 </tr>
                                 <tr v-if="contours.data.length === 0">
@@ -140,10 +116,11 @@ const deleteContour = (contour: any) => {
             </div>
         </div>
 
-        <ContourModal
-            :show="showingContourModal"
-            :contour="contourToEdit"
-            @close="closeContourModal"
+        <ViewDataModal
+            :show="showingViewModal"
+            :data="dataToView"
+            title="Contour Details"
+            @close="closeViewModal"
         />
     </AppLayout>
 </template>
