@@ -2,6 +2,10 @@
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import proj4 from 'proj4';
+
+// Define the CRS for Bayawan (UTM Zone 51N)
+proj4.defs("EPSG:32651","+proj=utm +zone=51 +datum=WGS84 +units=m +no_defs");
 
 const props = defineProps<{
     stations: Array<{
@@ -18,11 +22,13 @@ const props = defineProps<{
             heat_index: number | string;
         };
     }> | null;
+    barangays?: any[];
 }>();
 
 const mapContainer = ref<HTMLElement | null>(null);
 let map: L.Map | null = null;
 const markersLayer = L.layerGroup();
+const barangaysGroup = L.featureGroup();
 
 const getHeatIndexColor = (heatIndex: number) => {
     if (heatIndex >= 52) return '#990000'; // Extreme Danger - Dark Red
@@ -32,11 +38,83 @@ const getHeatIndexColor = (heatIndex: number) => {
     return '#33cc33'; // Normal - Green
 };
 
+const transformGeometry = (geometry: any) => {
+    if (!geometry) return null;
+    
+    // Check if it's already in WGS84 (approximate check based on coordinate magnitude)
+    // If UTM Zone 51, coordinates will be large (e.g., 400000, 1000000)
+    // We'll use proj4 to transform if necessary
+        const transformCoords = (coords: any): any => {
+            if (typeof coords[0] === 'number') {
+                // If coordinates are large, they likely need transformation from EPSG:32651 to WGS84
+                if (Math.abs(coords[0]) > 200 || Math.abs(coords[1]) > 200) {
+                    return proj4("EPSG:32651", "WGS84", coords);
+                }
+                return coords;
+            }
+            return coords.map(transformCoords);
+        };
+
+    return {
+        ...geometry,
+        coordinates: transformCoords(geometry.coordinates)
+    };
+};
+
+const processBarangays = () => {
+    if (!props.barangays || props.barangays.length === 0) return;
+
+    barangaysGroup.clearLayers();
+
+    const features = props.barangays.map(b => ({
+        type: "Feature",
+        properties: { ...b.properties, db_name: b.name },
+        geometry: transformGeometry(b.geometry)
+    }));
+
+    L.geoJSON({ type: "FeatureCollection", features: features } as any, {
+        style: {
+            color: '#0d4dad',
+            weight: 2,
+            opacity: 0.8,
+            fillOpacity: 0.1
+        },
+        coordsToLatLng: (coords) => L.latLng(coords[1], coords[0]),
+        onEachFeature: (feature: any, layer: any) => {
+            if (feature.properties) {
+                const label = `<b style="text-transform: capitalize;">${feature.properties.db_name || feature.properties.barangay || feature.properties.Bgy_Name || feature.properties.name || 'Unknown'}</b>`;
+                layer.bindTooltip(label, {
+                    sticky: true,
+                    className: 'map-tooltip'
+                });
+            }
+        }
+    }).addTo(barangaysGroup);
+
+    if (map && barangaysGroup.getLayers().length > 0) {
+        map.fitBounds(barangaysGroup.getBounds(), { padding: [5, 5] });
+    }
+};
+
 const updatePointsData = () => {
     if (!map) return;
     
     // Clear existing markers
     markersLayer.clearLayers();
+
+    // Calculate scaling factor based on zoom, ensuring it does not shrink below base size
+    const baseZoom = 11;
+    const currentZoom = map.getZoom();
+    const zoomScale = Math.max(1, Math.pow(1.3, currentZoom - baseZoom));
+
+    // Base sizes (+30% from original 40/24/10)
+    const baseOuter = 52;
+    const baseInner = 31;
+    const baseFont = 13;
+
+    const outerSize = Math.round(baseOuter * zoomScale);
+    const innerSize = Math.round(baseInner * zoomScale);
+    const fontSize = Math.round(baseFont * zoomScale);
 
     props.stations.forEach(station => {
         if (station.location?.latitude && station.location?.longitude) {
@@ -59,8 +137,8 @@ const updatePointsData = () => {
             html: `
                 <div class="${animationClass}" style="
                     position: relative;
-                    width: 40px;
-                    height: 40px;
+                    width: ${outerSize}px;
+                    height: ${outerSize}px;
                     display: flex;
                     align-items: center;
                     justify-content: center;
@@ -77,7 +155,7 @@ const updatePointsData = () => {
                     <!-- Inner Solid Circle -->
                     <div style="
                         position: relative;
-                        width: 24px; height: 24px;
+                        width: ${innerSize}px; height: ${innerSize}px;
                         border-radius: 50%;
                         background-color: ${color};
                         border: 2px solid white;
@@ -85,7 +163,7 @@ const updatePointsData = () => {
                         align-items: center;
                         justify-content: center;
                         color: white;
-                        font-size: 10px;
+                        font-size: ${fontSize}px;
                         font-weight: bold;
                         z-index: 10;
                         box-shadow: 0 1px 3px rgba(0,0,0,0.3);
@@ -94,9 +172,9 @@ const updatePointsData = () => {
                     </div>
                 </div>
             `,
-            iconSize: [40, 40],
-            iconAnchor: [20, 20],
-            popupAnchor: [0, -20]
+            iconSize: [outerSize, outerSize],
+            iconAnchor: [outerSize / 2, outerSize / 2],
+            popupAnchor: [0, -outerSize / 2]
         });
 
         // Add marker to layer
@@ -121,8 +199,17 @@ onMounted(() => {
     // Add markers layer
     markersLayer.addTo(map);
 
+    // Add barangays layer
+    barangaysGroup.addTo(map);
+
     // Initial data load
     updatePointsData();
+    processBarangays();
+
+    // Redraw markers when zoom changes to maintain scaling ratio
+    map.on('zoomend', () => {
+        updatePointsData();
+    });
 
     // Create custom Legend Control
     const LegendControl = L.Control.extend({

@@ -156,12 +156,38 @@ const pullData = () => {
     }
     processingWater.value = true;
 
-    const endpoint = page.props.auth.can.create
-      ? route("dashboard.pull-water-data")
-      : route("dashboard.refresh-water-data");
+    const endpoint = route("dashboard.pull-water-data");
 
     router.post(
       endpoint,
+      {},
+      {
+        preserveScroll: true,
+        preserveState: true,
+        only: ["latestData", "historyData"],
+        onFinish: () => {
+          processingWater.value = false;
+          resolve();
+        },
+        onError: () => {
+          processingWater.value = false;
+          resolve();
+        },
+      }
+    );
+  });
+};
+
+const refreshData = () => {
+  return new Promise<void>((resolve) => {
+    if (processingWater.value) {
+      resolve();
+      return;
+    }
+    processingWater.value = true;
+
+    router.post(
+      route("dashboard.refresh-water-data"),
       {},
       {
         preserveScroll: true,
@@ -188,9 +214,7 @@ const pullWeatherData = () => {
     }
     processingWeather.value = true;
 
-    const endpoint = page.props.auth.can.create
-      ? route("dashboard.pull-weather-data")
-      : route("dashboard.refresh-weather-data");
+    const endpoint = route("dashboard.pull-weather-data");
 
     router.post(
       endpoint,
@@ -212,16 +236,43 @@ const pullWeatherData = () => {
   });
 };
 
+const refreshWeatherData = () => {
+  return new Promise<void>((resolve) => {
+    if (processingWeather.value) {
+      resolve();
+      return;
+    }
+    processingWeather.value = true;
+
+    router.post(
+      route("dashboard.refresh-weather-data"),
+      {},
+      {
+        preserveScroll: true,
+        preserveState: true,
+        only: ["latestWeatherData", "historyWeatherData"],
+        onFinish: () => {
+          processingWeather.value = false;
+          resolve();
+        },
+        onError: () => {
+          processingWeather.value = false;
+          resolve();
+        },
+      }
+    );
+  });
+};
+
 onMounted(() => {
   interval = setInterval(async () => {
-    // If auto-pulling is enabled, triggers the actual data pull/refresh logic
-    // matching what the manual buttons do.
+    // If auto-pulling is enabled, triggers database refresh
     if (isAutoPulling.value) {
-      await pullData();
+      await refreshData();
     }
 
     if (isAutoWeatherPulling.value) {
-      await pullWeatherData();
+      await refreshWeatherData();
     }
   }, 300000); // 5 minutes
 });

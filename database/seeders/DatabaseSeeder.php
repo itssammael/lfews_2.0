@@ -28,5 +28,6 @@ class DatabaseSeeder extends Seeder
         ])->roles()->attach($adminRole);
         $this->call(FloodRiskSeeder::class);
         $this->call(ContourSeeder::class);
+        $this->call(BarangaySitioSeeder::class);
     }
 }

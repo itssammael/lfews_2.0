@@ -19,6 +19,7 @@ class LocatorController extends Controller
         $locations = Location::with('locationType')->whereHas('locationType')->get();
         $rivers = \App\Models\River::all();
         $floodRisks = \App\Models\FloodRisk::all();
+        $barangays = \App\Models\Barangay::all();
 
         return Inertia::render('LFEWS/Locator', [
             'weatherStations' => $weatherStations,
@@ -26,11 +27,17 @@ class LocatorController extends Controller
             'locations' => $locations,
             'rivers' => $rivers,
             'floodRisks' => $floodRisks,
+            'barangays' => $barangays,
         ]);
     }
 
-    public function apiContours()
+    public function apiContours(Request $request)
     {
-        return response()->json(\App\Models\Contour::all());
+        return response()->json(\App\Models\Contour::paginate(500));
+    }
+
+    public function apiSitios(Request $request)
+    {
+        return response()->json(\App\Models\Sitio::paginate(500));
     }
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, onMounted } from 'vue';
 import { Link } from "@inertiajs/vue3";
 import ResponsiveNavLink from "@/Components/ResponsiveNavLink.vue";
 import { useDashboardSettings } from '@/Composables/useDashboardSettings';
@@ -11,12 +11,26 @@ const props = defineProps({
 const emit = defineEmits(['closeMobile']);
 
 const showSidebar = ref(false);
-const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters, showTidalExtremes } = useDashboardSettings();
+const showGeoData = ref(false);
+const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters, showTidalExtremes, showBarangays, showSitios } = useDashboardSettings();
 
 // When mobile sidebar is shown, we might want to expand it or handle it specifically
 watch(() => props.showOnMobile, (val) => {
   if (val) showSidebar.value = false;
 });
+
+// Auto-expand Geo Data if any of its children are active
+onMounted(() => {
+    if (route().current('rivers.*') || route().current('hazard-map.*') || route().current('flood_risks.*') || route().current('barangays-sitios.*')) {
+        showGeoData.value = true;
+    }
+});
+
+// Close accordion when sidebar is collapsed
+watch(showSidebar, (val) => {
+    if (!val) showGeoData.value = false;
+});
+
 </script>
 
 <template>
@@ -117,38 +131,128 @@ watch(() => props.showOnMobile, (val) => {
              <span class="text-xs font-bold" :class="{'block': showSidebar, 'hidden': ! showSidebar}">Weather Stations</span>
         </div>
       </ResponsiveNavLink>
-      <ResponsiveNavLink
-        :href="route('rivers.index')"
-        :active="route().current('rivers.*')"
-        @click="$emit('closeMobile')"
-      >
-        <div class="flex items-center">
-             <img src="/images/river.png" alt="Rivers" class="w-8 h-8 mr-2" />
-             <span class="text-xs font-bold" :class="{'block': showSidebar, 'hidden': ! showSidebar}">Rivers</span>
-        </div>
-      </ResponsiveNavLink>
-      
-      <ResponsiveNavLink
-        :href="route('hazard-map.index')"
-        :active="route().current('hazard-map.*')"
-        @click="$emit('closeMobile')"
-      >
-        <div class="flex items-center">
-             <img src="/images/contour.png" alt="Contour Map" class="w-8 h-8 mr-2" />
-             <span class="text-xs font-bold" :class="{'block': showSidebar, 'hidden': ! showSidebar}">Contour Map</span>
-        </div>
-      </ResponsiveNavLink>
 
-      <ResponsiveNavLink
-        :href="route('flood_risks.index')"
-        :active="route().current('flood_risks.*')"
-        @click="$emit('closeMobile')"
-      >
-        <div class="flex items-center">
-             <img src="/images/flood.png" alt="Flood Hazard Map" class="w-8 h-8 mr-2" />
-             <span class="text-xs font-bold" :class="{'block': showSidebar, 'hidden': ! showSidebar}">Flood Hazard Map</span>
-        </div>
-      </ResponsiveNavLink>
+      <!-- Geo Data Accordion -->
+      <div v-if="showSidebar" class="space-y-1">
+        <button 
+          @click="showGeoData = !showGeoData"
+          class="w-full flex items-center justify-between px-4 py-3 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition duration-150 ease-in-out border-l-4 border-transparent"
+          :class="{'text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/50 border-indigo-400 dark:border-indigo-600': route().current('rivers.*') || route().current('hazard-map.*') || route().current('flood_risks.*') || route().current('barangays-sitios.*')}"
+        >
+          <div class="flex items-center">
+            <img src="/images/location.png" alt="Geo Data" class="w-8 h-8 mr-2" />
+            <span class="text-xs font-bold">Geo Data</span>
+          </div>
+          <svg 
+            class="size-4 transform transition-transform duration-200" 
+            :class="{'rotate-180': showGeoData}"
+            fill="none" 
+            viewBox="0 0 24 24" 
+            stroke="currentColor"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        <Transition
+          enter-active-class="transition duration-100 ease-out"
+          enter-from-class="transform scale-95 opacity-0"
+          enter-to-class="transform scale-100 opacity-100"
+          leave-active-class="transition duration-75 ease-in"
+          leave-from-class="transform scale-100 opacity-100"
+          leave-to-class="transform scale-95 opacity-0"
+        >
+          <div v-if="showGeoData" class="pl-4 space-y-1 bg-gray-50/50 dark:bg-gray-900/20 py-1">
+            <ResponsiveNavLink
+              :href="route('rivers.index')"
+              :active="route().current('rivers.*')"
+              @click="$emit('closeMobile')"
+            >
+              <div class="flex items-center">
+                   <img src="/images/river.png" alt="Rivers" class="w-8 h-8 mr-2" />
+                   <span class="text-[10px] font-bold">Rivers</span>
+              </div>
+            </ResponsiveNavLink>
+            
+            <ResponsiveNavLink
+              :href="route('hazard-map.index')"
+              :active="route().current('hazard-map.*')"
+              @click="$emit('closeMobile')"
+            >
+              <div class="flex items-center">
+                   <img src="/images/contour.png" alt="Contour Map" class="w-8 h-8 mr-2" />
+                   <span class="text-[10px] font-bold">Contour Map</span>
+              </div>
+            </ResponsiveNavLink>
+
+            <ResponsiveNavLink
+              :href="route('flood_risks.index')"
+              :active="route().current('flood_risks.*')"
+              @click="$emit('closeMobile')"
+            >
+              <div class="flex items-center">
+                   <img src="/images/flood.png" alt="Flood Hazard Map" class="w-8 h-8 mr-2" />
+                   <span class="text-[10px] font-bold">Flood Hazard Map</span>
+              </div>
+            </ResponsiveNavLink>
+
+            <ResponsiveNavLink
+              :href="route('barangays-sitios.index')"
+              :active="route().current('barangays-sitios.*')"
+              @click="$emit('closeMobile')"
+            >
+              <div class="flex items-center">
+                   <img src="/images/location.png" alt="Barangays & Sitios" class="w-8 h-8 mr-2" />
+                   <span class="text-[10px] font-bold">Barangays & Sitios</span>
+              </div>
+            </ResponsiveNavLink>
+          </div>
+        </Transition>
+      </div>
+
+      <!-- Fallback icons when sidebar is collapsed -->
+      <template v-else>
+        <ResponsiveNavLink
+          :href="route('rivers.index')"
+          :active="route().current('rivers.*')"
+          @click="$emit('closeMobile')"
+          title="Rivers"
+        >
+          <div class="flex items-center">
+               <img src="/images/river.png" alt="Rivers" class="w-8 h-8" />
+          </div>
+        </ResponsiveNavLink>
+        <ResponsiveNavLink
+          :href="route('hazard-map.index')"
+          :active="route().current('hazard-map.*')"
+          @click="$emit('closeMobile')"
+          title="Contour Map"
+        >
+          <div class="flex items-center">
+               <img src="/images/contour.png" alt="Contour Map" class="w-8 h-8" />
+          </div>
+        </ResponsiveNavLink>
+        <ResponsiveNavLink
+          :href="route('flood_risks.index')"
+          :active="route().current('flood_risks.*')"
+          @click="$emit('closeMobile')"
+          title="Flood Hazard Map"
+        >
+          <div class="flex items-center">
+               <img src="/images/flood.png" alt="Flood Hazard Map" class="w-8 h-8" />
+          </div>
+        </ResponsiveNavLink>
+        <ResponsiveNavLink
+          :href="route('barangays-sitios.index')"
+          :active="route().current('barangays-sitios.*')"
+          @click="$emit('closeMobile')"
+          title="Barangays & Sitios"
+        >
+          <div class="flex items-center">
+               <img src="/images/map.png" alt="Barangays & Sitios" class="w-8 h-8" />
+          </div>
+        </ResponsiveNavLink>
+      </template>
 
       <ResponsiveNavLink
         :href="route('lunar-tides')"
@@ -156,7 +260,7 @@ watch(() => props.showOnMobile, (val) => {
         @click="$emit('closeMobile')"
       >
         <div class="flex items-center">
-             <img src="/images/moon.png" alt="Lunar Tides" class="w-8 h-8 mr-2" />
+             <img src="/images/tide.png" alt="Lunar Tides" class="w-8 h-8 mr-2" />
              <span class="text-xs font-bold" :class="{'block': showSidebar, 'hidden': ! showSidebar}">Lunar Tides</span>
         </div>
       </ResponsiveNavLink>
@@ -247,6 +351,7 @@ watch(() => props.showOnMobile, (val) => {
                   <span :class="{'block': showSidebar, 'hidden': ! showSidebar}" class="text-xs font-medium text-gray-600 dark:text-gray-400">Tidal Extremes</span>
               </label>
           </div>
+
       </div>
     </div>
   </aside>

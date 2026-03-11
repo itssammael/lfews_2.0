@@ -7,7 +7,7 @@ use Inertia\Inertia;
 Route::get('/', [\App\Http\Controllers\PagesController::class, 'index'])->name('home');
 Route::get('/awards', [\App\Http\Controllers\PagesController::class, 'awards'])->name('awards');
 Route::get('/services', [\App\Http\Controllers\PagesController::class, 'services'])->name('services');
-Route::get('/heat-index-map', [\App\Http\Controllers\PagesController::class, 'heatIndexMap'])->name('heat-index-map');
+Route::get('/local-weather-map', [\App\Http\Controllers\PagesController::class, 'localWeatherMap'])->name('local-weather-map');
 
 Route::middleware([
     'auth:sanctum',
@@ -83,6 +83,8 @@ Route::middleware([
         ->middleware('can:can-read');
     Route::get('/locator/api/contours', [\App\Http\Controllers\LocatorController::class, 'apiContours'])->name('locator.api.contours')
         ->middleware('can:can-read');
+    Route::get('/locator/api/sitios', [\App\Http\Controllers\LocatorController::class, 'apiSitios'])->name('locator.api.sitios')
+        ->middleware('can:can-read');
 
     Route::get('/hazard-map', [\App\Http\Controllers\HazardMapController::class, 'index'])->name('hazard-map.index')
         ->middleware('can:can-read');
@@ -114,6 +116,11 @@ Route::middleware([
     Route::middleware('can:can-read')->group(function () {
         Route::resource('flood_risks', \App\Http\Controllers\FloodRiskController::class)->except(['index']);
     });
+
+    Route::get('/barangays-sitios', [\App\Http\Controllers\BarangaySitioController::class, 'index'])->name('barangays-sitios.index')
+        ->middleware('can:can-read');
+    Route::get('/barangays-sitios/api/geojson', [\App\Http\Controllers\BarangaySitioController::class, 'getGeoJson'])->name('barangays-sitios.api.geojson')
+        ->middleware('can:can-read');
 
     Route::get('/lunar-tides', [\App\Http\Controllers\TideController::class, 'index'])->name('lunar-tides')
         ->middleware('can:can-read');

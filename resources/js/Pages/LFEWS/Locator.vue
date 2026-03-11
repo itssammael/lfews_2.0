@@ -6,6 +6,7 @@ import L from 'leaflet';
 // @ts-ignore
 import Checkbox from '@/Components/Checkbox.vue';
 import axios from 'axios';
+import { useDashboardSettings } from "@/Composables/useDashboardSettings";
 
 import 'leaflet/dist/leaflet.css';
 import proj4 from 'proj4';
@@ -63,13 +64,23 @@ const props = defineProps<{
     rivers: any[];
     contours?: any[];
     floodRisks: any[];
+    barangays: any[];
+    sitios?: any[];
 }>();
 
 const localContours = ref<any[]>([]);
+const localSitios = ref<any[]>([]);
 
 const mapContainer = ref<HTMLElement | null>(null);
 const map = ref<any>(null);
+
+const { showBarangays, showSitios } = useDashboardSettings();
+
 const selectedCategories = ref<string[]>(['weather_stations', 'water_level_sensors', 'evacuation_centers', 'rivers']); // Default visible categories
+
+// Sync global settings to selectedCategories
+if (showBarangays.value && !selectedCategories.value.includes('barangays')) selectedCategories.value.push('barangays');
+if (showSitios.value && !selectedCategories.value.includes('sitios')) selectedCategories.value.push('sitios');
 
 // Contour loading state
 const isLoadingContours = ref(false);
@@ -83,6 +94,15 @@ const isLoadingFloodRisks = ref(false);
 const floodRiskLoadingProgress = ref(0);
 const isFloodRisksProcessed = ref(false);
 
+// Barangay & Sitio loading state
+const isLoadingBarangays = ref(false);
+const barangayLoadingProgress = ref(0);
+const isBarangaysProcessed = ref(false);
+
+const isLoadingSitios = ref(false);
+const sitioLoadingProgress = ref(0);
+const isSitiosProcessed = ref(false);
+
 // Layer Groups
 const weatherStationsGroup = L.layerGroup();
 const waterLevelSensorsGroup = L.layerGroup();
@@ -90,43 +110,26 @@ const evacuationCentersGroup = L.layerGroup();
 const riversGroup = L.layerGroup();
 const contoursGroup = L.layerGroup();
 const floodRiskGroup = L.layerGroup();
+const barangaysGroup = L.layerGroup();
+const sitiosGroup = L.layerGroup();
 
 const categories = [
     { id: 'weather_stations', label: 'Weather Stations' },
     { id: 'water_level_sensors', label: 'Water Level Sensors' },
-    { id: 'all_devices', label: 'All Devices' },
     { id: 'evacuation_centers', label: 'Evacuation Centers' },
-    { id: 'rivers', label: 'All Rivers in Bayawan City' },
+    { id: 'rivers', label: 'Rivers' },
     { id: 'contours', label: 'Contour lines' },
     { id: 'flood_risk', label: 'Flood Risk Map' },
+    { id: 'sitios', label: 'Sitios' },
+    { id: 'barangays', label: 'Barangays' },
 ];
 
 const toggleCategory = (id: string) => {
-    if (id === 'all_devices') {
-        const isAllDevicesSelected = selectedCategories.value.includes('weather_stations') && selectedCategories.value.includes('water_level_sensors');
-        if (isAllDevicesSelected) {
-            selectedCategories.value = selectedCategories.value.filter(item => item !== 'weather_stations' && item !== 'water_level_sensors' && item !== 'all_devices');
-        } else {
-            if (!selectedCategories.value.includes('weather_stations')) selectedCategories.value.push('weather_stations');
-            if (!selectedCategories.value.includes('water_level_sensors')) selectedCategories.value.push('water_level_sensors');
-            if (!selectedCategories.value.includes('all_devices')) selectedCategories.value.push('all_devices');
-        }
+    const index = selectedCategories.value.indexOf(id);
+    if (index > -1) {
+        selectedCategories.value.splice(index, 1);
     } else {
-        const index = selectedCategories.value.indexOf(id);
-        if (index > -1) {
-            selectedCategories.value.splice(index, 1);
-            if (id === 'weather_stations' || id === 'water_level_sensors') {
-                selectedCategories.value = selectedCategories.value.filter(item => item !== 'all_devices');
-            }
-        } else {
-            selectedCategories.value.push(id);
-            if (id === 'weather_stations' || id === 'water_level_sensors') {
-                 const hasBoth = selectedCategories.value.includes('weather_stations') && selectedCategories.value.includes('water_level_sensors');
-                 if (hasBoth && !selectedCategories.value.includes('all_devices')) {
-                     selectedCategories.value.push('all_devices');
-                 }
-            }
-        }
+        selectedCategories.value.push(id);
     }
 
     if (selectedCategories.value.includes('contours') && !isContoursProcessed.value) {
@@ -137,12 +140,61 @@ const toggleCategory = (id: string) => {
         processFloodRisks();
     }
 
+    if (selectedCategories.value.includes('barangays') && !isBarangaysProcessed.value && props.barangays?.length > 0) {
+        processBarangays();
+    }
+
+    if (selectedCategories.value.includes('sitios') && !isSitiosProcessed.value) {
+        processSitios();
+    }
+
     updateVisibleLayers();
 };
 
-watch(selectedCategories, () => {
+const transformGeometry = (geometry: any) => {
+    if (!geometry) return null;
+    
+    const transformCoords = (coords: any): any => {
+        if (typeof coords[0] === 'number') {
+            // [x, y] -> [lng, lat]
+            return proj4("EPSG:32651", "WGS84", coords);
+        }
+        return coords.map(transformCoords);
+    };
+
+    return {
+        ...geometry,
+        coordinates: transformCoords(geometry.coordinates)
+    };
+};
+
+// Sync local selectedCategories changes back to global showBarangays/showSitios
+watch(selectedCategories, (newCats) => {
+    showBarangays.value = newCats.includes('barangays');
+    showSitios.value = newCats.includes('sitios');
     updateVisibleLayers();
 }, { deep: true });
+
+// Sync global showBarangays/showSitios changes back to selectedCategories
+watch(showBarangays, (newVal) => {
+    const has = selectedCategories.value.includes('barangays');
+    if (newVal && !has) {
+        selectedCategories.value.push('barangays');
+        if (!isBarangaysProcessed.value && props.barangays?.length > 0) processBarangays();
+    } else if (!newVal && has) {
+        selectedCategories.value = selectedCategories.value.filter(c => c !== 'barangays');
+    }
+});
+
+watch(showSitios, (newVal) => {
+    const has = selectedCategories.value.includes('sitios');
+    if (newVal && !has) {
+        selectedCategories.value.push('sitios');
+        if (!isSitiosProcessed.value) processSitios();
+    } else if (!newVal && has) {
+        selectedCategories.value = selectedCategories.value.filter(c => c !== 'sitios');
+    }
+});
 
 const processContours = async () => {
     if (isLoadingContours.value || isContoursProcessed.value) return;
@@ -151,56 +203,71 @@ const processContours = async () => {
     contourLoadingProgress.value = 0;
     processedContoursCount.value = 0;
 
-    // Fetch data if not already loaded locally
     if (localContours.value.length === 0) {
         try {
-            // @ts-ignore
-            const response = await axios.get(route('locator.api.contours'));
-            localContours.value = response.data;
+            let page = 1;
+            let hasMorePages = true;
+
+            while (hasMorePages) {
+                // @ts-ignore
+                const response = await axios.get(route('locator.api.contours', { page }));
+                const payload = response.data;
+                
+                if (page === 1) {
+                    totalContours.value = payload.total;
+                }
+
+                const chunkData = payload.data;
+                localContours.value.push(...chunkData);
+
+                const features = chunkData.map((contour: any) => ({
+                    type: "Feature",
+                    properties: contour.properties,
+                    geometry: contour.geometry
+                }));
+
+                const chunkSize = 50;
+                for (let i = 0; i < features.length; i += chunkSize) {
+                    const chunk = features.slice(i, i + chunkSize);
+                    
+                    L.geoJSON({ type: "FeatureCollection", features: chunk } as any, {
+                        style: (feature) => getContourStyle(feature),
+                        coordsToLatLng: (coords) => L.latLng(coords[1], coords[0]),
+                        onEachFeature: (feature, layer) => {
+                            if (feature.properties) {
+                                const style = getContourStyle(feature);
+                                const label = `<b>${feature.properties.name || 'Contour'}</b><br/>Height: ${style.height}m<br/><b>${style.riskLevel}</b>`;
+                                layer.bindTooltip(label, {
+                                    sticky: true,
+                                    className: 'contour-label'
+                                });
+                            }
+                        }
+                    }).addTo(contoursGroup);
+
+                    processedContoursCount.value += chunk.length;
+                    contourLoadingProgress.value = Math.min(100, Math.round((processedContoursCount.value / totalContours.value) * 100));
+                    
+                    // Yield to browser for UI updates
+                    await new Promise(resolve => setTimeout(resolve, 10));
+                }
+
+                if (page >= payload.last_page) {
+                    hasMorePages = false;
+                } else {
+                    page++;
+                }
+            }
+            
+            isContoursProcessed.value = true;
+            isLoadingContours.value = false;
+            updateVisibleLayers();
         } catch (error) {
             console.error('Failed to load contours:', error);
             isLoadingContours.value = false;
             return;
         }
     }
-
-    totalContours.value = localContours.value.length;
-
-    const chunkSize = 50;
-    const features = localContours.value.map(contour => ({
-        type: "Feature",
-        properties: contour.properties,
-        geometry: contour.geometry
-    }));
-
-    for (let i = 0; i < features.length; i += chunkSize) {
-        const chunk = features.slice(i, i + chunkSize);
-        
-        L.geoJSON({ type: "FeatureCollection", features: chunk } as any, {
-            style: (feature) => getContourStyle(feature),
-            coordsToLatLng: (coords) => L.latLng(coords[1], coords[0]),
-            onEachFeature: (feature, layer) => {
-                if (feature.properties) {
-                    const style = getContourStyle(feature);
-                    const label = `<b>${feature.properties.name || 'Contour'}</b><br/>Height: ${style.height}m<br/><b>${style.riskLevel}</b>`;
-                    layer.bindTooltip(label, {
-                        sticky: true,
-                        className: 'contour-label'
-                    });
-                }
-            }
-        }).addTo(contoursGroup);
-
-        processedContoursCount.value += chunk.length;
-        contourLoadingProgress.value = Math.min(100, Math.round((processedContoursCount.value / totalContours.value) * 100));
-        
-        // Yield to browser for UI updates
-        await new Promise(resolve => setTimeout(resolve, 10));
-    }
-
-    isContoursProcessed.value = true;
-    isLoadingContours.value = false;
-    updateVisibleLayers();
 };
 
 const processFloodRisks = async () => {
@@ -244,6 +311,131 @@ const processFloodRisks = async () => {
     isFloodRisksProcessed.value = true;
     isLoadingFloodRisks.value = false;
     updateVisibleLayers();
+};
+
+const processBarangays = async () => {
+    if (isLoadingBarangays.value || isBarangaysProcessed.value) return;
+    
+    isLoadingBarangays.value = true;
+    barangayLoadingProgress.value = 0;
+    const total = props.barangays.length;
+    let processed = 0;
+
+    const chunkSize = 20;
+    const features = props.barangays.map(b => ({
+        type: "Feature",
+        properties: { ...b.properties, db_name: b.name },
+        geometry: transformGeometry(b.geometry)
+    }));
+
+    for (let i = 0; i < features.length; i += chunkSize) {
+        const chunk = features.slice(i, i + chunkSize);
+        
+        L.geoJSON({ type: "FeatureCollection", features: chunk } as any, {
+            style: {
+                color: '#f97316', // Orange-500
+                weight: 2,
+                opacity: 0.8,
+                fillOpacity: 0.1
+            },
+            coordsToLatLng: (coords) => L.latLng(coords[1], coords[0]),
+            onEachFeature: (feature, layer) => {
+                if (feature.properties) {
+                    const label = `<b style="text-transform: capitalize;">${feature.properties.db_name || feature.properties.barangay || feature.properties.Bgy_Name || feature.properties.name || 'Unknown'}</b>`;
+                    layer.bindTooltip(label, {
+                        sticky: true,
+                        className: 'map-tooltip'
+                    });
+                }
+            }
+        }).addTo(barangaysGroup);
+
+        processed += chunk.length;
+        barangayLoadingProgress.value = Math.min(100, Math.round((processed / total) * 100));
+        await new Promise(resolve => setTimeout(resolve, 10));
+    }
+
+    isBarangaysProcessed.value = true;
+    isLoadingBarangays.value = false;
+    updateVisibleLayers();
+};
+
+const processSitios = async () => {
+    if (isLoadingSitios.value || isSitiosProcessed.value) return;
+    
+    isLoadingSitios.value = true;
+    sitioLoadingProgress.value = 0;
+    
+    let processed = 0;
+    let total = 0;
+
+    if (localSitios.value.length === 0) {
+        try {
+            let page = 1;
+            let hasMorePages = true;
+
+            while (hasMorePages) {
+                // @ts-ignore
+                const response = await axios.get(route('locator.api.sitios', { page }));
+                const payload = response.data;
+                
+                if (page === 1) {
+                    total = payload.total;
+                }
+
+                const chunkData = payload.data;
+                localSitios.value.push(...chunkData);
+
+                const chunkSize = 50;
+                const features = chunkData.map((s: any) => ({
+                    type: "Feature",
+                    properties: { ...s.properties, db_name: s.name },
+                    geometry: transformGeometry(s.geometry)
+                }));
+
+                for (let i = 0; i < features.length; i += chunkSize) {
+                    const chunk = features.slice(i, i + chunkSize);
+                    
+                    L.geoJSON({ type: "FeatureCollection", features: chunk } as any, {
+                        style: {
+                            color: '#06b6d4', // Cyan-500
+                            weight: 1,
+                            opacity: 0.6,
+                            fillOpacity: 0.2
+                        },
+                        coordsToLatLng: (coords) => L.latLng(coords[1], coords[0]),
+                        onEachFeature: (feature, layer) => {
+                            if (feature.properties) {
+                                const label = `<b>Sitio: ${feature.properties.db_name || feature.properties.sitioname || feature.properties.Sitio_Name || feature.properties.name || 'Unknown'}</b><br/>Barangay: ${feature.properties.barangayname || feature.properties.Bgy_Name || 'Unknown'}`;
+                                layer.bindTooltip(label, {
+                                    sticky: true,
+                                    className: 'map-tooltip'
+                                });
+                            }
+                        }
+                    }).addTo(sitiosGroup);
+
+                    processed += chunk.length;
+                    sitioLoadingProgress.value = Math.min(100, Math.round((processed / total) * 100));
+                    await new Promise(resolve => setTimeout(resolve, 10));
+                }
+
+                if (page >= payload.last_page) {
+                    hasMorePages = false;
+                } else {
+                    page++;
+                }
+            }
+
+            isSitiosProcessed.value = true;
+            isLoadingSitios.value = false;
+            updateVisibleLayers();
+        } catch (error) {
+            console.error('Failed to load sitios:', error);
+            isLoadingSitios.value = false;
+            return;
+        }
+    }
 };
 
 const getFloodRiskStyle = (feature: any) => {
@@ -342,6 +534,20 @@ const updateVisibleLayers = () => {
     } else {
         contoursGroup.removeFrom(map.value);
     }
+
+    // barangays
+    if (selectedCategories.value.includes('barangays')) {
+        barangaysGroup.addTo(map.value);
+    } else {
+        barangaysGroup.removeFrom(map.value);
+    }
+
+    // sitios
+    if (selectedCategories.value.includes('sitios')) {
+        sitiosGroup.addTo(map.value);
+    } else {
+        sitiosGroup.removeFrom(map.value);
+    }
 };
 
 onMounted(() => {
@@ -381,11 +587,15 @@ onMounted(() => {
                         <div class="mt-2 space-y-1">
                             <div class="flex justify-between gap-4">
                                 <span class="text-gray-500">Temperature:</span>
-                                <span class="font-bold">${latest.temperature}°C</span>
+                                <span class="font-bold">${Number(latest.temperature).toFixed(2)}°C</span>
                             </div>
                             <div class="flex justify-between gap-4">
-                                <span class="text-gray-500">Rain Rate:</span>
-                                <span class="font-bold">${latest.precipitation_rate} mm/hr</span>
+                                <span class="text-gray-500">Heat Index:</span>
+                                <span class="font-bold">${Number(latest.heat_index).toFixed(2)}°C</span>
+                            </div>
+                            <div class="flex justify-between gap-4">
+                                <span class="text-gray-500">Rain Total:</span>
+                                <span class="font-bold">${Number(latest.precipitation_total).toFixed(2)} mm</span>
                             </div>
                             <div class="text-[10px] text-gray-400 mt-1">As of: ${latest.date_time}</div>
                         </div>
@@ -510,11 +720,9 @@ onMounted(() => {
                     fillOpacity: 0.3
                 },
                 coordsToLatLng: (coords) => {
-                    // Convert UTM Zone 51N (EPSG:32651) to WGS84 (EPSG:4326)
-                    // Proj4 takes [x, y] and returns [lng, lat]
+                    // Coordinates in BayawanRivers.json are already in WGS84 [lng, lat]
                     // Leaflet expects L.latLng(lat, lng)
-                    const [lng, lat] = proj4('EPSG:32651', 'EPSG:4326', coords as [number, number]);
-                    return L.latLng(lat, lng);
+                    return L.latLng(coords[1], coords[0]);
                 },
                 onEachFeature: (feature, layer) => {
                     if (feature.properties && feature.properties.seg_name) {
@@ -530,9 +738,9 @@ onMounted(() => {
         }
 
 
-        if (selectedCategories.value.includes('contours')) {
-            if (!isContoursProcessed.value) {
-                 processContours();
+        if (selectedCategories.value.includes('barangays')) {
+            if (!isBarangaysProcessed.value && props.barangays?.length > 0) {
+                 processBarangays();
             }
         }
 
@@ -583,6 +791,42 @@ onMounted(() => {
                     </div>
                 </div>
             </div>
+
+            <!-- Barangay Loading -->
+            <div v-if="isLoadingBarangays" class="fixed inset-0 z-[9999] flex items-center justify-center bg-gray-900/50 backdrop-blur-sm">
+                <div class="bg-white dark:bg-gray-800 rounded-[2rem] p-8 shadow-2xl w-full max-w-md mx-4 transform transition-all">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Loading Barangays</h2>
+                            <p class="text-gray-500 dark:text-gray-400 text-sm">Processing Geographic Data</p>
+                        </div>
+                        <div class="text-3xl font-bold text-orange-500">
+                            {{ barangayLoadingProgress }}%
+                        </div>
+                    </div>
+                    <div class="w-full bg-gray-100 dark:bg-gray-700 h-4 rounded-full overflow-hidden mb-8 relative">
+                        <div class="h-full bg-orange-500 transition-all duration-300 ease-out" :style="{ width: barangayLoadingProgress + '%' }"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sitio Loading -->
+            <div v-if="isLoadingSitios" class="fixed inset-0 z-[9999] flex items-center justify-center bg-gray-900/50 backdrop-blur-sm">
+                <div class="bg-white dark:bg-gray-800 rounded-[2rem] p-8 shadow-2xl w-full max-w-md mx-4 transform transition-all">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Loading Sitios</h2>
+                            <p class="text-gray-500 dark:text-gray-400 text-sm">Processing Geographic Data</p>
+                        </div>
+                        <div class="text-3xl font-bold text-orange-500">
+                            {{ sitioLoadingProgress }}%
+                        </div>
+                    </div>
+                    <div class="w-full bg-gray-100 dark:bg-gray-700 h-4 rounded-full overflow-hidden mb-8 relative">
+                        <div class="h-full bg-orange-500 transition-all duration-300 ease-out" :style="{ width: sitioLoadingProgress + '%' }"></div>
+                    </div>
+                </div>
+            </div>
         </Teleport>
 
         <div class="h-[calc(100vh-82px)] overflow-hidden">
@@ -608,6 +852,8 @@ onMounted(() => {
                                     <Checkbox 
                                         :id="category.id"
                                         :value="category.id"
+                                        :disabled="category.id === 'barangays'"
+                                        :class="category.id === 'barangays' ? 'opacity-50 cursor-not-allowed' : ''"
                                         :checked="selectedCategories.includes(category.id)"
                                         @update:checked="toggleCategory(category.id)"
                                     />

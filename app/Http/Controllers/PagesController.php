@@ -23,7 +23,7 @@ class PagesController extends Controller
         return Inertia::render('Guest/Services');
     }
 
-    public function heatIndexMap()
+    public function localWeatherMap()
     {
         $stations = \App\Models\WeatherStation::with('location')->get();
         
@@ -48,9 +48,12 @@ class PagesController extends Controller
             }
         }
 
-        return Inertia::render('Guest/HeatIndexMap', [
+        $barangays = \App\Models\Barangay::all();
+        
+        return Inertia::render('Guest/LocalWeatherMap', [
             'stations' => $stations,
             'latestWeatherData' => $latestWeatherData,
+            'barangays' => $barangays,
         ]);
     }
 

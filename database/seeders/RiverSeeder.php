@@ -14,6 +14,7 @@ class RiverSeeder extends Seeder
      */
     public function run(): void
     {
+        River::truncate();
         $jsonPath = resource_path('js/Geojson/BayawanRivers.json'); // Adjust path
         
         if (!File::exists($jsonPath)) {

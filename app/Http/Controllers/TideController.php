@@ -34,49 +34,53 @@ class TideController extends Controller
         $lon = 122.8055;
         $key = '050aba25-4e85-42f0-a856-cba4dab9822a';
 
-        // Fetch extremes (High/Low) AND heights
-        $response = Http::get("https://www.worldtides.info/api/v3", [
-            'extremes' => '',
-            'heights' => '',
-            'lat' => $lat,
-            'lon' => $lon,
-            'key' => $key,
-            'days' => 7,
-        ]);
+        try {
+            // Fetch extremes (High/Low) AND heights
+            $response = Http::timeout(30)->withoutVerifying()->get("https://www.worldtides.info/api/v3", [
+                'extremes' => '',
+                'heights' => '',
+                'lat' => $lat,
+                'lon' => $lon,
+                'key' => $key,
+                'days' => 7,
+            ]);
 
-        if ($response->successful()) {
-            $data = $response->json();
-            $station = $data['station'] ?? 'Nearest Station';
+            if ($response->successful()) {
+                $data = $response->json();
+                $station = $data['station'] ?? 'Nearest Station';
 
-            if (isset($data['extremes'])) {
-                foreach ($data['extremes'] as $extreme) {
-                    Tide::updateOrCreate(
-                        ['dt' => $extreme['dt']],
-                        [
-                            'date' => $extreme['date'],
-                            'height' => $extreme['height'],
-                            'type' => $extreme['type'],
-                            'latitude' => $lat,
-                            'longitude' => $lon,
-                            'station' => $station,
-                        ]
-                    );
+                if (isset($data['extremes'])) {
+                    foreach ($data['extremes'] as $extreme) {
+                        Tide::updateOrCreate(
+                            ['dt' => $extreme['dt']],
+                            [
+                                'date' => $extreme['date'],
+                                'height' => $extreme['height'],
+                                'type' => $extreme['type'],
+                                'latitude' => $lat,
+                                'longitude' => $lon,
+                                'station' => $station,
+                            ]
+                        );
+                    }
+                }
+
+                if (isset($data['heights'])) {
+                    foreach ($data['heights'] as $height) {
+                        \App\Models\TideHeight::updateOrCreate(
+                            ['dt' => $height['dt']],
+                            [
+                                'date' => $height['date'],
+                                'height' => $height['height'],
+                                'latitude' => $lat,
+                                'longitude' => $lon,
+                            ]
+                        );
+                    }
                 }
             }
-
-            if (isset($data['heights'])) {
-                foreach ($data['heights'] as $height) {
-                    \App\Models\TideHeight::updateOrCreate(
-                        ['dt' => $height['dt']],
-                        [
-                            'date' => $height['date'],
-                            'height' => $height['height'],
-                            'latitude' => $lat,
-                            'longitude' => $lon,
-                        ]
-                    );
-                }
-            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Tide Sync Failed: " . $e->getMessage());
         }
 
         return redirect()->back();
