@@ -138,4 +138,12 @@ Route::middleware([
     Route::get('/update-geo-data', [\App\Http\Controllers\PagesController::class, 'updateGeoData'])
         ->name('update-geo-data')
         ->middleware('can:can-read');
+
+    Route::get('/api/geo-data/{type}', [\App\Http\Controllers\GeoDataController::class, 'fetchCurrentData'])
+        ->name('api.geo-data.fetch')
+        ->middleware('can:can-read');
+
+    Route::post('/api/geo-data/update', [\App\Http\Controllers\GeoDataController::class, 'update'])
+        ->name('api.geo-data.update')
+        ->middleware('can:can-create');
 });

@@ -7,6 +7,7 @@ import L from 'leaflet';
 import Checkbox from '@/Components/Checkbox.vue';
 import axios from 'axios';
 import { useDashboardSettings } from "@/Composables/useDashboardSettings";
+import ProgressLoader from '@/Components/ProgressLoader.vue';
 
 import 'leaflet/dist/leaflet.css';
 import proj4 from 'proj4';
@@ -755,79 +756,26 @@ onMounted(() => {
 
 <template>
     <AppLayout title="Locator">
-        <Teleport to="body">
-            <div v-if="isLoadingContours" class="fixed inset-0 z-[9999] flex items-center justify-center bg-gray-900/50 backdrop-blur-sm">
-                <div class="bg-white dark:bg-gray-800 rounded-[2rem] p-8 shadow-2xl w-full max-w-md mx-4 transform transition-all">
-                    <div class="flex justify-between items-start mb-2">
-                        <div>
-                            <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Loading Map Data</h2>
-                            <p class="text-gray-500 dark:text-gray-400 text-sm">Plotting Coordinates</p>
-                        </div>
-                        <div class="text-3xl font-bold text-orange-500">
-                            {{ contourLoadingProgress }}%
-                        </div>
-                    </div>
+        <ProgressLoader 
+            :show="isLoadingContours" 
+            title="Loading Map Data" 
+            subtitle="Plotting Coordinates"
+            :progress="contourLoadingProgress" 
+        />
 
-                    <!-- Progress Bar Container -->
-                    <div class="w-full bg-gray-100 dark:bg-gray-700 h-4 rounded-full overflow-hidden mb-8 relative">
-                        <!-- Orange Progress Fill -->
-                        <div 
-                            class="h-full bg-orange-500 transition-all duration-300 ease-out" 
-                            :style="{ width: contourLoadingProgress + '%' }"
-                        ></div>
-                        <!-- Progress Knob/Circle -->
-                        <div 
-                            class="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-orange-500 border-2 border-white rounded-full transition-all duration-300 ease-out"
-                            :style="{ left: `calc(${contourLoadingProgress}% - 8px)` }"
-                        ></div>
-                    </div>
+        <ProgressLoader 
+            :show="isLoadingBarangays" 
+            title="Loading Barangays" 
+            subtitle="Processing Geographic Data"
+            :progress="barangayLoadingProgress" 
+        />
 
-                    <div class="flex items-center justify-center gap-3 text-gray-400 dark:text-gray-500">
-                        <svg class="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <span class="text-xs font-bold tracking-widest uppercase">PLEASE WAIT...</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Barangay Loading -->
-            <div v-if="isLoadingBarangays" class="fixed inset-0 z-[9999] flex items-center justify-center bg-gray-900/50 backdrop-blur-sm">
-                <div class="bg-white dark:bg-gray-800 rounded-[2rem] p-8 shadow-2xl w-full max-w-md mx-4 transform transition-all">
-                    <div class="flex justify-between items-start mb-2">
-                        <div>
-                            <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Loading Barangays</h2>
-                            <p class="text-gray-500 dark:text-gray-400 text-sm">Processing Geographic Data</p>
-                        </div>
-                        <div class="text-3xl font-bold text-orange-500">
-                            {{ barangayLoadingProgress }}%
-                        </div>
-                    </div>
-                    <div class="w-full bg-gray-100 dark:bg-gray-700 h-4 rounded-full overflow-hidden mb-8 relative">
-                        <div class="h-full bg-orange-500 transition-all duration-300 ease-out" :style="{ width: barangayLoadingProgress + '%' }"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Sitio Loading -->
-            <div v-if="isLoadingSitios" class="fixed inset-0 z-[9999] flex items-center justify-center bg-gray-900/50 backdrop-blur-sm">
-                <div class="bg-white dark:bg-gray-800 rounded-[2rem] p-8 shadow-2xl w-full max-w-md mx-4 transform transition-all">
-                    <div class="flex justify-between items-start mb-2">
-                        <div>
-                            <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Loading Sitios</h2>
-                            <p class="text-gray-500 dark:text-gray-400 text-sm">Processing Geographic Data</p>
-                        </div>
-                        <div class="text-3xl font-bold text-orange-500">
-                            {{ sitioLoadingProgress }}%
-                        </div>
-                    </div>
-                    <div class="w-full bg-gray-100 dark:bg-gray-700 h-4 rounded-full overflow-hidden mb-8 relative">
-                        <div class="h-full bg-orange-500 transition-all duration-300 ease-out" :style="{ width: sitioLoadingProgress + '%' }"></div>
-                    </div>
-                </div>
-            </div>
-        </Teleport>
+        <ProgressLoader 
+            :show="isLoadingSitios" 
+            title="Loading Sitios" 
+            subtitle="Processing Geographic Data"
+            :progress="sitioLoadingProgress" 
+        />
 
         <div class="h-[calc(100vh-82px)] overflow-hidden">
             <div class="h-full w-full">
