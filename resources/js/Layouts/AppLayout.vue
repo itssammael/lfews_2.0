@@ -188,7 +188,7 @@ const currentDate = new Date().toLocaleDateString('en-US', {
                             </div>
 
                             <!-- Hamburger -->
-                            <div class="-me-2 flex items-center sm:hidden">
+                            <div class="-me-2 flex items-center lg:hidden">
                                 <button class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-900 focus:outline-none focus:bg-gray-100 dark:focus:bg-gray-900 focus:text-gray-500 dark:focus:text-gray-400 transition duration-150 ease-in-out" @click="showingNavigationDropdown = ! showingNavigationDropdown">
                                     <svg class="size-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
                                         <path :class="{'hidden': showingNavigationDropdown, 'inline-flex': ! showingNavigationDropdown }" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
@@ -200,7 +200,7 @@ const currentDate = new Date().toLocaleDateString('en-US', {
                     </div>
 
                     <!-- Responsive Navigation Menu -->
-                    <div :class="{'block': showingNavigationDropdown, 'hidden': ! showingNavigationDropdown}" class="sm:hidden max-h-[calc(100vh-3.6rem)] overflow-y-auto pb-10">
+                    <div :class="{'block': showingNavigationDropdown, 'hidden': ! showingNavigationDropdown}" class="lg:hidden max-h-[calc(100vh-3.6rem)] overflow-y-auto pb-10">
                         <div class="pt-2 pb-3 space-y-1">
                             <ResponsiveNavLink :href="route('dashboard')" :active="route().current('dashboard')">
                                 Dashboard
@@ -219,6 +219,21 @@ const currentDate = new Date().toLocaleDateString('en-US', {
                             </ResponsiveNavLink>
                             <ResponsiveNavLink :href="route('rivers.index')" :active="route().current('rivers.*')">
                                 Rivers
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('hazard-map.index')" :active="route().current('hazard-map.*')">
+                                Contour Map
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('flood_risks.index')" :active="route().current('flood_risks.*')">
+                                Flood Hazard Map
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('barangays-sitios.index')" :active="route().current('barangays-sitios.*')">
+                                Barangays & Sitios
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('update-geo-data')" :active="route().current('update-geo-data')">
+                                Update Geo Data
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink :href="route('lunar-tides')" :active="route().current('lunar-tides')">
+                                Lunar Tides
                             </ResponsiveNavLink>
                             <ResponsiveNavLink :href="route('evacuation-center.index')" :active="route().current('evacuation-center.*')">
                                 Evacuation Center
