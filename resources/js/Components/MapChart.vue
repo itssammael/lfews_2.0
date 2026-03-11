@@ -107,10 +107,10 @@ const updatePointsData = () => {
     const currentZoom = map.getZoom();
     const zoomScale = Math.max(1, Math.pow(1.3, currentZoom - baseZoom));
 
-    // Base sizes (+30% from original 40/24/10)
-    const baseOuter = 52;
-    const baseInner = 31;
-    const baseFont = 13;
+    // Base sizes
+    const baseOuter = 58;
+    const baseInner = 38;
+    const baseFont = 12;
 
     const outerSize = Math.round(baseOuter * zoomScale);
     const innerSize = Math.round(baseInner * zoomScale);
@@ -165,10 +165,11 @@ const updatePointsData = () => {
                         color: white;
                         font-size: ${fontSize}px;
                         font-weight: bold;
+                        letter-spacing: -0.5px;
                         z-index: 10;
                         box-shadow: 0 1px 3px rgba(0,0,0,0.3);
                     ">
-                        ${heatIndex.toFixed(1)}
+                        ${heatIndex.toFixed(1)}°
                     </div>
                 </div>
             `,
