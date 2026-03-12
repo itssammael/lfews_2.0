@@ -85,6 +85,12 @@ const props = defineProps<{
     date: string;
     height: number;
   }>;
+  hiSettings?: Array<{
+    color: string;
+    advice: string;
+    label: string;
+    temprange: string;
+  }>;
 }>();
 
 const page = usePage();
@@ -309,6 +315,37 @@ const isWeatherAlertDismissed = (stationId: number) => {
   return dismissedWeatherAlerts.value[stationId] === true;
 };
 
+const getHeatIndexAlertInfo = (heatIndex: any) => {
+  const val = Number(heatIndex);
+  if (!props.hiSettings || props.hiSettings.length === 0) return null;
+
+  for (const setting of [...props.hiSettings].reverse()) {
+    const range = setting.temprange;
+    try {
+      if (range.includes('>=')) {
+        const threshold = parseFloat(range.replace(/>=/g, '').trim());
+        if (val >= threshold) return setting;
+      } else if (range.includes('<=')) {
+        const threshold = parseFloat(range.replace(/<=/g, '').trim());
+        if (val <= threshold) return setting;
+      } else if (range.includes('>')) {
+        const threshold = parseFloat(range.replace(/>/g, '').trim());
+        if (val > threshold) return setting;
+      } else if (range.includes('<')) {
+        const threshold = parseFloat(range.replace(/</g, '').trim());
+        if (val < threshold) return setting;
+      } else if (range.includes('-')) {
+        const parts = range.split('-').map(p => parseFloat(p.trim()));
+        if (val >= parts[0] && val <= parts[1]) return setting;
+      }
+    } catch (e) {
+      console.error("Error parsing range:", range, e);
+    }
+  }
+  return null;
+};
+
+
 const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters, showTidalExtremes } =
   useDashboardSettings();
 </script>
@@ -477,15 +514,15 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters, showT
                         getAlertLevel(sensor, modbusResult[sensor.id].data)
                       )
                     "
-                    class="absolute inset-x-2 top-2 z-10 rounded-lg shadow-2xl p-4 flex flex-col border-2"
+                    class="absolute w-fit left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 z-10 rounded-[1.5rem] shadow-2xl p-4 flex flex-col border-2 animate-pulse"
                     :class="{
-                      'bg-yellow-500 border-yellow-400 text-black':
+                      'bg-yellow-400 border-yellow-300 text-black shadow-yellow-400/40':
                         getAlertLevel(sensor, modbusResult[sensor.id].data) ===
                         2,
-                      'bg-orange-500 border-orange-400 text-white':
+                      'bg-orange-500 border-orange-400 text-white shadow-orange-500/40':
                         getAlertLevel(sensor, modbusResult[sensor.id].data) ===
                         3,
-                      'bg-red-600 border-red-500 text-white':
+                      'bg-red-600 border-red-500 text-white shadow-red-600/40':
                         getAlertLevel(sensor, modbusResult[sensor.id].data) ===
                         4,
                     }"
@@ -736,10 +773,16 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters, showT
                   <div
                     v-if="
                       weatherResult[station.id].success &&
-                      Number(weatherResult[station.id].data?.heat_index) >= 39 &&
+                      getHeatIndexAlertInfo(weatherResult[station.id].data?.heat_index) &&
                       !isWeatherAlertDismissed(station.id)
                     "
-                    class="absolute inset-x-2 top-2 z-10 rounded-[1.5rem] shadow-2xl p-4 flex flex-col border-2 bg-red-600 border-red-500 text-white"
+                    class="absolute w-fit left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 z-10 rounded-[1.5rem] shadow-2xl p-4 flex flex-col border-2 animate-pulse text-center"
+                    :style="{
+                        backgroundColor: getHeatIndexAlertInfo(weatherResult[station.id].data?.heat_index)?.color,
+                        borderColor: getHeatIndexAlertInfo(weatherResult[station.id].data?.heat_index)?.color,
+                        boxShadow: `0 10px 15px -3px ${getHeatIndexAlertInfo(weatherResult[station.id].data?.heat_index)?.color}66, 0 4px 6px -2px ${getHeatIndexAlertInfo(weatherResult[station.id].data?.heat_index)?.color}66`,
+                        color: ['Normal', 'Caution'].includes(getHeatIndexAlertInfo(weatherResult[station.id].data?.heat_index)?.label || '') ? 'black' : 'white'
+                    }"
                   >
                     <div class="flex items-start justify-between">
                       <div class="flex items-center space-x-2">
@@ -757,7 +800,7 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters, showT
                         <h5
                           class="text-xl font-black uppercase tracking-tighter italic"
                         >
-                          DANGER
+                          {{ getHeatIndexAlertInfo(weatherResult[station.id].data?.heat_index)?.label }}
                         </h5>
                       </div>
                       <button
@@ -781,9 +824,9 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters, showT
                     </div>
 
                     <div class="mt-2 text-sm font-bold leading-tight uppercase">
-                      <p>EXTREME HEAT ALERT.</p>
+                      <p>{{ getHeatIndexAlertInfo(weatherResult[station.id].data?.heat_index)?.advice }}</p>
                       <p class="mt-1">
-                        Heat index is {{ Number(weatherResult[station.id].data.heat_index).toFixed(1) }}°C. Take necessary precautions.
+                        Heat index is {{ Number(weatherResult[station.id].data?.heat_index).toFixed(1) }}°C. Take necessary precautions.
                       </p>
                     </div>
                   </div>

@@ -28,6 +28,12 @@ const props = defineProps<{
     }
   > | null;
   barangays?: any[];
+  hiSettings: Array<{
+    color: string;
+    advice: string;
+    label: string;
+    temprange: string;
+  }>;
 }>();
 
 const page = usePage();
@@ -43,6 +49,8 @@ const weatherResult = computed(() => {
 
   return data;
 });
+
+const viewMode = ref<'heat_index' | 'full'>('heat_index');
 
 const REFRESH_INTERVAL_SECONDS = 300; // 5 minutes
 const countdownRemaining = ref(REFRESH_INTERVAL_SECONDS);
@@ -78,13 +86,36 @@ onUnmounted(() => {
     <Head title="Local Weather Map" />
     <div class="w-full h-screen p-2 relative bg-gray-50 dark:bg-gray-900 flex justify-center items-center">
         <!-- Countdown overlay -->
-        <div class="absolute top-4 right-4 z-[1000] bg-white dark:bg-gray-800 bg-opacity-90 dark:bg-opacity-90 px-4 py-2 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 pointer-events-none">
+        <div class="absolute bottom-4 right-4 z-[1000] bg-white dark:bg-gray-800 bg-opacity-90 dark:bg-opacity-90 px-4 py-2 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 pointer-events-none">
             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Refreshing data in {{ countdownRemaining }} seconds
+                Refreshing in {{ countdownRemaining }}s
             </span>
         </div>
         
-        <MapChart :stations="stations || []" :weatherData="weatherResult" :barangays="barangays || []" heightClass="h-full" />
+        <div class="absolute bottom-[180px] left-3 z-[1001] flex flex-col bg-[#FFFFFF] p-1 rounded-md shadow-lg border border-gray-500">
+            <button 
+                @click="viewMode = 'heat_index'"
+                title="Heat Index View"
+                class="p-2 transition-all duration-200 border-b border-black/20"
+                :class="viewMode === 'heat_index' ? 'bg-black/40 shadow-inner rounded-md' : 'hover:bg-gray-500'"
+            >
+                <div class="relative w-10 h-10 flex items-center justify-center  rounded-sm overflow-hidden p-1">
+                   <img src="/images/hot.png" alt="Sun" class="w-10">
+                </div>
+            </button>
+            <button 
+                @click="viewMode = 'full'"
+                title="Full Weather View"
+                class="p-2 transition-all duration-200"
+                :class="viewMode === 'full' ? 'bg-black/40 shadow-inner rounded-md' : 'hover:bg-gray-500'"
+            >
+                <div class="relative w-10 h-10 flex items-center justify-center  rounded-sm overflow-hidden p-1">
+                   <img src="/images/meteorology.png" alt="Sun" class="w-10 ">
+                </div>
+            </button>
+        </div>
+        
+        <MapChart :stations="stations || []" :weatherData="weatherResult" :barangays="barangays || []" :hiSettings="hiSettings" :viewMode="viewMode" heightClass="h-full" />
     </div>
   </LocalWeatherMapLayout>
 </template>

@@ -20,9 +20,24 @@ const props = defineProps<{
         success: boolean;
         data?: {
             heat_index: number | string;
+            temperature?: number | string;
+            humidity?: number | string;
+            wind_speed?: number | string;
+            precipitation_rate?: number | string;
+            solar_radiation?: number | string;
+            uv?: number | string;
+            date_time?: string;
         };
+        timestamp?: string;
     }> | null;
     barangays?: any[];
+    hiSettings?: Array<{
+        color: string;
+        advice: string;
+        label: string;
+        temprange: string;
+    }>;
+    viewMode?: 'heat_index' | 'full';
 }>();
 
 const mapContainer = ref<HTMLElement | null>(null);
@@ -31,11 +46,42 @@ const markersLayer = L.layerGroup();
 const barangaysGroup = L.featureGroup();
 
 const getHeatIndexColor = (heatIndex: number) => {
-    if (heatIndex >= 52) return '#990000'; // Extreme Danger - Dark Red
-    if (heatIndex >= 39) return '#cc0000'; // Danger - Red
-    if (heatIndex >= 32) return '#ff9900'; // Extreme Caution - Orange
-    if (heatIndex >= 27) return '#ffcc00'; // Caution - Yellow
-    return '#33cc33'; // Normal - Green
+    if (!props.hiSettings || props.hiSettings.length === 0) {
+        if (heatIndex >= 52) return '#990000'; // Extreme Danger - Dark Red
+        if (heatIndex >= 42) return '#cc0000'; // Danger - Red
+        if (heatIndex >= 33) return '#ff9900'; // Extreme Caution - Orange
+        if (heatIndex >= 28) return '#ffcc00'; // Caution - Yellow
+        return '#33cc33'; // Normal - Green
+    }
+
+    // Iterate through settings to find the matching range
+    // Settings are expected to be ordered from lowest to highest or vice versa
+    // We'll check each range.
+    for (const setting of [...props.hiSettings].reverse()) {
+        const range = setting.temprange;
+        try {
+            if (range.includes('>=')) {
+                const val = parseFloat(range.replace(/>=/g, '').trim());
+                if (heatIndex >= val) return setting.color;
+            } else if (range.includes('<=')) {
+                const val = parseFloat(range.replace(/<=/g, '').trim());
+                if (heatIndex <= val) return setting.color;
+            } else if (range.includes('>')) {
+                const val = parseFloat(range.replace(/>/g, '').trim());
+                if (heatIndex > val) return setting.color;
+            } else if (range.includes('<')) {
+                const val = parseFloat(range.replace(/</g, '').trim());
+                if (heatIndex < val) return setting.color;
+            } else if (range.includes('-')) {
+                const parts = range.split('-').map(p => parseFloat(p.trim()));
+                if (heatIndex >= parts[0] && heatIndex <= parts[1]) return setting.color;
+            }
+        } catch (e) {
+            console.error("Error parsing temprange:", range, e);
+        }
+    }
+
+    return props.hiSettings[0]?.color || '#33cc33';
 };
 
 const transformGeometry = (geometry: any) => {
@@ -96,94 +142,156 @@ const processBarangays = () => {
     }
 };
 
+const formatValue = (value: any, decimals: number = 0) => {
+    if (value === undefined || value === null || isNaN(Number(value))) return '-';
+    return Number(value).toFixed(decimals);
+};
+
 const updatePointsData = () => {
     if (!map) return;
     
     // Clear existing markers
     markersLayer.clearLayers();
 
-    // Calculate scaling factor based on zoom, ensuring it does not shrink below base size
-    const baseZoom = 11;
-    const currentZoom = map.getZoom();
-    const zoomScale = Math.max(1, Math.pow(1.3, currentZoom - baseZoom));
+    if (props.viewMode === 'full') {
+        props.stations.forEach(station => {
+            if (station.location?.latitude && station.location?.longitude) {
+                const stationData = props.weatherData?.[station.id];
+                const data = (stationData?.data || {}) as any;
 
-    // Base sizes
-    const baseOuter = 58;
-    const baseInner = 38;
-    const baseFont = 12;
+                const customIcon = L.divIcon({
+                    className: 'custom-full-weather-marker',
+                    html: `
+                        <div class="grid grid-cols-2 gap-0.5 w-[76px] h-[76px] bg-white dark:bg-gray-800 border-2 border-gray-400 rounded-lg shadow-xl overflow-hidden p-[2px]">
+                            <!-- Top Left: Temp -->
+                            <div class="bg-blue-300/30 flex flex-col items-center justify-center rounded-sm">
+                                 <span class="text-[7px] font-bold text-blue-600 leading-none">TEMP</span>
+                                 <span class="text-[13px] font-black text-blue-700 leading-none">${formatValue(data.temperature)}°</span>
+                            </div>
+                            <!-- Top Right: Humidity -->
+                            <div class="bg-yellow-200/30 flex flex-col items-center justify-center rounded-sm">
+                                 <span class="text-[7px] font-bold text-yellow-600 leading-none">HUMI</span>
+                                 <span class="text-[13px] font-black text-yellow-700 leading-none">${formatValue(data.humidity)}%</span>
+                            </div>
+                            <!-- Bottom Left: Wind -->
+                            <div class="bg-white/50 flex flex-col items-center justify-center rounded-sm">
+                                 <span class="text-[7px] font-bold text-gray-500 leading-none">WIND</span>
+                                 <span class="text-[11px] font-black text-gray-800 leading-none italic">${formatValue(data.wind_speed)}</span>
+                            </div>
+                            <!-- Bottom Right: Rain -->
+                            <div class="bg-red-200/30 flex flex-col items-center justify-center rounded-sm">
+                                 <span class="text-[7px] font-bold text-red-600 leading-none">RAIN</span>
+                                 <span class="text-[11px] font-black text-red-700 leading-none">${formatValue(data.precipitation_rate, 1)}</span>
+                            </div>
+                        </div>
+                    `,
+                    iconSize: [76, 76],
+                    iconAnchor: [38, 38],
+                    popupAnchor: [0, -38]
+                });
 
-    const outerSize = Math.round(baseOuter * zoomScale);
-    const innerSize = Math.round(baseInner * zoomScale);
-    const fontSize = Math.round(baseFont * zoomScale);
-
-    props.stations.forEach(station => {
-        if (station.location?.latitude && station.location?.longitude) {
-            const stationData = props.weatherData?.[station.id];
-            
-            let heatIndex = 0;
-            if (stationData && stationData.success && stationData.data?.heat_index !== undefined) {
-                 heatIndex = Number(stationData.data.heat_index);
+                L.marker([Number(station.location.latitude), Number(station.location.longitude)], { icon: customIcon })
+                    .bindPopup(`
+                        <div class="p-2 min-w-[200px] dark:bg-gray-800 dark:text-gray-100">
+                            <div class="font-black text-lg border-b border-gray-200 dark:border-gray-700 mb-2 uppercase italic text-blue-600">${station.name}</div>
+                            <div class="grid grid-cols-2 gap-2 text-sm">
+                                <div class="flex flex-col"><span class="font-bold opacity-60">Temperature</span> <span class="text-lg font-black">${formatValue(data.temperature)}°C</span></div>
+                                <div class="flex flex-col"><span class="font-bold opacity-60">Humidity</span> <span class="text-lg font-black">${formatValue(data.humidity)}%</span></div>
+                                <div class="flex flex-col"><span class="font-bold opacity-60">Wind Speed</span> <span class="text-lg font-black">${formatValue(data.wind_speed)} kph</span></div>
+                                <div class="flex flex-col"><span class="font-bold opacity-60">Rain Rate</span> <span class="text-lg font-black">${formatValue(data.precipitation_rate, 1)} mm/h</span></div>
+                                <div class="flex flex-col"><span class="font-bold opacity-60">Solar Radiation</span> <span class="text-lg font-black">${formatValue(data.solar_radiation)} W/m²</span></div>
+                                <div class="flex flex-col"><span class="font-bold opacity-60">UV Index</span> <span class="text-lg font-black">${formatValue(data.uv, 1)}</span></div>
+                            </div>
+                            <div class="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 text-[10px] opacity-40 uppercase font-bold italic">Latest Observation: ${stationData?.data?.date_time || '-'}</div>
+                        </div>
+                    `)
+                    .addTo(markersLayer);
             }
-
-            const color = getHeatIndexColor(heatIndex);
-            
-            // Determine if the marker should blink (Danger or Extreme Danger)
-            const isDanger = heatIndex >= 42;
-            const animationClass = isDanger ? 'pulse-danger' : '';
-
-        // Create a custom DivIcon
-        const customIcon = L.divIcon({
-            className: 'custom-heat-index-marker',
-            html: `
-                <div class="${animationClass}" style="
-                    position: relative;
-                    width: ${outerSize}px;
-                    height: ${outerSize}px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                ">
-                    <!-- Outer Glow -->
-                    <div style="
-                        position: absolute;
-                        top: 0; left: 0;
-                        width: 100%; height: 100%;
-                        border-radius: 50%;
-                        background-color: ${color};
-                        opacity: 0.3;
-                    "></div>
-                    <!-- Inner Solid Circle -->
-                    <div style="
-                        position: relative;
-                        width: ${innerSize}px; height: ${innerSize}px;
-                        border-radius: 50%;
-                        background-color: ${color};
-                        border: 2px solid white;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        color: white;
-                        font-size: ${fontSize}px;
-                        font-weight: bold;
-                        letter-spacing: -0.5px;
-                        z-index: 10;
-                        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-                    ">
-                        ${heatIndex.toFixed(1)}°
-                    </div>
-                </div>
-            `,
-            iconSize: [outerSize, outerSize],
-            iconAnchor: [outerSize / 2, outerSize / 2],
-            popupAnchor: [0, -outerSize / 2]
         });
+    } else {
+        // Calculate scaling factor based on zoom, ensuring it does not shrink below base size
+        const baseZoom = 11;
+        const currentZoom = map.getZoom();
+        const zoomScale = Math.max(1, Math.pow(1.3, currentZoom - baseZoom));
 
-        // Add marker to layer
-        L.marker([Number(station.location.latitude), Number(station.location.longitude)], { icon: customIcon })
-            .bindPopup(`<strong>${station.name}</strong><br/>Heat Index: ${heatIndex.toFixed(1)}°C`)
-            .addTo(markersLayer);
+        // Base sizes
+        const baseOuter = 58;
+        const baseInner = 38;
+        const baseFont = 12;
+
+        const outerSize = Math.round(baseOuter * zoomScale);
+        const innerSize = Math.round(baseInner * zoomScale);
+        const fontSize = Math.round(baseFont * zoomScale);
+
+        props.stations.forEach(station => {
+            if (station.location?.latitude && station.location?.longitude) {
+                const stationData = props.weatherData?.[station.id];
+                
+                let heatIndex = 0;
+                if (stationData && stationData.success && stationData.data?.heat_index !== undefined) {
+                     heatIndex = Number(stationData.data.heat_index);
+                }
+
+                const color = getHeatIndexColor(heatIndex);
+                
+                // Determine if the marker should blink (Danger or Extreme Danger)
+                const isDanger = heatIndex >= 42;
+                const animationClass = isDanger ? 'pulse-danger' : '';
+
+                // Create a custom DivIcon
+                const customIcon = L.divIcon({
+                    className: 'custom-heat-index-marker',
+                    html: `
+                        <div class="${animationClass}" style="
+                            position: relative;
+                            width: ${outerSize}px;
+                            height: ${outerSize}px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                        ">
+                            <!-- Outer Glow -->
+                            <div style="
+                                position: absolute;
+                                top: 0; left: 0;
+                                width: 100%; height: 100%;
+                                border-radius: 50%;
+                                background-color: ${color};
+                                opacity: 0.3;
+                            "></div>
+                            <!-- Inner Solid Circle -->
+                            <div style="
+                                position: relative;
+                                width: ${innerSize}px; height: ${innerSize}px;
+                                border-radius: 50%;
+                                background-color: ${color};
+                                border: 2px solid white;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                color: white;
+                                font-size: ${fontSize}px;
+                                font-weight: bold;
+                                letter-spacing: -0.5px;
+                                z-index: 10;
+                                box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+                            ">
+                                ${heatIndex.toFixed(1)}°
+                            </div>
+                        </div>
+                    `,
+                    iconSize: [outerSize, outerSize],
+                    iconAnchor: [outerSize / 2, outerSize / 2],
+                    popupAnchor: [0, -outerSize / 2]
+                });
+
+                // Add marker to layer
+                L.marker([Number(station.location.latitude), Number(station.location.longitude)], { icon: customIcon })
+                    .bindPopup(`<strong>${station.name}</strong><br/>Heat Index: ${heatIndex.toFixed(1)}°C`)
+                    .addTo(markersLayer);
+            }
+        });
     }
-});
 };
 
 onMounted(() => {
@@ -226,14 +334,22 @@ onMounted(() => {
             div.style.fontSize = '12px';
             div.style.lineHeight = '1.5';
             
-            const labels = [
-                { color: '#33cc33', text: 'Normal (< 27°C)' },
-                { color: '#ffcc00', text: 'Caution (27°C - 32°C)' },
-                { color: '#ff9900', text: 'Ext. Caution (33°C - 41°C)' },
-                { color: '#cc0000', text: 'Danger (42°C - 51°C)' },
-                { color: '#990000', text: 'Ext. Danger (>= 52°C)' }
-            ];
-
+            if (props.viewMode !== 'heat_index') {
+                div.style.display = 'none';
+                return div;
+            }
+            div.style.display = 'block';
+            
+            const labels = props.hiSettings && props.hiSettings.length > 0
+                ? props.hiSettings.map(s => ({ color: s.color, text: `${s.label} (${s.temprange})` }))
+                : [
+                    { color: '#33cc33', text: 'Normal (< 27°C)' },
+                    { color: '#ffcc00', text: 'Caution (28°C - 32°C)' },
+                    { color: '#ff9900', text: 'Ext. Caution (33°C - 41°C)' },
+                    { color: '#cc0000', text: 'Danger (42°C - 51°C)' },
+                    { color: '#990000', text: 'Ext. Danger (>= 52°C)' }
+                ];
+            
             let html = '<div style="font-weight:bold;margin-bottom:5px;">Heat Index</div>';
             labels.forEach(label => {
                 html += `
@@ -248,8 +364,11 @@ onMounted(() => {
         }
     });
 
-    new LegendControl().addTo(map);
+    legendInstance = new LegendControl();
+    legendInstance.addTo(map);
 });
+
+let legendInstance: L.Control | null = null;
 
 onUnmounted(() => {
     if (map) {
@@ -261,6 +380,24 @@ onUnmounted(() => {
 watch(() => props.weatherData, () => {
     updatePointsData();
 }, { deep: true });
+
+watch(() => props.hiSettings, () => {
+    updatePointsData();
+    // Re-add legend if it changes
+    if (map && legendInstance) {
+        map.removeControl(legendInstance);
+        legendInstance.addTo(map);
+    }
+}, { deep: true });
+
+watch(() => props.viewMode, () => {
+    updatePointsData();
+    // Re-add legend to apply visibility check
+    if (map && legendInstance) {
+        map.removeControl(legendInstance);
+        legendInstance.addTo(map);
+    }
+});
 
 </script>
 

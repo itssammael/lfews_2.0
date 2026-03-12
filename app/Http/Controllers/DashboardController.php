@@ -63,6 +63,7 @@ class DashboardController extends Controller
             'evacuationCenters' => \Illuminate\Support\Facades\Cache::get('evacuation_centers'),
             'tides' => $tides,
             'tideHeights' => $tideHeights,
+            'hiSettings' => \App\Models\SystemSetting::where('name', 'heat_index_advisory_gauge')->first()?->value ?? [],
         ]);
     }
 

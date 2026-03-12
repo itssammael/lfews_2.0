@@ -497,6 +497,131 @@ const initChart = (rootElement: HTMLElement, title: string, data: any[], seriesN
     return root;
 }
 
+const initRainMixedChart = (rootElement: HTMLElement, title: string, dailyData: any[], hourlyData: any[], stationName: string) => {
+    const root = setupChartRoot(rootElement);
+
+    const chart = root.container.children.push(am5xy.XYChart.new(root, {
+        panX: true,
+        panY: true,
+        wheelX: "panX",
+        wheelY: "zoomX",
+        pinchZoomX: true,
+        layout: am5.VerticalLayout.new(root, {})
+    }));
+
+    chart.children.unshift(am5.Label.new(root, {
+        text: title,
+        fontSize: 18,
+        fontWeight: "600",
+        textAlign: "center",
+        x: am5.percent(50),
+        centerX: am5.percent(50),
+        paddingTop: 10,
+        paddingBottom: 20
+    }));
+
+    // Axis for Daily Data (Columns) - DateAxis with BaseInterval Day
+    let xAxisDaily = chart.xAxes.push(am5xy.DateAxis.new(root, {
+        baseInterval: { timeUnit: "day", count: 1 },
+        renderer: am5xy.AxisRendererX.new(root, {
+            minorGridEnabled: true,
+            minGridDistance: 60
+        }),
+        tooltip: am5.Tooltip.new(root, {})
+    }));
+
+    xAxisDaily.get("renderer").labels.template.setAll({
+        fontSize: 11,
+        paddingTop: 10
+    });
+
+    // Axis for Hourly Data (Line) - DateAxis with BaseInterval Minute
+    let xAxisHourly = chart.xAxes.push(am5xy.DateAxis.new(root, {
+        baseInterval: { timeUnit: "minute", count: 1 },
+        renderer: am5xy.AxisRendererX.new(root, {
+            forceHidden: true // Hide grid and labels
+        })
+    }));
+
+    let yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, {
+        maxDeviation: 0.3,
+        renderer: am5xy.AxisRendererY.new(root, {})
+    }));
+
+    // Series 1: Column for Daily Total
+    let columnSeries = chart.series.push(am5xy.ColumnSeries.new(root, {
+        name: "Daily Total (mm)",
+        xAxis: xAxisDaily,
+        yAxis: yAxis,
+        valueYField: stationName,
+        valueXField: "date",
+        fill: am5.color(0x6495ED),
+        stroke: am5.color(0x6495ED),
+        tooltip: am5.Tooltip.new(root, {
+            labelText: "Daily Total: {valueY}mm"
+        })
+    }));
+
+    columnSeries.columns.template.setAll({
+        width: am5.percent(60), // Narrower for intra-day line visibility
+        tooltipText: "Daily Total: {valueY}mm",
+        strokeOpacity: 0,
+        fillOpacity: 0.7
+    });
+
+    // Series 2: Line for Intra-day Rate
+    let lineSeries = chart.series.push(am5xy.LineSeries.new(root, {
+        name: "Rain Rate (mm/h)",
+        xAxis: xAxisHourly,
+        yAxis: yAxis,
+        valueYField: "precipitation_rate",
+        valueXField: "date_time",
+        stroke: am5.color(0x00BFFF),
+        tooltip: am5.Tooltip.new(root, {
+            labelText: "Rain Rate: {valueY}mm/h"
+        })
+    }));
+
+    lineSeries.strokes.template.setAll({
+        strokeWidth: 2
+    });
+
+    lineSeries.fills.template.setAll({
+        visible: true,
+        fillOpacity: 0.1
+    });
+
+    // Process daily data for DateAxis
+    const processedDailyData = dailyData.map(item => ({
+        ...item,
+        date: new Date(item.date).getTime()
+    }));
+
+    // Process hourly data for DateAxis
+    const processedHourlyData = hourlyData.map(r => ({
+        date_time: new Date(r.date_time).getTime(),
+        precipitation_rate: r.precipitation_rate
+    }));
+
+    xAxisDaily.data.setAll(processedDailyData);
+    columnSeries.data.setAll(processedDailyData);
+    lineSeries.data.setAll(processedHourlyData);
+
+    let cursor = chart.set("cursor", am5xy.XYCursor.new(root, {}));
+    cursor.lineY.set("visible", false);
+
+    let legend = chart.children.push(am5.Legend.new(root, {
+        centerX: am5.p50,
+        x: am5.p50,
+        paddingTop: 15,
+    }));
+    legend.data.setAll(chart.series.values);
+
+    chart.appear(1000, 100);
+
+    return root;
+}
+
 const initWaterLevelRangeChart = (rootElement: HTMLElement, data: any[], thresholds: any) => {
     const root = setupChartRoot(rootElement);
 
@@ -1071,8 +1196,14 @@ const renderChart = async (chartData?: any[], seriesNames: string[] = []) => {
     
     if (selectedReport.value === 'Rain') {
         chartDiv = rainChartDiv.value;
+        const station = detailRainReport.value.station;
         title = `24-Hour Daily Accumulated Rain Chart - ${rainReportType.value === 'Monthly' ? detailRainReport.value.month + ' ' + detailRainReport.value.year : detailRainReport.value.from + ' - ' + detailRainReport.value.to}`;
         unit = 'mm';
+
+        if (chartDiv && rainRecords.value.length > 0 && station !== 'All') {
+            activeChartRoot = initRainMixedChart(chartDiv, title, chartData || [], rainRecords.value, station);
+            return;
+        }
     } else if (selectedReport.value === 'Heat Index') {
         chartDiv = heatIndexChartDiv.value;
         title = 'Heat Index';
@@ -1229,7 +1360,7 @@ const handleWeatherReport = async () => {
         rainActiveTab.value = detailRainReport.value.station === 'All' ? 'Summary' : '';
         
         let chartData = response.data.chartData || [];
-        if (rainReportType.value === 'Monthly') {
+        if (rainReportType.value === 'Monthly' && detailRainReport.value.station === 'All') {
             chartData = chartData.map((item: any) => ({
                 ...item,
                 date: item.date.split(' ')[1] || item.date

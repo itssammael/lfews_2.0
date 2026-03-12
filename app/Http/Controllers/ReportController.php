@@ -175,76 +175,74 @@ class ReportController extends Controller
             $endDate = $request->to . ' 23:59:59';
         }
 
-        if ($isAllStations) {
-            $stationId = null;
-            // Get summary records for ALL report types when station is All
-            $aggQuery = DB::query()
-                ->select(
-                    'weather_stations.name as station_name',
-                    'date_only',
+        // Get summary and chart records for ALL stations or a specific station
+        $aggQuery = DB::query()
+            ->select(
+                'weather_stations.name as station_name',
+                'date_only',
+                'temperature',
+                'humidity',
+                'dewpoint',
+                'heat_index',
+                'precipitation_rate',
+                'precipitation_total'
+            )
+            ->fromSub(function ($subQuery) use ($startDate, $endDate, $request, $isAllStations) {
+                $subQuery->select(
+                    'weather_station_id',
+                    DB::raw('DATE(date_time) as date_only'),
                     'temperature',
                     'humidity',
                     'dewpoint',
                     'heat_index',
                     'precipitation_rate',
-                    'precipitation_total'
+                    'precipitation_total',
+                    'date_time',
+                    DB::raw('ROW_NUMBER() OVER (PARTITION BY weather_station_id, DATE(date_time) ORDER BY date_time DESC) as `rank`')
                 )
-                ->fromSub(function ($query) use ($startDate, $endDate) {
-                    $query->select(
-                        'weather_station_id',
-                        DB::raw('DATE(date_time) as date_only'),
-                        'temperature',
-                        'humidity',
-                        'dewpoint',
-                        'heat_index',
-                        'precipitation_rate',
-                        'precipitation_total',
-                        'date_time',
-                        DB::raw('ROW_NUMBER() OVER (PARTITION BY weather_station_id, DATE(date_time) ORDER BY date_time DESC) as `rank`')
-                    )
-                        ->from('weather_station_observation_data')
-                        ->whereBetween('date_time', [$startDate, $endDate])
-                        ->whereTime('date_time', '<=', '23:59:00');
-                }, 'ranked_data')
-                ->join('weather_stations', 'ranked_data.weather_station_id', '=', 'weather_stations.id')
-                ->where('rank', 1)
-                ->orderBy('date_only', 'asc');
+                    ->from('weather_station_observation_data')
+                    ->whereBetween('date_time', [$startDate, $endDate])
+                    ->whereTime('date_time', '<=', '23:59:00');
 
-            $summaryResults = $aggQuery->get();
-            $summaryRecords = $summaryResults->map(function ($record) {
-                return [
-                    'station_name' => $record->station_name,
-                    'temperature' => (float) $record->temperature,
-                    'humidity' => (float) $record->humidity,
-                    'dewpoint' => (float) $record->dewpoint,
-                    'heat_index' => (float) $record->heat_index,
-                    'precipitation_rate' => (float) $record->precipitation_rate,
-                    'precipitation_total' => (float) $record->precipitation_total,
-                    'date_time' => $record->date_only . ' 23:59:00',
-                ];
-            });
+                if (!$isAllStations) {
+                    $subQuery->whereIn('weather_station_id', function ($q) use ($request) {
+                        $q->select('id')->from('weather_stations')->where('name', $request->station);
+                    });
+                }
+            }, 'ranked_data')
+            ->join('weather_stations', 'ranked_data.weather_station_id', '=', 'weather_stations.id')
+            ->where('rank', 1)
+            ->orderBy('date_only', 'asc');
 
-            if ($request->report === 'Rain') {
-                $chartData = $summaryResults->groupBy('date_only')->map(function ($items, $date) {
-                    $entry = ['date' => date('M d', strtotime($date))];
-                    foreach ($items as $item) {
-                        $entry[$item->station_name] = (float) $item->precipitation_total;
-                    }
-                    return $entry;
-                })->values()->toArray();
+        $summaryResults = $aggQuery->get();
+        $summaryRecords = $summaryResults->map(function ($record) {
+            return [
+                'station_name' => $record->station_name,
+                'temperature' => (float) $record->temperature,
+                'humidity' => (float) $record->humidity,
+                'dewpoint' => (float) $record->dewpoint,
+                'heat_index' => (float) $record->heat_index,
+                'precipitation_rate' => (float) $record->precipitation_rate,
+                'precipitation_total' => (float) $record->precipitation_total,
+                'date_time' => $record->date_only . ' 23:59:00',
+            ];
+        });
 
+        if ($request->report === 'Rain') {
+            $chartData = $summaryResults->groupBy('date_only')->map(function ($items, $date) {
+                $entry = ['date' => $date];
+                foreach ($items as $item) {
+                    $entry[$item->station_name] = (float) $item->precipitation_total;
+                }
+                return $entry;
+            })->values()->toArray();
+
+            if ($isAllStations) {
                 $stationNames = WeatherStation::whereHas('observations', function ($q) use ($startDate, $endDate) {
                     $q->whereBetween('date_time', [$startDate, $endDate]);
                 })->pluck('name')->toArray();
-            }
-        } else {
-            if ($request->report === 'Rain') {
-                $station = WeatherStation::where('name', $request->station)->first();
+            } else {
                 $stationNames = [$request->station];
-
-                // For direct station, we still use the ranking logic for chart if needed, 
-                // but usually the charts for single station use the raw records.
-                // However, the existing implementation uses aggregated data for clustered series.
             }
         }
 

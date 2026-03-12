@@ -72,6 +72,24 @@ const submitIcon = () => {
         forceFormData: true,
     });
 };
+
+const heatIndexForm = useForm({
+    name: 'heat_index_advisory_gauge',
+    value: props.settings?.heat_index_advisory_gauge || [
+        { color: '#33cc33', advice: "Heat Index within bearable parameters.", label: "Normal", temprange: '< 27°C' },
+        { color: '#ffcc00', advice: "HEAT ALERT. Fatigue is possible with prolonged exposure and activity. Continuing activity could result in heat cramps.", label: "Caution", temprange: '28°C - 32°C' },
+        { color: '#ff9900', advice: "HEAT ALERT. Heat cramps and heat exhaustion are possible. Continuing activity could result in heatstroke.", label: "Ext. Caution", temprange: '33°C - 41°C' },
+        { color: '#cc0000', advice: "EXTREME HEAT ALERT. Heat cramps and heat exhaustion are likely. Heatstroke is probable with continued exposure.", label: "Danger", temprange: '42°C - 51°C' },
+        { color: '#990000', advice: "EXTREME HEAT ALERT. Heatstroke is highly likely with continued exposure.", label: "Extreme Danger", temprange: '>= 52°C' }
+    ],
+});
+
+const submitHeatIndex = () => {
+    heatIndexForm.post(route('system-settings.update'), {
+        preserveScroll: true,
+    });
+};
+
 </script>
 
 <template>
@@ -133,6 +151,82 @@ const submitIcon = () => {
                 </FormSection>
 
                 <SectionBorder />
+
+                <FormSection @submitted="submitHeatIndex">
+                    <template #title>
+                        Heat Index Advisory Gauge
+                    </template>
+
+                    <template #description>
+                        Configuration for Heat Index Advisory Gauge (labels, colors, advice, and brackets).
+                    </template>
+
+                    <template #form>
+                        <div class="col-span-12 overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                <thead>
+                                    <tr>
+                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Color</th>
+                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Label</th>
+                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Range</th>
+                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Advice</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-transparent divide-y divide-gray-200 dark:divide-gray-700">
+                                    <tr v-for="(item, index) in heatIndexForm.value" :key="index">
+                                        <td class="px-3 py-4 whitespace-nowrap">
+                                            <div class="flex items-center space-x-2">
+                                                <input
+                                                    type="color"
+                                                    v-model="item.color"
+                                                    class="h-8 w-8 rounded border border-gray-300 dark:border-gray-600 cursor-pointer p-0"
+                                                />
+                                                <span class="text-xs font-mono text-gray-500">{{ item.color }}</span>
+                                            </div>
+                                        </td>
+                                        <td class="px-3 py-4 whitespace-nowrap">
+                                            <TextInput
+                                                v-model="item.label"
+                                                type="text"
+                                                class="mt-1 block w-24 sm:w-32"
+                                                autocomplete="off"
+                                            />
+                                        </td>
+                                        <td class="px-3 py-4 whitespace-nowrap">
+                                            <TextInput
+                                                v-model="item.temprange"
+                                                type="text"
+                                                class="mt-1 block w-24 sm:w-32"
+                                                autocomplete="off"
+                                            />
+                                        </td>
+                                        <td class="px-3 py-4">
+                                            <textarea
+                                                v-model="item.advice"
+                                                rows="2"
+                                                class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600 rounded-md shadow-sm text-sm"
+                                            ></textarea>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <InputError :message="heatIndexForm.errors.value" class="mt-2" />
+                        </div>
+                    </template>
+
+                    <template #actions>
+                        <ActionMessage :on="heatIndexForm.recentlySuccessful" class="me-3">
+                            Saved.
+                        </ActionMessage>
+
+                        <PrimaryButton :class="{ 'opacity-25': heatIndexForm.processing }" :disabled="heatIndexForm.processing">
+                            Save Configuration
+                        </PrimaryButton>
+                    </template>
+                </FormSection>
+
+                <SectionBorder />
+
 
                 <FormSection @submitted="submitLogo">
                     <template #title>

@@ -41,6 +41,13 @@ class PagesController extends Controller
                     'success' => true,
                     'data' => [
                         'heat_index' => $latestEntry->heat_index,
+                        'temperature' => $latestEntry->temperature,
+                        'humidity' => $latestEntry->humidity,
+                        'wind_speed' => $latestEntry->wind_speed,
+                        'wind_direction' => $latestEntry->wind_direction,
+                        'precipitation_rate' => $latestEntry->precipitation_rate,
+                        'solar_radiation' => $latestEntry->solar_radiation,
+                        'uv' => $latestEntry->uv,
                         'date_time' => $latestEntry->date_time,
                     ],
                     'timestamp' => $latestEntry->created_at->toDateTimeString(),
@@ -49,11 +56,13 @@ class PagesController extends Controller
         }
 
         $barangays = \App\Models\Barangay::all();
+        $hiSettings = SystemSetting::where('name', 'heat_index_advisory_gauge')->first()?->value ?? [];
         
         return Inertia::render('Guest/LocalWeatherMap', [
             'stations' => $stations,
             'latestWeatherData' => $latestWeatherData,
             'barangays' => $barangays,
+            'hiSettings' => $hiSettings,
         ]);
     }
 
