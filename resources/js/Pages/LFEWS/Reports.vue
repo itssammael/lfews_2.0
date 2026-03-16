@@ -25,6 +25,12 @@ const props = defineProps<{
     stations: Station[];
     waterLevelYears: number[];
     weatherStationYears: number[];
+    hiSettings?: Array<{
+        color: string;
+        advice: string;
+        label: string;
+        temprange: string;
+    }>;
 }>();
 
 const months = [
@@ -294,6 +300,56 @@ const colors = [
     0x74a309, // Complementary Olive (for Violet)
     0x13b766, // Complementary Green (for Pink)
 ];
+
+const getHeatIndexColor = (heatIndex: number | string | null | undefined) => {
+    const hi = Number(heatIndex);
+    if (isNaN(hi) || heatIndex === '-' || heatIndex === null) return 'transparent';
+
+    if (!props.hiSettings || props.hiSettings.length === 0) {
+        if (hi >= 52) return '#990000'; // Extreme Danger
+        if (hi >= 42) return '#cc0000'; // Danger
+        if (hi >= 33) return '#ff9900'; // Extreme Caution
+        if (hi >= 28) return '#ffcc00'; // Caution
+        return '#33cc33'; // Normal
+    }
+
+    for (const setting of [...props.hiSettings].reverse()) {
+        const range = setting.temprange;
+        try {
+            if (range.includes('>=')) {
+                const val = parseFloat(range.replace(/>=/g, '').trim());
+                if (hi >= val) return setting.color;
+            } else if (range.includes('<=')) {
+                const val = parseFloat(range.replace(/<=/g, '').trim());
+                if (hi <= val) return setting.color;
+            } else if (range.includes('>')) {
+                const val = parseFloat(range.replace(/>/g, '').trim());
+                if (hi > val) return setting.color;
+            } else if (range.includes('<')) {
+                const val = parseFloat(range.replace(/</g, '').trim());
+                if (hi < val) return setting.color;
+            } else if (range.includes('-')) {
+                const parts = range.split('-').map(p => parseFloat(p.trim()));
+                if (hi >= parts[0] && hi <= parts[1]) return setting.color;
+            }
+        } catch (e) {
+            console.error("Error parsing temprange:", range, e);
+        }
+    }
+
+    return props.hiSettings[0]?.color || '#33cc33';
+};
+
+const getTextColorForBg = (bgColor: string) => {
+    if (bgColor === 'transparent') return 'inherit';
+    // Simplified brightness check
+    const hex = bgColor.replace('#', '');
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    return brightness > 155 ? '#000000' : '#ffffff';
+};
 
 const setupChartRoot = (element: HTMLElement) => {
     const root = am5.Root.new(element);
@@ -827,22 +883,23 @@ const processHeatmapData = (records: any[]) => {
             map.set(key, { 
                 day, 
                 hour: hourStr, 
-                sum: 0, 
-                count: 0,
+                max: -Infinity,
                 hourVal: hour // for sorting if needed
             });
         }
         
         const entry = map.get(key);
-        entry.sum += parseFloat(record.heat_index);
-        entry.count++;
+        const val = parseFloat(record.heat_index);
+        if (!isNaN(val)) {
+            entry.max = Math.max(entry.max, val);
+        }
     });
 
     map.forEach(value => {
         data.push({
             day: value.day,
             hour: value.hour,
-            value: parseFloat((value.sum / value.count).toFixed(2)),
+            value: value.max === -Infinity ? null : parseFloat(value.max.toFixed(2)),
             hourVal: value.hourVal // Keep for reference if needed, though axes will handle order
         });
     });
@@ -858,9 +915,10 @@ const initHeatmapChart = (root: am5.Root, data: any[], numDays: number = 31) => 
         wheelX: "none",
         wheelY: "none",
         layout: am5.VerticalLayout.new(root, {}),
-        paddingRight: 60,
-        paddingLeft: 60,
-        paddingBottom: 0
+        paddingRight: 10,
+        paddingLeft: 10,
+        paddingBottom: 0,
+        paddingTop: 0
     }));
 
     chart.children.unshift(am5.Label.new(root, {
@@ -870,7 +928,7 @@ const initHeatmapChart = (root: am5.Root, data: any[], numDays: number = 31) => 
         textAlign: "center",
         x: am5.percent(50),
         centerX: am5.percent(50),
-        paddingTop: 0,
+        paddingTop: 20,
         paddingBottom: 20
     }));
     // Create Axes
@@ -930,38 +988,25 @@ const initHeatmapChart = (root: am5.Root, data: any[], numDays: number = 31) => 
         height: am5.percent(100)
     });
 
-    // Heat Rules (Light Red to Dark Red)
-    // Dark Red: 0x8b0000, Light Red/White: 0xffcccc or similar.
-    // User said: "Color: Darker red for higher Heat Index."
-    series.set("heatRules", [{
-        target: series.columns.template,
-        min: am5.color(0xffcccc), // Light red/pink
-        max: am5.color(0x8b0000), // Dark red
-        dataField: "value",
-        key: "fill"
-    }]);
+    series.columns.template.adapters.add("fill", function(fill, target) {
+        if (target.dataItem) {
+            return am5.color(getHeatIndexColor(target.dataItem.get("value" as any) as number));
+        }
+        return fill;
+    });
+
+    series.columns.template.adapters.add("stroke", function(stroke, target) {
+        if (target.dataItem) {
+            return am5.color(getHeatIndexColor(target.dataItem.get("value" as any) as number));
+        }
+        return stroke;
+    });
 
     series.data.setAll(data);
     series.appear(1000);
 
-    // Add Legend for Heatmap values (Color Key) on the Right
-    const heatLegend = chart.children.push(am5.HeatLegend.new(root, {
-        orientation: "vertical",
-        startColor: am5.color(0xfff7bc),
-        endColor: am5.color(0x800026),
-        startText: "Low",
-        endText: "High",
-        stepCount: 5,
-        height: am5.percent(100),
-        centerY: am5.p50,
-        y: am5.p50,
-        x: am5.p100,
-        centerX: am5.p100,
-        paddingTop: -20,
-        paddingLeft: 10,
-        startOpacity: 1,
-        endOpacity: 1
-    }));
+    series.data.setAll(data);
+    series.appear(1000);
 
     chart.appear(1000, 100);
 
@@ -984,21 +1029,22 @@ const processStationHeatmapData = (records: any[]) => {
             map.set(key, { 
                 station, 
                 day, 
-                sum: 0, 
-                count: 0
+                max: -Infinity
             });
         }
         
         const entry = map.get(key);
-        entry.sum += parseFloat(record.heat_index);
-        entry.count++;
+        const val = parseFloat(record.heat_index);
+        if (!isNaN(val)) {
+            entry.max = Math.max(entry.max, val);
+        }
     });
 
     map.forEach(value => {
         data.push({
             station: value.station,
             day: value.day,
-            value: parseFloat((value.sum / value.count).toFixed(2))
+            value: value.max === -Infinity ? null : parseFloat(value.max.toFixed(2))
         });
     });
 
@@ -1014,7 +1060,7 @@ const initStationHeatmapChart = (root: am5.Root, data: any[], stations: any[], n
         height: am5.percent(100),
         layout: am5.VerticalLayout.new(root, {}),
         
-        paddingRight: 50,
+        paddingRight: 10,
         paddingLeft: 10,
         paddingBottom: 0,
         paddingTop: 0
@@ -1032,7 +1078,7 @@ const initStationHeatmapChart = (root: am5.Root, data: any[], stations: any[], n
         textAlign: "center",
         x: am5.percent(50),
         centerX: am5.percent(50),
-        paddingTop: 60,
+        paddingTop: 20,
         paddingBottom: 20
     }));
 
@@ -1058,7 +1104,8 @@ const initStationHeatmapChart = (root: am5.Root, data: any[], stations: any[], n
     // Show text labels
     yAxis.get("renderer").labels.template.setAll({
         forceHidden: false,
-        fontSize: 12
+        fontSize: 12,
+        fontWeight: "500"
     });
 
     yAxis.data.setAll(stationNames.map(s => ({ station: s })));
@@ -1081,7 +1128,10 @@ const initStationHeatmapChart = (root: am5.Root, data: any[], stations: any[], n
         am5.Label.new(root, {
             text: "Day of Month",
             x: am5.p50,
-            centerX: am5.p50
+            centerX: am5.p50,
+            fontSize: 14,
+            fontWeight: "bold",
+            paddingTop: 10
         })
     );
 
@@ -1100,76 +1150,57 @@ const initStationHeatmapChart = (root: am5.Root, data: any[], stations: any[], n
     series.columns.template.setAll({
         tooltipText: "{station}, Day {day}\nHeat Index: [bold]{value}[/]",
         strokeOpacity: 1,
-        strokeWidth: 2,
+        strokeWidth: 0.5,
+        stroke: am5.color(0xdddddd),
         width: am5.percent(100),
         height: am5.percent(100)
     });
     
     // Add Label to show value inside the cell
-    // The user example shows values inside.
-    series.bullets.push(function () {
+    series.bullets.push(function (root, series, dataItem) {
+        const label = am5.Label.new(root, {
+            text: "{value}",
+            fill: am5.color(0x000000),
+            centerY: am5.p50,
+            centerX: am5.p50,
+            populateText: true,
+            fontSize: 10,
+            fontWeight: "bold"
+        });
+
+        label.adapters.add("fill", function(fill: am5.Color | undefined, target: am5.Label) {
+            const dataItem = target.dataItem;
+            if (dataItem) {
+                const val = dataItem.get("value" as any) as number;
+                const bgColor = getHeatIndexColor(val);
+                return am5.color(getTextColorForBg(bgColor));
+            }
+            return fill;
+        });
+
         return am5.Bullet.new(root, {
             locationY: 0.5,
             locationX: 0.5,
-            sprite: am5.Label.new(root, {
-                text: "{value}",
-                fill: am5.color(0x000000), // Black text for contrast on headers, might need adjustment for dark red
-                // Logic for contrast: if value is high (dark red), text should technically be white.
-                // But user example has black text on light cells. 
-                // Let's stick to black or auto. 
-                // amCharts autoTextColor might work if background is set. 
-                // But column fill is set via heatRules.
-                // explicitly setting to black for now as per user request "text color black" in previous turn.
-                centerY: am5.p50,
-                centerX: am5.p50,
-                populateText: true,
-                fontSize: 10
-            })
+            sprite: label
         });
     });
 
-    // Heat Rules (Light Yellow to Dark Red as per user example image which looks like spectral/heat)
-    // User text said: "Color: Darker red for higher Heat Index." 
-    // User image shows: Light Yellow -> Orange -> Dark Red.
-    // Let's try to match that gradient.
-    series.set("heatRules", [{
-        target: series.columns.template,
-        min: am5.color(0xfff7bc), // Light yellow
-        max: am5.color(0x800026), // Dark red
-        dataField: "value",
-        key: "fill"
-    }]);
+    series.columns.template.adapters.add("fill", function(fill, target) {
+        if (target.dataItem) {
+            return am5.color(getHeatIndexColor(target.dataItem.get("value" as any) as number));
+        }
+        return fill;
+    });
+
+    series.columns.template.adapters.add("stroke", function(stroke, target) {
+        if (target.dataItem) {
+            return am5.color(getHeatIndexColor(target.dataItem.get("value" as any) as number));
+        }
+        return stroke;
+    });
 
     series.data.setAll(data);
     series.appear(1000);
-    
-    // Add Legend for Heatmap values (Color Key) on the Right
-    const heatLegend = chart.children.push(am5.HeatLegend.new(root, {
-        orientation: "vertical",
-        startColor: am5.color(0xfff7bc),
-        endColor: am5.color(0x800026),
-        startText: "Low",
-        endText: "High",
-        stepCount: 5,
-        height: am5.percent(100),
-        centerY: am5.p50,
-        y: am5.p50,
-        x: am5.p100,
-        centerX: am5.p100,
-        paddingLeft: 15,
-        startOpacity: 1,
-        endOpacity: 1
-    }));
-
-    heatLegend.startLabel.setAll({
-        fontSize: 12,
-        fill: heatLegend.get("startColor")
-    });
-
-    heatLegend.endLabel.setAll({
-        fontSize: 12,
-        fill: heatLegend.get("endColor")
-    });
 
     chart.appear(1000, 100);
 
@@ -1904,17 +1935,17 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                     <div v-if="rainRecords.length > 0 || heatIndexRecords.length > 0 || waterLevelRecords.length > 0" class="space-y-8 pt-8 mb-12">
                         <!-- Rain Chart -->
                         <div v-show="selectedReport === 'Rain' && rainRecords.length > 0" class="space-y-2">
-                            <div class="flex justify-between items-center">
-                                <h4 class="font-bold text-gray-600 uppercase text-sm hidden">24-Hour Daily Accumulated Rain Chart - {{ rainReportType==='Monthly'? detailRainReport.month + ' ' + detailRainReport.year : detailRainReport.from + ' ' + detailRainReport.to }}</h4>
+                            <div class="flex justify-between items-center bg-white p-2 border-b border-gray-50 rounded-t-xl">
                                 <button 
                                     @click="downloadChart" 
-                                    class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-sm font-bold uppercase tracking-wider text-[10px] transition-colors flex items-center gap-2"
+                                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow-sm font-bold uppercase tracking-wider text-[11px] transition-all flex items-center gap-2 active:scale-95"
                                 >
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                     </svg>
                                     Download Chart
                                 </button>
+                                <h4 class="font-bold text-gray-400 uppercase text-[10px] tracking-[0.2em] pr-4">Rain Report</h4>
                             </div>
                             <div class="bg-white p-2 border-2 border-orange-500 rounded-2xl shadow-md h-[400px] sm:h-[600px] w-full" ref="rainChartDiv"></div>
                             <!-- <div class="text-center text-xs font-bold text-gray-400 uppercase">Month</div> -->
@@ -2084,21 +2115,37 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                         </div>
 
                         <!-- Heat Index Chart -->
-                        <div v-show="selectedReport === 'Heat Index' && heatIndexRecords.length > 0" class="space-y-6">
-                            <div class="flex justify-between items-center">
-                                <h4 class="font-bold text-gray-600 uppercase text-sm hidden">Heat Index</h4>
+                        <div v-show="selectedReport === 'Heat Index' && heatIndexRecords.length > 0" class="space-y-4">
+                            <div class="flex justify-between items-center bg-white p-2 border-b border-gray-50 rounded-t-xl">
                                 <button 
                                     @click="downloadChart" 
-                                    class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-sm font-bold uppercase tracking-wider text-[10px] transition-colors flex items-center gap-2"
+                                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow-sm font-bold uppercase tracking-wider text-[11px] transition-all flex items-center gap-2 active:scale-95"
                                 >
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                     </svg>
                                     Download Chart
                                 </button>
+                                <h4 class="font-bold text-gray-400 uppercase text-[10px] tracking-[0.2em] pr-4">Heat Index Report</h4>
                             </div>
-                            <div class="bg-white p-2 rounded-sm border border-gray-100 w-full" :class="heatIndexReport.station === 'All' ? 'h-[350px] sm:h-[450px]' : 'h-[400px] sm:h-[500px]'" ref="heatIndexChartDiv"></div>
-                            <!-- <div class="text-center text-xs font-bold text-gray-400 uppercase">Month</div> -->
+                            <div class="bg-white p-4 rounded-xl border border-gray-200 w-full shadow-sm" :class="heatIndexReport.station === 'All' ? 'h-[350px] sm:h-[450px]' : 'h-[400px] sm:h-[500px]'" ref="heatIndexChartDiv"></div>
+                            
+                            <!-- Heat Index Legend -->
+                            <div v-if="hiSettings && hiSettings.length > 0" class="mt-6 flex flex-wrap justify-center gap-8 py-6 px-8 bg-white rounded-xl shadow-sm border border-gray-100">
+                                <div v-for="(setting, index) in hiSettings" :key="index" class="flex flex-col items-center gap-1 group cursor-help">
+                                    <div class="flex items-center gap-3">
+                                        <div 
+                                            class="w-5 h-5 rounded-full border border-gray-200 shadow-sm"
+                                            :style="{ backgroundColor: setting.color }"
+                                        ></div>
+                                        <span class="text-[11px] font-black text-gray-700 uppercase tracking-widest">{{ setting.label }}</span>
+                                    </div>
+                                    <span class="text-[10px] text-gray-400 font-bold font-mono tracking-tighter">{{ setting.temprange }}</span>
+                                    <div class="hidden group-hover:block absolute z-10 p-3 bg-white border border-gray-200 rounded-lg shadow-xl text-[10px] text-gray-600 max-w-[250px] -mt-24 text-center pointer-events-none">
+                                        {{ setting.advice }}
+                                    </div>
+                                </div>
+                            </div>
 
                             <!-- Heat Index Results Table -->
                             <div v-if="heatIndexRecords.length > 0" class="bg-white border border-gray-200 rounded-sm mt-8 overflow-hidden">
@@ -2187,8 +2234,17 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                                         <tbody class="divide-y divide-gray-100">
                                             <tr v-for="(row, idx) in heatIndexSummaryMatrix.rows" :key="idx" class="hover:bg-gray-50 transition-colors">
                                                 <td class="px-4 py-2 text-sm text-gray-500 font-bold border-r border-gray-200">{{ row.dateLabel }}</td>
-                                                <td v-for="station in heatIndexSummaryMatrix.stations" :key="station" class="px-4 py-2 text-sm text-gray-800 font-bold text-center border-r border-gray-200">
+                                                <td 
+                                                    v-for="station in heatIndexSummaryMatrix.stations" 
+                                                    :key="station" 
+                                                    class="px-4 py-2 text-[10px] sm:text-xs font-bold text-center border-r border-gray-200"
+                                                    :style="{ 
+                                                        backgroundColor: getHeatIndexColor(row[station]),
+                                                        color: getTextColorForBg(getHeatIndexColor(row[station]))
+                                                    }"
+                                                >
                                                     {{ row[station] }}
+                                                    
                                                 </td>
                                             </tr>
                                         </tbody>
@@ -2222,7 +2278,13 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                                                 <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">{{ record.temperature }}</td>
                                                 <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">{{ record.humidity }}%</td>
                                                 <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">
-                                                    <span class="bg-orange-50 text-orange-700 px-2 py-1 rounded text-xs font-bold">
+                                                    <span 
+                                                        class="px-2 py-1 rounded text-xs font-bold"
+                                                        :style="{ 
+                                                            backgroundColor: getHeatIndexColor(record.heat_index),
+                                                            color: getTextColorForBg(getHeatIndexColor(record.heat_index))
+                                                        }"
+                                                    >
                                                         {{ record.heat_index }}°C
                                                     </span>
                                                 </td>
@@ -2267,19 +2329,19 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                         <!-- Water Level Chart -->
                         <div v-show="selectedReport === 'Water Level' && waterLevelRecords.length > 0" class="space-y-6">
                             <div class="space-y-2">
-                                <div class="flex justify-between items-center">
-                                    <h4 class="font-bold text-gray-600 uppercase text-sm hidden">Water Level Sensor Data Chart</h4>
+                                <div class="flex justify-between items-center bg-white p-2 border-b border-gray-50 rounded-t-xl">
                                     <button 
                                         @click="downloadChart" 
-                                        class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-sm font-bold uppercase tracking-wider text-[10px] transition-colors flex items-center gap-2"
+                                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow-sm font-bold uppercase tracking-wider text-[11px] transition-all flex items-center gap-2 active:scale-95"
                                     >
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                         </svg>
                                         Download Chart
                                     </button>
+                                    <h4 class="font-bold text-gray-400 uppercase text-[10px] tracking-[0.2em] pr-4">Water Level Report</h4>
                                 </div>
-                                <div class="bg-white p-2 rounded-sm border border-gray-100 h-[400px] sm:h-[600px] w-full" ref="waterLevelChartDiv"></div>
+                                <div class="bg-white p-4 rounded-xl border border-gray-200 w-full shadow-sm" ref="waterLevelChartDiv"></div>
                                 <div class="text-center text-xs font-bold text-gray-800 uppercase">Timestamp</div>
                             </div>
 

@@ -29,12 +29,14 @@ class ReportController extends Controller
             ->orderBy('year', 'desc')
             ->pluck('year');
 
+        $hiSettings = \App\Models\SystemSetting::where('name', 'heat_index_advisory_gauge')->first()?->value ?? [];
+
         return Inertia::render('LFEWS/Reports', [
             'sensors' => $sensors,
             'stations' => $stations,
             'waterLevelYears' => $waterLevelYears,
             'weatherStationYears' => $weatherStationYears,
-
+            'hiSettings' => $hiSettings,
         ]);
     }
 
@@ -198,7 +200,7 @@ class ReportController extends Controller
                     'precipitation_rate',
                     'precipitation_total',
                     'date_time',
-                    DB::raw('ROW_NUMBER() OVER (PARTITION BY weather_station_id, DATE(date_time) ORDER BY date_time DESC) as `rank`')
+                    DB::raw('ROW_NUMBER() OVER (PARTITION BY weather_station_id, DATE(date_time) ORDER BY ' . ($request->report === 'Heat Index' ? 'heat_index DESC, date_time DESC' : 'date_time DESC') . ') as `rank`')
                 )
                     ->from('weather_station_observation_data')
                     ->whereBetween('date_time', [$startDate, $endDate])

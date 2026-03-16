@@ -55,8 +55,7 @@ const getHeatIndexColor = (heatIndex: number) => {
     }
 
     // Iterate through settings to find the matching range
-    // Settings are expected to be ordered from lowest to highest or vice versa
-    // We'll check each range.
+    // We reverse to check higher ranges first (e.g., >= 52 before >= 42)
     for (const setting of [...props.hiSettings].reverse()) {
         const range = setting.temprange;
         try {
@@ -81,6 +80,7 @@ const getHeatIndexColor = (heatIndex: number) => {
         }
     }
 
+    // Default to the first setting's color or normal green if no match found
     return props.hiSettings[0]?.color || '#33cc33';
 };
 
@@ -190,7 +190,7 @@ const updatePointsData = () => {
                     popupAnchor: [0, -38]
                 });
 
-                L.marker([Number(station.location.latitude), Number(station.location.longitude)], { icon: customIcon })
+                const marker = L.marker([Number(station.location.latitude), Number(station.location.longitude)], { icon: customIcon })
                     .bindPopup(`
                         <div class="p-2 min-w-[200px] dark:bg-gray-800 dark:text-gray-100">
                             <div class="font-black text-lg border-b border-gray-200 dark:border-gray-700 mb-2 uppercase italic text-blue-600">${station.name}</div>
@@ -204,8 +204,12 @@ const updatePointsData = () => {
                             </div>
                             <div class="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 text-[10px] opacity-40 uppercase font-bold italic">Latest Observation: ${stationData?.data?.date_time || '-'}</div>
                         </div>
-                    `)
+                    `, {
+                        autoClose: false,
+                        closeOnClick: false
+                    })
                     .addTo(markersLayer);
+                marker.openPopup();
             }
         });
     } else {
@@ -286,9 +290,13 @@ const updatePointsData = () => {
                 });
 
                 // Add marker to layer
-                L.marker([Number(station.location.latitude), Number(station.location.longitude)], { icon: customIcon })
-                    .bindPopup(`<strong>${station.name}</strong><br/>Heat Index: ${heatIndex.toFixed(1)}°C`)
+                const marker = L.marker([Number(station.location.latitude), Number(station.location.longitude)], { icon: customIcon })
+                    .bindPopup(`<strong>${station.name}</strong>`, {
+                        autoClose: false,
+                        closeOnClick: false
+                    })
                     .addTo(markersLayer);
+                marker.openPopup();
             }
         });
     }
