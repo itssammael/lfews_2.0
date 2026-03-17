@@ -8,6 +8,9 @@ Route::get('/', [\App\Http\Controllers\PagesController::class, 'index'])->name('
 Route::get('/awards', [\App\Http\Controllers\PagesController::class, 'awards'])->name('awards');
 Route::get('/services', [\App\Http\Controllers\PagesController::class, 'services'])->name('services');
 Route::get('/local-weather-map', [\App\Http\Controllers\PagesController::class, 'localWeatherMap'])->name('local-weather-map');
+Route::get('/user-manual', function () {
+    return Inertia::render('Guest/UserManual');
+})->name('user-manual');
 
 Route::middleware([
     'auth:sanctum',

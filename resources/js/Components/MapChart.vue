@@ -51,7 +51,7 @@ const getHeatIndexColor = (heatIndex: number) => {
         if (heatIndex >= 42) return '#cc0000'; // Danger - Red
         if (heatIndex >= 33) return '#ff9900'; // Extreme Caution - Orange
         if (heatIndex >= 28) return '#ffcc00'; // Caution - Yellow
-        return '#33cc33'; // Normal - Green
+        // return '#33cc33'; // Normal - Green
     }
 
     // Iterate through settings to find the matching range
@@ -70,10 +70,12 @@ const getHeatIndexColor = (heatIndex: number) => {
                 if (heatIndex > val) return setting.color;
             } else if (range.includes('<')) {
                 const val = parseFloat(range.replace(/</g, '').trim());
+                // Handle gap if heat index is slightly below the warning bounds (e.g. 27.5 for < 27 condition if needed, but < works fine alone)
                 if (heatIndex < val) return setting.color;
             } else if (range.includes('-')) {
-                const parts = range.split('-').map(p => parseFloat(p.trim()));
-                if (heatIndex >= parts[0] && heatIndex <= parts[1]) return setting.color;
+                const parts = range.split('-').map((p: string) => parseFloat(p.trim()));
+                // Add 1 to the upper bound to effectively cover float values like 41.5 in a 33-41 range (as [33, 42))
+                if (heatIndex >= parts[0] && heatIndex < (parts[1] + 1)) return setting.color;
             }
         } catch (e) {
             console.error("Error parsing temprange:", range, e);
@@ -81,7 +83,8 @@ const getHeatIndexColor = (heatIndex: number) => {
     }
 
     // Default to the first setting's color or normal green if no match found
-    return props.hiSettings[0]?.color || '#33cc33';
+    // also gracefully covers gap values like 27.5 lying between < 27 and 28-32
+    return props.hiSettings?.[0]?.color || '#33cc33';
 };
 
 const transformGeometry = (geometry: any) => {

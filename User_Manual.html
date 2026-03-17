@@ -127,8 +127,8 @@
                     <p class="text-lg text-slate-600 font-light">Comprehensive operational guide for LFEWS 2.0</p>
                 </div>
                 <div class="text-left md:text-right text-sm text-slate-400">
-                    <p>Revision: 2.0.1</p>
-                    <p>Updated: March 6, 2026</p>
+                    <p>Revision: 2.0.2</p>
+                    <p>Updated: March 17, 2026</p>
                 </div>
             </div>
         </header>
@@ -161,16 +161,21 @@
                     class="flex items-center justify-center w-10 h-10 rounded-full bg-slate-900 text-white font-bold text-sm">02</span>
                 <h2 class="text-2xl font-bold text-slate-900">Getting Started</h2>
             </div>
-            <div class="grid md:grid-cols-2 gap-6">
+            <div class="grid md:grid-cols-2 gap-6 mb-8">
                 <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                     <div class="w-10 h-10 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center mb-4">
                         <i class="fas fa-right-to-bracket"></i>
                     </div>
                     <h3 class="font-bold text-slate-900 mb-2">Access & Login</h3>
-                    <p class="text-sm text-slate-600 leading-relaxed">
+                    <p class="text-sm text-slate-600 leading-relaxed mb-4">
                         Navigate to the application URL provided by your IT department. Enter your assigned email and
                         password to securely enter the system.
                     </p>
+                    <ol class="list-decimal list-inside text-sm text-slate-600 space-y-2 bg-slate-50 p-4 rounded-xl">
+                        <li>Enter your designated email address.</li>
+                        <li>Input your secure password.</li>
+                        <li>Click "Log In" to access your tailored dashboard.</li>
+                    </ol>
                 </div>
                 <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                     <div
@@ -179,10 +184,13 @@
                     </div>
                     <h3 class="font-bold text-slate-900 mb-2">Role-Based Access</h3>
                     <p class="text-sm text-slate-600 leading-relaxed">
-                        Features are restricted based on roles (e.g., Administrator, Reviewer). If a module is missing,
-                        check your permissions with your administrator.
+                        Features are restricted by roles (Administrator, Command Center, and User). Administrators have full access, Command Center staff can manage data but cannot delete records, and standard Users have view-only and remote download access.
                     </p>
                 </div>
+            </div>
+            
+            <div class="mb-6 border-4 border-slate-50 rounded-xl overflow-hidden shadow-inner bg-slate-100">
+                <img src="public/images/screenshots/login_screen.png" alt="Login Screen" class="w-full h-auto block">
             </div>
         </section>
 
@@ -193,7 +201,7 @@
                     class="flex items-center justify-center w-10 h-10 rounded-full bg-slate-900 text-white font-bold text-sm">03</span>
                 <h2 class="text-2xl font-bold text-slate-900">Dashboard</h2>
             </div>
-            <div class="bg-slate-900 text-white p-8 rounded-2xl shadow-xl overflow-hidden relative">
+            <div class="bg-slate-900 text-white p-8 rounded-2xl shadow-xl overflow-hidden relative mb-8">
                 <div class="relative z-10">
                     <h3 class="text-xl font-bold mb-6">Command Center Overview</h3>
                     <ul class="space-y-4">
@@ -206,11 +214,10 @@
                             </div>
                         </li>
                         <li class="flex items-start gap-3">
-                            <i class="fas fa-chart-pie text-blue-400 mt-1"></i>
+                            <i class="fas fa-water text-blue-400 mt-1"></i>
                             <div>
-                                <span class="font-semibold block">Budget Visualizations (amCharts)</span>
-                                <span class="text-sm text-slate-300">Track MOOE and Capital Outlay allocations for the
-                                    current year.</span>
+                                <span class="font-semibold block">Environmental Visualizations</span>
+                                <span class="text-sm text-slate-300">Track Water Levels, local Weather Station observations, Lunar Tides, and Evacuation Center occupant capacities.</span>
                             </div>
                         </li>
                         <li class="flex items-start gap-3">
@@ -225,6 +232,18 @@
                 </div>
                 <i class="fas fa-gauge-high absolute -right-10 -bottom-10 text-[180px] text-white/5 rotate-12"></i>
             </div>
+            
+            <div class="mb-6 border-4 border-slate-50 rounded-xl overflow-hidden shadow-inner bg-slate-100">
+                <img src="public/images/screenshots/dashboard.png" alt="Dashboard" class="w-full h-auto block">
+            </div>
+
+            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Interacting with the Dashboard</h4>
+            <ol class="list-decimal list-inside text-sm text-slate-600 space-y-3 bg-slate-50 p-6 rounded-xl">
+                <li><strong>Auto-Pull Data:</strong> Use the toggle switch on the upper right of the Water/Weather widget frames to enable or disable the 5-minute automatic data refresh protocol.</li>
+                <li><strong>Manual Refresh:</strong> Click the "Pull Data Now" or "Refresh Data" manual action buttons to instantly sync live data from the remote modems.</li>
+                <li><strong>Acknowledge Alerts:</strong> If a sensor hits a critical threshold, a flashing alert will appear over the sensor card. Click the "X" button to acknowledge and dismiss the visual warning.</li>
+                <li><strong>Tidal Analysis:</strong> Scroll down to view the predicted high/low tide graphical representation mapping out the current lunar cycle limits.</li>
+            </ol>
         </section>
 
         <!-- 4. Monitoring System -->
@@ -243,7 +262,7 @@
                             <i class="fas fa-water"></i> Water Level Sensors
                         </h3>
                     </div>
-                    <div class="grid md:grid-cols-3 gap-4 text-sm">
+                    <div class="grid md:grid-cols-3 gap-4 text-sm mb-6">
                         <div class="p-3 bg-slate-50 rounded-lg border border-slate-100">
                             <span class="font-bold block mb-1">Overview</span>
                             Monitor connected sensors across river systems.
@@ -257,6 +276,17 @@
                             Manual triggers available for real-time syncing.
                         </div>
                     </div>
+
+                    <div class="mb-6 border-4 border-slate-50 rounded-xl overflow-hidden shadow-inner bg-slate-100">
+                        <img src="public/images/screenshots/water_sensors.png" alt="Water Level Sensors" class="w-full h-auto block">
+                    </div>
+
+                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Sensor Management Steps</h4>
+                    <ol class="list-decimal list-inside text-sm text-slate-600 space-y-3 bg-slate-50 p-6 rounded-xl">
+                        <li><strong>Register New Sensor:</strong> Click "Add Sensor" to define the sensor name, geographical coordinates (lat/long), and link it to an existing river profile.</li>
+                        <li><strong>Set Warning Thresholds:</strong> Assign specific depth values for Level 2 (Caution), Level 3 (Warning), and Level 4 (Critical) hazard heights.</li>
+                        <li><strong>Perform Diagnostics:</strong> Trigger manual communication pulls to ensure reliable pingbacks.</li>
+                    </ol>
                 </div>
 
                 <!-- Weather Stations -->
@@ -266,16 +296,17 @@
                     </h3>
                     <p class="text-sm text-slate-600 mb-4">Lists all synced equipment monitoring precipitation,
                         temperature, and wind metrics.</p>
-                    <div class="flex flex-wrap gap-2">
-                        <span
-                            class="px-3 py-1 bg-slate-100 rounded-full text-[11px] font-bold text-slate-500 uppercase">Synchronization</span>
-                        <span
-                            class="px-3 py-1 bg-slate-100 rounded-full text-[11px] font-bold text-slate-500 uppercase">Station
-                            Metrics</span>
-                        <span
-                            class="px-3 py-1 bg-slate-100 rounded-full text-[11px] font-bold text-slate-500 uppercase">Deployment
-                            Map</span>
+
+                    <div class="mb-6 border-4 border-slate-50 rounded-xl overflow-hidden shadow-inner bg-slate-100">
+                        <img src="public/images/screenshots/weather_stations.png" alt="Weather Stations" class="w-full h-auto block">
                     </div>
+
+                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Station Management Steps</h4>
+                    <ol class="list-decimal list-inside text-sm text-slate-600 space-y-3 bg-slate-50 p-6 rounded-xl">
+                        <li><strong>Link Hardware:</strong> Click "Register Station" and supply the unique string identifier issued by the hardware provider API.</li>
+                        <li><strong>Verify Sync:</strong> Check the "Last Observation" column in the data table for recent timestamps to confirm continuous communication.</li>
+                        <li><strong>Geographical Assignment:</strong> Ensure the marker longitude/latitude accurately reflects actual deployment for precision on dashboard map visualizations.</li>
+                    </ol>
                 </div>
 
                 <!-- Lunar Tides -->
@@ -285,10 +316,15 @@
                     </h3>
                     <div class="flex gap-4 items-center">
                         <div class="flex-1">
-                            <p class="text-sm text-slate-600 leading-relaxed">
+                            <p class="text-sm text-slate-600 leading-relaxed mb-6">
                                 Integrated with <strong>WorldTides API</strong>. This module graphs "Tidal Extremes,"
                                 allowing users to anticipate high and low tide phases impacting coastal flood risk.
                             </p>
+
+                            <ol class="list-decimal list-inside text-sm text-slate-600 space-y-3 bg-slate-50 p-6 rounded-xl">
+                                <li><strong>Access Tide Tool:</strong> Click "Lunar Tides" on the administration navigation layout.</li>
+                                <li><strong>API Sync:</strong> Click the "Sync External API" button to forcefully pull in forward-looking predictive tide data for the upcoming week from external data services.</li>
+                            </ol>
                         </div>
                         <div
                             class="hidden md:block w-32 h-20 bg-indigo-50 rounded-lg border border-indigo-100 flex items-center justify-center">
@@ -307,40 +343,69 @@
                 <h2 class="text-2xl font-bold text-slate-900">Maps and Geolocation</h2>
             </div>
 
-            <div class="grid md:grid-cols-2 gap-6">
-                <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between">
-                    <div>
-                        <h3 class="font-bold text-lg mb-4 text-slate-900 flex items-center gap-2">
-                            <i class="fas fa-map-location-dot text-rose-500"></i> Locator Map
-                        </h3>
-                        <p class="text-sm text-slate-600 mb-4 leading-relaxed">
-                            Interactive map displaying all active devices. Click markers to view the <strong>Device
-                                Status Popover</strong>, showing real-time visibility and safety limit records.
-                        </p>
-                    </div>
-                    <div class="mt-4 p-3 bg-rose-50 text-rose-700 text-xs rounded-lg font-medium">
-                        <i class="fas fa-info-circle mr-1"></i> Markers change color based on sensor status.
-                    </div>
-                </div>
-
+            <div class="space-y-8">
+                <!-- Locator Map -->
                 <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
                     <h3 class="font-bold text-lg mb-4 text-slate-900 flex items-center gap-2">
-                        <i class="fas fa-triangle-exclamation text-amber-500"></i> Risk & Hazard Maps
+                        <i class="fas fa-map-location-dot text-rose-500"></i> Locator Map
                     </h3>
-                    <ul class="text-sm text-slate-600 space-y-3">
-                        <li class="flex items-start gap-2">
-                            <span class="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5"></span>
-                            Multi-layered configurations for flood hazard outlines.
-                        </li>
-                        <li class="flex items-start gap-2">
-                            <span class="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5"></span>
-                            Topographical risk assessment.
-                        </li>
-                        <li class="flex items-start gap-2">
-                            <span class="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5"></span>
-                            Evacuation Center charting for strategic deployment.
-                        </li>
-                    </ul>
+                    <p class="text-sm text-slate-600 mb-6 leading-relaxed">
+                        The comprehensive command map for administrators. This interactive interface displays all connected monitoring devices, geographic administrative boundaries, and critical infrastructure.
+                    </p>
+                    
+                    <div class="mb-6 border-4 border-slate-50 rounded-xl overflow-hidden shadow-inner bg-slate-100">
+                        <img src="public/images/screenshots/locator_map.png" alt="Locator Map" class="w-full h-auto block">
+                    </div>
+
+                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">How to Use the Locator Map</h4>
+                    <ol class="list-decimal list-inside text-sm text-slate-600 space-y-3 mb-6 bg-slate-50 p-6 rounded-xl">
+                        <li><strong>Navigate</strong> to the Locator page from the sidebar menu.</li>
+                        <li><strong>Toggle Layers:</strong> Use the "MAP LAYERS" filtering menu on the left side to show or hide specific data: Weather Stations, Water Level Sensors, Evacuation Centers, Rivers, Contour Lines, Flood Risk Maps, Sitios, or Barangays.</li>
+                        <li><strong>View Device Data:</strong> Click on any sensor marker (Water Level or Weather Station) to open a popup showing its connection status, recent readings, and last update timestamp.</li>
+                        <li><strong>Check Evacuation Status:</strong> Click on Evacuation Center markers to see capacity and current occupant percentages.</li>
+                    </ol>
+                </div>
+
+                <!-- Local Weather Map (Guest) -->
+                <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
+                    <h3 class="font-bold text-lg mb-4 text-slate-900 flex items-center gap-2">
+                        <i class="fas fa-sun text-amber-500"></i> Public Local Weather Map
+                    </h3>
+                    <p class="text-sm text-slate-600 mb-6 leading-relaxed">
+                        A specialized public-facing map equipped with always-visible popovers and auto-refresh mechanisms, allowing citizens to monitor realtime weather conditions without navigating complex menus.
+                    </p>
+                    
+                    <div class="mb-6 border-4 border-slate-50 rounded-xl overflow-hidden shadow-inner bg-slate-100">
+                        <img src="public/images/screenshots/local_weather_map.png" alt="Local Weather Map" class="w-full h-auto block">
+                    </div>
+
+                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">How to Use the Weather Map</h4>
+                    <ol class="list-decimal list-inside text-sm text-slate-600 space-y-3 bg-slate-50 p-6 rounded-xl">
+                        <li><strong>Access the Map:</strong> Open the Local Weather Map link. The map auto-refreshes every 5 minutes (a countdown timer is visible in the corner).</li>
+                        <li><strong>Read Popovers:</strong> Device markers feature <strong>always-visible popovers</strong>, providing an immediate view of real-time metrics without requiring any clicks.</li>
+                        <li><strong>Toggle Views:</strong> Locate the view mode buttons on the bottom left. Click the <i class="fas fa-fire text-red-500 mx-1"></i> Heat Index button for heat warnings, or the <i class="fas fa-cloud-sun text-blue-500 mx-1"></i> Full Weather button to see temperature and precipitation totals.</li>
+                    </ol>
+                </div>
+
+                <!-- Risk & Hazard Maps -->
+                <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
+                    <h3 class="font-bold text-lg mb-4 text-slate-900 flex items-center gap-2">
+                        <i class="fas fa-triangle-exclamation text-amber-500"></i> Flood Risk & Hazard Maps
+                    </h3>
+                    <p class="text-sm text-slate-600 mb-6 leading-relaxed">
+                        Color-coded geographical overlays illustrating the vulnerability of specific areas to flooding, utilizing historical data and topographical contours.
+                    </p>
+
+                    <div class="mb-6 border-4 border-slate-50 rounded-xl overflow-hidden shadow-inner bg-slate-100">
+                        <img src="public/images/screenshots/hazard_map.png" alt="Hazard Map" class="w-full h-auto block">
+                    </div>
+
+                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Analyzing Hazard Maps</h4>
+                    <ol class="list-decimal list-inside text-sm text-slate-600 space-y-3 bg-slate-50 p-6 rounded-xl">
+                        <li><strong>Select the Map:</strong> Navigate to the Flood Hazard Map via the administration sidebar.</li>
+                        <li><strong>Interpret Colors:</strong> The map overlays are color-coded (e.g., Light Green for Low Risk, Blue for High, Purple for Very High).</li>
+                        <li><strong>Strategic Planning:</strong> Cross-reference high-risk zones against nearby Evacuation Centers to plan safe emergency deployment routes.</li>
+                    </ol>
                 </div>
             </div>
         </section>
@@ -372,7 +437,7 @@
                         </div>
                     </div>
                     <div class="md:w-px bg-slate-100"></div>
-                    <div class="flex-1 space-y-4">
+                    <div class="flex-1 space-y-4 mb-8">
                         <div class="flex items-center gap-3">
                             <div
                                 class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs">
@@ -387,8 +452,29 @@
                             </div>
                             <span class="text-sm font-medium text-slate-700">Weather Observations</span>
                         </div>
+                        <div class="flex items-center gap-3">
+                            <div
+                                class="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-xs">
+                                <i class="fas fa-fire"></i>
+                            </div>
+                            <span class="text-sm font-medium text-slate-700">Heat Index Reports &amp; Charting</span>
+                        </div>
                     </div>
                 </div>
+
+                <div class="mt-8 border-4 border-slate-50 rounded-xl overflow-hidden shadow-inner bg-slate-100">
+                    <img src="public/images/screenshots/reports_interface.png" alt="Reports Interface" class="w-full h-auto block">
+                </div>
+
+                <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-8 mb-3">Generating System Reports</h4>
+                <ol class="list-decimal list-inside text-sm text-slate-600 space-y-3 bg-slate-50 p-6 rounded-xl">
+                    <li><strong>Select Asset Type:</strong> Choose either "Water Level Sensors" or "Weather Stations" from the top tabular navigation menu to load the relevant data sets.</li>
+                    <li><strong>Select Target Asset:</strong> Choose a specific device model or River association from the drop-down selector to plot its independent archive records.</li>
+                    <li><strong>Define Timespans:</strong> Utilize the comprehensive Date-Range picker system to zoom into localized specific event occurrences (e.g. tracking typhoon data dumps spanning last month).</li>
+                    <li><strong>Visual Charts:</strong> As you configure the filters, the line and bar graphs will dynamically adjust to visually capture trends. Hover over plotted graphical nodes to review specific statistical instances in popovers.</li>
+                    <li><strong>Heat Index Maps:</strong> If reviewing Weather Stations, scroll down to the Heat Index map. The heatmap chart colors dynamically match severity thresholds configured in System Settings.</li>
+                    <li><strong>Exporting:</strong> Click the "Download" or "Export Data" utilities to parse the compiled filter results down into accessible Excel/CSV compatible archives or printer-friendly PDF summaries for archival records.</li>
+                </ol>
             </div>
         </section>
 
@@ -412,8 +498,8 @@
                                 Settings</h4>
                             <ul class="space-y-4">
                                 <li>
-                                    <span class="block font-bold text-slate-800">Budget Config</span>
-                                    <span class="text-slate-500">Manage Budget Years and Fund Sources (MOOE/CO).</span>
+                                    <span class="block font-bold text-slate-800">System Settings</span>
+                                    <span class="text-slate-500">Configure core advisory thresholds like Heat Index levels and alert messages.</span>
                                 </li>
                                 <li>
                                     <span class="block font-bold text-slate-800">Rivers Module</span>
@@ -427,8 +513,7 @@
                             <ul class="space-y-4">
                                 <li>
                                     <span class="block font-bold text-slate-800">User Management</span>
-                                    <span class="text-slate-500">Add, revoke, or edit staff profiles and
-                                        credentials.</span>
+                                    <span class="text-slate-500">Administrators can add, revoke, or edit staff profiles, roles, and credentials.</span>
                                 </li>
                                 <li>
                                     <span class="block font-bold text-slate-800">Roles Manager</span>
