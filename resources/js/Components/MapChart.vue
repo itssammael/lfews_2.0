@@ -51,7 +51,7 @@ const getHeatIndexColor = (heatIndex: number) => {
         if (heatIndex >= 42) return '#cc0000'; // Danger - Red
         if (heatIndex >= 33) return '#ff9900'; // Extreme Caution - Orange
         if (heatIndex >= 28) return '#ffcc00'; // Caution - Yellow
-        // return '#33cc33'; // Normal - Green
+        return '#33cc33'; // Normal - Green
     }
 
     // Iterate through settings to find the matching range
