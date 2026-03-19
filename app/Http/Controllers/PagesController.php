@@ -8,20 +8,6 @@ use App\Models\SystemSetting;
 
 class PagesController extends Controller
 {
-    public function index()
-    {
-        return Inertia::render('Guest/Home');
-    }
-
-    public function awards()
-    {
-        return Inertia::render('Guest/Awards');
-    }
-
-    public function services()
-    {
-        return Inertia::render('Guest/Services');
-    }
 
     public function localWeatherMap()
     {

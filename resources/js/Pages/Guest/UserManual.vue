@@ -3,6 +3,10 @@ import { Head, Link } from '@inertiajs/vue3';
 
 // Since this is a standalone manual page with its own sidebar, 
 // we'll keep the design self-contained but accessible as a guest page.
+
+const printPage = () => {
+    window.print();
+};
 </script>
 
 <template>
@@ -12,7 +16,7 @@ import { Head, Link } from '@inertiajs/vue3';
         <!-- Sidebar Navigation -->
         <aside class="no-print fixed top-0 left-0 h-full w-72 glass-sidebar z-50 hidden lg:block overflow-y-auto p-6">
             <div class="flex items-center gap-3 mb-10">
-                <div class="bg-blue-600 p-2 rounded-lg">
+                <div class="bg-orange-600 p-2 rounded-lg">
                     <i class="fas fa-droplet text-white text-xl"></i>
                 </div>
                 <div>
@@ -24,57 +28,61 @@ import { Head, Link } from '@inertiajs/vue3';
             <nav class="space-y-1">
                 <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 px-3">Table of Contents</p>
                 <a href="#introduction"
-                    class="toc-link flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-blue-50">
+                    class="toc-link flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-orange-50">
                     <span class="w-6 text-center">1</span> Introduction
                 </a>
                 <a href="#getting-started"
-                    class="toc-link flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-blue-50">
+                    class="toc-link flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-orange-50">
                     <span class="w-6 text-center">2</span> Getting Started
                 </a>
                 <a href="#dashboard"
-                    class="toc-link flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-blue-50">
+                    class="toc-link flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-orange-50">
                     <span class="w-6 text-center">3</span> Dashboard
                 </a>
                 <a href="#monitoring"
-                    class="toc-link flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-blue-50">
+                    class="toc-link flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-orange-50">
                     <span class="w-6 text-center">4</span> Monitoring System
                 </a>
                 <a href="#maps"
-                    class="toc-link flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-blue-50">
+                    class="toc-link flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-orange-50">
                     <span class="w-6 text-center">5</span> Maps & Geolocation
                 </a>
                 <a href="#reports"
-                    class="toc-link flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-blue-50">
+                    class="toc-link flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-orange-50">
                     <span class="w-6 text-center">6</span> Reports
                 </a>
                 <a href="#admin"
-                    class="toc-link flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-blue-50">
+                    class="toc-link flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-orange-50">
                     <span class="w-6 text-center">7</span> Administration
                 </a>
 
-                <div class="pt-6 border-t border-slate-100 mt-6">
-                    <Link href="/" class="flex items-center gap-3 px-3 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-50 rounded-md">
-                        <i class="fas fa-arrow-left"></i> Back to Home
+                <div class="pt-6 border-t border-slate-100 mt-6 space-y-2">
+                    <button @click="printPage" class="w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg transition-colors shadow-sm no-print">
+                        <i class="fas fa-file-pdf"></i> Download as PDF
+                    </button>
+                    
+                    <Link href="/login" class="flex items-center gap-3 px-3 py-2 text-sm font-semibold text-orange-600 hover:bg-orange-50 rounded-md">
+                        <i class="fas fa-arrow-left"></i> Back to Login
                     </Link>
                 </div>
             </nav>
 
-            <div class="mt-12 p-4 bg-blue-50 rounded-xl">
-                <p class="text-xs text-blue-700 font-semibold mb-1">Need Support?</p>
-                <p class="text-[11px] text-blue-600 leading-relaxed">Contact your system administrator for technical
+            <div class="mt-12 p-4 bg-orange-50 rounded-xl border border-orange-100">
+                <p class="text-xs text-orange-700 font-semibold mb-1">Need Support?</p>
+                <p class="text-[11px] text-orange-600 leading-relaxed">Contact your system administrator for technical
                     assistance or credential issues.</p>
             </div>
         </aside>
 
         <!-- Main Content Area -->
-        <main class="lg:ml-72 min-h-screen p-6 md:p-12 max-w-5xl mx-auto">
+        <main class="lg:ml-72 min-h-screen p-6 md:p-12 max-w-5xl mx-auto main-content">
 
             <!-- Header / Cover Section -->
             <header class="mb-16 border-b border-slate-200 pb-10">
                 <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
                     <div>
                         <span
-                            class="inline-block bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded mb-4 uppercase tracking-widest">Official
+                            class="inline-block bg-orange-100 text-orange-700 text-[10px] font-bold px-2 py-1 rounded mb-4 uppercase tracking-widest">Official
                             Documentation</span>
                         <h1 class="text-4xl font-extrabold text-slate-900 mb-2">Local Flood Early Warning System</h1>
                         <p class="text-lg text-slate-600 font-light">Comprehensive operational guide for LFEWS 2.0</p>
@@ -116,7 +124,7 @@ import { Head, Link } from '@inertiajs/vue3';
                 </div>
                 <div class="grid md:grid-cols-2 gap-6 mb-8">
                     <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                        <div class="w-10 h-10 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center mb-4">
+                        <div class="w-10 h-10 bg-orange-50 text-orange-600 rounded-lg flex items-center justify-center mb-4">
                             <i class="fas fa-right-to-bracket"></i>
                         </div>
                         <h3 class="font-bold text-slate-900 mb-2">Access & Login</h3>
@@ -132,7 +140,7 @@ import { Head, Link } from '@inertiajs/vue3';
                     </div>
                     <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                         <div
-                            class="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center mb-4">
+                            class="w-10 h-10 bg-orange-50 text-orange-600 rounded-lg flex items-center justify-center mb-4">
                             <i class="fas fa-user-shield"></i>
                         </div>
                         <h3 class="font-bold text-slate-900 mb-2">Role-Based Access</h3>
@@ -167,7 +175,7 @@ import { Head, Link } from '@inertiajs/vue3';
                                 </div>
                             </li>
                             <li class="flex items-start gap-3">
-                                <i class="fas fa-water text-blue-400 mt-1"></i>
+                                <i class="fas fa-water text-orange-400 mt-1"></i>
                                 <div>
                                     <span class="font-semibold block">Environmental Visualizations</span>
                                     <span class="text-sm text-slate-300">Track Water Levels, local Weather Station observations, Lunar Tides, and Evacuation Center occupant capacities.</span>
@@ -211,7 +219,7 @@ import { Head, Link } from '@inertiajs/vue3';
                     <!-- Water Sensors -->
                     <div class="section-card bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                         <div class="flex justify-between items-start mb-4">
-                            <h3 class="text-lg font-bold text-blue-700 flex items-center gap-2">
+                            <h3 class="text-lg font-bold text-orange-700 flex items-center gap-2">
                                 <i class="fas fa-water"></i> Water Level Sensors
                             </h3>
                         </div>
@@ -224,7 +232,7 @@ import { Head, Link } from '@inertiajs/vue3';
                                 <span class="font-bold block mb-1">Management</span>
                                 Admins can Create, Edit, or Delete sensors.
                             </div>
-                            <div class="p-3 bg-blue-50 rounded-lg border border-blue-100">
+                            <div class="p-3 bg-orange-50 rounded-lg border border-orange-100">
                                 <span class="font-bold block mb-1">Data Pull</span>
                                 Manual triggers available for real-time syncing.
                             </div>
@@ -264,7 +272,7 @@ import { Head, Link } from '@inertiajs/vue3';
 
                     <!-- Lunar Tides -->
                     <div class="section-card bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                        <h3 class="text-lg font-bold text-indigo-700 flex items-center gap-2 mb-4">
+                        <h3 class="text-lg font-bold text-orange-600 flex items-center gap-2 mb-4">
                             <i class="fas fa-moon"></i> Lunar Tides
                         </h3>
                         <div class="flex gap-4 items-center">
@@ -280,8 +288,8 @@ import { Head, Link } from '@inertiajs/vue3';
                                 </ol>
                             </div>
                             <div
-                                class="hidden md:block w-32 h-20 bg-indigo-50 rounded-lg border border-indigo-100 flex items-center justify-center">
-                                <i class="fas fa-chart-line text-indigo-300 text-2xl"></i>
+                                class="hidden md:block w-32 h-20 bg-orange-50 rounded-lg border border-orange-100 flex items-center justify-center">
+                                <i class="fas fa-chart-line text-orange-300 text-2xl"></i>
                             </div>
                         </div>
                     </div>
@@ -393,7 +401,7 @@ import { Head, Link } from '@inertiajs/vue3';
                         <div class="flex-1 space-y-4 mb-8">
                             <div class="flex items-center gap-3">
                                 <div
-                                    class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs">
+                                    class="w-8 h-8 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xs">
                                     <i class="fas fa-ruler-vertical"></i>
                                 </div>
                                 <span class="text-sm font-medium text-slate-700">Water Level History</span>
@@ -513,8 +521,8 @@ import { Head, Link } from '@inertiajs/vue3';
 }
 
 .section-card:hover {
-    border-left-color: #3b82f6;
-    background: #f8fafc;
+    border-left-color: #ea580c;
+    background: #fff7ed;
 }
 
 .toc-link {
@@ -522,7 +530,7 @@ import { Head, Link } from '@inertiajs/vue3';
 }
 
 .toc-link:hover {
-    color: #3b82f6;
+    color: #ea580c;
 }
 
 @media print {
@@ -541,6 +549,29 @@ import { Head, Link } from '@inertiajs/vue3';
     .main-content {
         margin-left: 0 !important;
         width: 100% !important;
+        padding: 0 !important;
+    }
+
+    section {
+        break-inside: avoid;
+        margin-bottom: 2rem !important;
+    }
+
+    img {
+        max-width: 100% !important;
+        height: auto !important;
+    }
+
+    .bg-slate-900 {
+        background-color: #0f172a !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .text-white {
+        color: white !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
     }
 }
 </style>
