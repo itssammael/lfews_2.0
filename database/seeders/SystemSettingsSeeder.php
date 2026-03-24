@@ -37,5 +37,16 @@ class SystemSettingsSeeder extends Seeder
                 'description' => 'Configuration for Heat Index Advisory Gauge (labels, colors, advice, and ranges).',
             ]
         );
+
+        SystemSetting::updateOrCreate(
+            ['name' => 'api_key'],
+            [
+                'value' => [
+                    'name' => 'API/wunderground',
+                    'key' => 'cb0c2dc0f7e84bdd8c2dc0f7e8ebdd4d',
+                ],
+                'description' => 'API Key configuration for Weather Station Setup.',
+            ]
+        );
     }
 }

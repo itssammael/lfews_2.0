@@ -347,4 +347,29 @@ class WaterLevelSensorController extends Controller
             return $errorResult;
         }
     }
+
+    public function getLiveWaterLevelData()
+    {
+        $sensors = WaterLevelSensor::where('state', 1)
+            ->with(['latestData', 'location.locationType'])
+            ->get();
+
+        $sensors->each(function ($sensor) {
+            $sensor->makeHidden(['id', 'brand', 'mode', 'ip', 'port', 'slave_id', 'location_id', 'created_at', 'updated_at']);
+            if ($sensor->location) {
+                $sensor->location->makeHidden(['id', 'location_type_id', 'created_at', 'updated_at']);
+                if ($sensor->location->locationType) {
+                    $sensor->location->locationType->makeHidden(['id', 'created_at', 'updated_at']);
+                }
+            }
+            if ($sensor->latestData) {
+                $sensor->latestData->makeHidden(['id', 'water_level_sensor_id', 'created_at', 'updated_at']);
+            }
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => $sensors
+        ]);
+    }
 }

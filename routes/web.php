@@ -11,6 +11,8 @@ Route::get('/', function () {
 // Route::get('/awards', [\App\Http\Controllers\PagesController::class, 'awards'])->name('awards');
 // Route::get('/services', [\App\Http\Controllers\PagesController::class, 'services'])->name('services');
 Route::get('/local-weather-map', [\App\Http\Controllers\PagesController::class, 'localWeatherMap'])->name('local-weather-map');
+Route::get('/api/latest-weather-observation', [\App\Http\Controllers\WeatherStationController::class, 'getActiveStations'])->name('api.latest-weather-observation');
+Route::get('/api/live-water-level-data', [\App\Http\Controllers\WaterLevelSensorController::class, 'getLiveWaterLevelData'])->name('api.live-water-level-data');
 Route::get('/user-manual', function () {
     return Inertia::render('Guest/UserManual');
 })->name('user-manual');

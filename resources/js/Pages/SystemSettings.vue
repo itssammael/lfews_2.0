@@ -90,6 +90,20 @@ const submitHeatIndex = () => {
     });
 };
 
+const apiKeyForm = useForm({
+    name: 'api_key',
+    value: props.settings?.api_key || {
+        name: 'API/wunderground',
+        key: 'cb0c2dc0f7e84bdd8c2dc0f7e8ebdd4d'
+    },
+});
+
+const submitApiKey = () => {
+    apiKeyForm.post(route('system-settings.update'), {
+        preserveScroll: true,
+    });
+};
+
 </script>
 
 <template>
@@ -221,6 +235,54 @@ const submitHeatIndex = () => {
 
                         <PrimaryButton :class="{ 'opacity-25': heatIndexForm.processing }" :disabled="heatIndexForm.processing">
                             Save Configuration
+                        </PrimaryButton>
+                    </template>
+                </FormSection>
+
+                <SectionBorder />
+
+                <FormSection @submitted="submitApiKey">
+                    <template #title>
+                        Weather Station Setup
+                    </template>
+
+                    <template #description>
+                        Configuration for API connection and integration keys.
+                    </template>
+
+                    <template #form>
+                        <div class="col-span-6 sm:col-span-4">
+                            <InputLabel for="api_name" value="API Name" />
+                            <TextInput
+                                id="api_name"
+                                v-model="apiKeyForm.value.name"
+                                type="text"
+                                class="mt-1 block w-full"
+                                autocomplete="off"
+                            />
+                            <InputError :message="apiKeyForm.errors.value" class="mt-2" />
+                        </div>
+
+                        <div class="col-span-6 sm:col-span-4">
+                            <InputLabel for="api_key_val" value="API Key" />
+                            <TextInput
+                                id="api_key_val"
+                                v-model="apiKeyForm.value.key"
+                                type="text"
+                                class="mt-1 block w-full"
+                                autocomplete="off"
+                            />
+                            <InputError :message="apiKeyForm.errors.value" class="mt-2" />
+                        </div>
+                    </template>
+
+                    <template #actions>
+                        <ActionMessage :on="apiKeyForm.recentlySuccessful" class="me-3">
+                            Saved.
+                        </ActionMessage>
+
+                        <PrimaryButton :class="{ 'opacity-25': apiKeyForm.processing }" :disabled="apiKeyForm.processing">
+                            Save API Key
                         </PrimaryButton>
                     </template>
                 </FormSection>

@@ -334,6 +334,9 @@ class WeatherStationController extends Controller
 
     public function fetchWundergroundData($station)
     {
+        $apiKeySetting = \App\Models\SystemSetting::where('name', 'api_key')->first();
+        $apiKey = $apiKeySetting ? $apiKeySetting->value['key'] : 'cb0c2dc0f7e84bdd8c2dc0f7e8ebdd4d';
+
         return Http::timeout(30)
             ->connectTimeout(15)
             ->withoutVerifying()
@@ -349,7 +352,7 @@ class WeatherStationController extends Controller
                 'format' => 'json',
                 'units' => 'm',
                 'numericPrecision' => 'decimal',
-                'apiKey' => 'cb0c2dc0f7e84bdd8c2dc0f7e8ebdd4d',
+                'apiKey' => $apiKey,
             ]);
     }
 
@@ -533,5 +536,30 @@ class WeatherStationController extends Controller
         $dpF = ($dpC * 9 / 5) + 32;
 
         return round($dpF, 1);
+    }
+
+    public function getActiveStations()
+    {
+        $stations = WeatherStation::where('state', 1)
+            ->with(['latestObservation', 'location.locationType'])
+            ->get();
+
+        $stations->each(function ($station) {
+            $station->makeHidden(['id', 'station_id', 'mode', 'key', 'ip', 'location_id', 'created_at', 'updated_at']);
+            if ($station->location) {
+                $station->location->makeHidden(['id', 'location_type_id', 'created_at', 'updated_at']);
+                if ($station->location->locationType) {
+                    $station->location->locationType->makeHidden(['id', 'created_at', 'updated_at']);
+                }
+            }
+            if ($station->latestObservation) {
+                $station->latestObservation->makeHidden(['id', 'created_at', 'updated_at']);
+            }
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => $stations
+        ]);
     }
 }
