@@ -150,6 +150,53 @@ const formatValue = (value: any, decimals: number = 0) => {
     return Number(value).toFixed(decimals);
 };
 
+const getWeatherIconHTML = (data: any) => {
+    const prec = parseFloat(data.precipitation_rate || 0);
+    const solar = parseFloat(data.solar_radiation || 0);
+    const wind = parseFloat(data.wind_speed || 0);
+    
+    // Determine if it's night (6 PM to 6 AM)
+    let isNight = false;
+    if (data.date_time) {
+        try {
+            const hour = new Date(data.date_time.replace(' ', 'T')).getHours();
+            isNight = hour >= 18 || hour < 6;
+        } catch (e) {
+            // Fallback to current time if parsing fails
+            const hour = new Date().getHours();
+            isNight = hour >= 18 || hour < 6;
+        }
+    }
+
+    let icon = 'sunny.png';
+
+    // High priority: Storm/Rain levels
+    if (prec > 20) {
+        icon = 'thunder-storm.png';
+    } else if (prec > 15) {
+        icon = 'storm.png';
+    } else if (prec > 7.5) {
+        icon = 'heavy-rain.png';
+    } else if (prec > 2.5) {
+        icon = 'moderate-rain.png';
+    } else if (prec > 0.1) {
+        icon = 'light-rain.png';
+    } 
+    // Medium priority: Wind
+    else if (wind > 30) {
+        icon = 'windy.png';
+    }
+    // Low priority: Night vs Cloud vs Sun
+    else if (isNight) {
+        icon = 'night.png';
+    }
+    else if (solar < 200) {
+        icon = 'cloud.png';
+    }
+
+    return `<img src="/images/map_marker/weather/${icon}" class="w-full h-full object-contain drop-shadow-md" alt="weather" />`;
+};
+
 const updatePointsData = () => {
     if (!map) return;
     
@@ -165,32 +212,48 @@ const updatePointsData = () => {
                 const customIcon = L.divIcon({
                     className: 'custom-full-weather-marker',
                     html: `
-                        <div class="grid grid-cols-2 gap-0.5 w-[76px] h-[76px] bg-white dark:bg-gray-800 border-2 border-gray-400 rounded-lg shadow-xl overflow-hidden p-[2px]">
-                            <!-- Top Left: Temp -->
-                            <div class="bg-blue-300/30 flex flex-col items-center justify-center rounded-sm">
-                                 <span class="text-[7px] font-bold text-blue-600 leading-none">TEMP</span>
-                                 <span class="text-[13px] font-black text-blue-700 leading-none">${formatValue(data.temperature)}°</span>
+                        <div class="flex flex-col items-center justify-center overflow-visible" style="width: 80px; height: 80px; position: relative;">
+                            <!-- Weather Icon Container -->
+                            <div style="
+                                width: 64px; 
+                                height: 64px; 
+                                position: relative;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
+                            ">
+                                ${getWeatherIconHTML(data)}
                             </div>
-                            <!-- Top Right: Humidity -->
-                            <div class="bg-yellow-200/30 flex flex-col items-center justify-center rounded-sm">
-                                 <span class="text-[7px] font-bold text-yellow-600 leading-none">HUMI</span>
-                                 <span class="text-[13px] font-black text-yellow-700 leading-none">${formatValue(data.humidity)}%</span>
-                            </div>
-                            <!-- Bottom Left: Wind -->
-                            <div class="bg-white/50 flex flex-col items-center justify-center rounded-sm">
-                                 <span class="text-[7px] font-bold text-gray-500 leading-none">WIND</span>
-                                 <span class="text-[11px] font-black text-gray-800 leading-none italic">${formatValue(data.wind_speed)}</span>
-                            </div>
-                            <!-- Bottom Right: Rain -->
-                            <div class="bg-red-200/30 flex flex-col items-center justify-center rounded-sm">
-                                 <span class="text-[7px] font-bold text-red-600 leading-none">RAIN</span>
-                                 <span class="text-[11px] font-black text-red-700 leading-none">${formatValue(data.precipitation_rate, 1)}</span>
+
+                            <!-- Station Name Label (Consistent with heat index view) -->
+                            <div style="
+                                position: absolute;
+                                top: 100%;
+                                left: 50%;
+                                transform: translateX(-50%);
+                                white-space: nowrap;
+                                color: black;
+                                font-weight: 800;
+                                font-size: 14px;
+                                text-shadow: 
+                                    -2px -2px 0 #fff,  
+                                     2px -2px 0 #fff,
+                                    -2px  2px 0 #fff,
+                                     2px  2px 0 #fff,
+                                     0px 0px 5px rgba(255,255,255,0.8);
+                                margin-top: 6px;
+                                pointer-events: none;
+                                z-index: 20;
+                                font-family: 'Inter', system-ui, -apple-system, sans-serif;
+                            ">
+                                ${station.name}
                             </div>
                         </div>
                     `,
-                    iconSize: [76, 76],
-                    iconAnchor: [38, 38],
-                    popupAnchor: [0, -38]
+                    iconSize: [80, 80],
+                    iconAnchor: [40, 40],
+                    popupAnchor: [0, -40]
                 });
 
                 const marker = L.marker([Number(station.location.latitude), Number(station.location.longitude)], { icon: customIcon })
@@ -207,12 +270,8 @@ const updatePointsData = () => {
                             </div>
                             <div class="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 text-[10px] opacity-40 uppercase font-bold italic">Latest Observation: ${stationData?.data?.date_time || '-'}</div>
                         </div>
-                    `, {
-                        autoClose: false,
-                        closeOnClick: false
-                    })
+                    `)
                     .addTo(markersLayer);
-                marker.openPopup();
             }
         });
     } else {
@@ -285,6 +344,30 @@ const updatePointsData = () => {
                             ">
                                 ${heatIndex.toFixed(1)}°
                             </div>
+                            
+                            <!-- Station Name Label -->
+                            <div style="
+                                position: absolute;
+                                top: 100%;
+                                left: 50%;
+                                transform: translateX(-50%);
+                                white-space: nowrap;
+                                color: black;
+                                font-weight: 800;
+                                font-size: ${Math.round(fontSize * 1.6)}px;
+                                text-shadow: 
+                                    -2px -2px 0 #fff,  
+                                     2px -2px 0 #fff,
+                                    -2px  2px 0 #fff,
+                                     2px  2px 0 #fff,
+                                     0px 0px 5px rgba(255,255,255,0.8);
+                                margin-top: 4px;
+                                pointer-events: none;
+                                z-index: 20;
+                                font-family: 'Inter', system-ui, -apple-system, sans-serif;
+                            ">
+                                ${station.name}
+                            </div>
                         </div>
                     `,
                     iconSize: [outerSize, outerSize],
@@ -292,14 +375,9 @@ const updatePointsData = () => {
                     popupAnchor: [0, -outerSize / 2]
                 });
 
-                // Add marker to layer
-                const marker = L.marker([Number(station.location.latitude), Number(station.location.longitude)], { icon: customIcon })
-                    .bindPopup(`<strong>${station.name}</strong>`, {
-                        autoClose: false,
-                        closeOnClick: false
-                    })
+                // Add marker to layer without popup
+                L.marker([Number(station.location.latitude), Number(station.location.longitude)], { icon: customIcon })
                     .addTo(markersLayer);
-                marker.openPopup();
             }
         });
     }
