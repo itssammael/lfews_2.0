@@ -11,7 +11,7 @@ class PagesController extends Controller
 
     public function localWeatherMap()
     {
-        $stations = \App\Models\WeatherStation::with('location')->get();
+        $stations = \App\Models\WeatherStation::where('state', 1)->with('location')->get();
         
         $latestWeatherData = [];
         foreach ($stations as $station) {

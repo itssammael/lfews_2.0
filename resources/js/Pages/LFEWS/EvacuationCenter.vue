@@ -17,7 +17,7 @@ const evacuationCenters = ref(props.evacuationCenters);
 const fetchEvacuationCenters = async () => {
     loading.value = true;
     try {
-        const response = await fetch(route('evacuation-center.api'), {
+        const response = await fetch('https://swera.bayawancity.gov.ph/fetch/evacs', {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
