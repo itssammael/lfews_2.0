@@ -7,5 +7,4 @@ Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
-Route::get('/filtered-data', [\App\Http\Controllers\Api\DataApiController::class, 'getFilteredData'])
-    ->middleware('auth:sanctum');
+Route::get('/filtered-data', [\App\Http\Controllers\Api\DataApiController::class, 'getFilteredData']);
