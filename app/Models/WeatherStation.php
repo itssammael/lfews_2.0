@@ -21,10 +21,10 @@ class WeatherStation extends Model
         return $this->belongsTo(Location::class);
     }
 
-    // public function observations()
-    // {
-    //     return $this->hasMany(WeatherStationObservationData::class);
-    // }
+    public function observations()
+    {
+        return $this->hasMany(WeatherStationObservationData::class);
+    }
 
     public function latestObservation()
     {

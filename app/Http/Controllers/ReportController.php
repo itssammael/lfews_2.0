@@ -53,7 +53,7 @@ class ReportController extends Controller
 
         if ($request->reportType === 'Monthly') {
             $query->whereYear('date', $request->year)
-                ->whereMonth('date', date('m', strtotime($request->month)));
+                ->whereMonth('date', date('m', strtotime('1 ' . $request->month)));
         } else {
             if ($request->from && $request->to) {
                 $query->whereBetween('date', [$request->from . ' 00:00:00', $request->to . ' 23:59:59']);
@@ -69,7 +69,7 @@ class ReportController extends Controller
             $endDate = '';
 
             if ($request->reportType === 'Monthly') {
-                $monthNum = date('m', strtotime($request->month));
+                $monthNum = date('m', strtotime('1 ' . $request->month));
                 $startDate = "{$request->year}-{$monthNum}-01 00:00:00";
                 $endDate = date('Y-m-t 23:59:59', strtotime($startDate));
             } else {
@@ -151,7 +151,7 @@ class ReportController extends Controller
 
         if ($request->reportType === 'Monthly') {
             $query->whereYear('date_time', $request->year)
-                ->whereMonth('date_time', date('m', strtotime($request->month)));
+                ->whereMonth('date_time', date('m', strtotime('1 ' . $request->month)));
         } else {
             if ($request->from && $request->to) {
                 $query->whereBetween('date_time', [$request->from . ' 00:00:00', $request->to . ' 23:59:59']);
@@ -169,7 +169,7 @@ class ReportController extends Controller
         $startDate = '';
         $endDate = '';
         if ($request->reportType === 'Monthly') {
-            $monthNum = date('m', strtotime($request->month));
+            $monthNum = date('m', strtotime('1 ' . $request->month));
             $startDate = "{$request->year}-{$monthNum}-01 00:00:00";
             $endDate = date('Y-m-t 23:59:59', strtotime($startDate));
         } else {
