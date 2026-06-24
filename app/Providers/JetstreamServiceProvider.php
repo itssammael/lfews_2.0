@@ -26,7 +26,9 @@ class JetstreamServiceProvider extends ServiceProvider
 
         Jetstream::deleteUsersUsing(DeleteUser::class);
 
-        Vite::prefetch(concurrency: 3);
+        if (!app()->runningInConsole() && !request()->is('local-weather-map*')) {
+            Vite::prefetch(concurrency: 3);
+        }
     }
 
     /**

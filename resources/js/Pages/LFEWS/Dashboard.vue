@@ -229,6 +229,7 @@ onUnmounted(() => {
   if (interval) clearInterval(interval);
 });
 const sensorAlarmsEnabled = ref<Record<number, boolean>>({});
+const weatherAlarmsEnabled = ref<Record<number, boolean>>({});
 const dismissedAlerts = ref<Record<number, number>>({});
 
 const getAlertLevel = (sensor: any, value: any) => {
@@ -714,6 +715,7 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters, showT
                   <!-- Alert Overlay -->
                   <div
                     v-if="
+                      weatherAlarmsEnabled[station.id] !== false &&
                       weatherResult[station.id].success &&
                       getHeatIndexAlertInfo(weatherResult[station.id].data?.heat_index) &&
                       !isWeatherAlertDismissed(station.id)
@@ -777,6 +779,46 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters, showT
                   <div
                     class="w-full md:w-4/5 p-4 border-r dark:border-gray-700 flex flex-col"
                   >
+                    <!-- Alarm Toggle Switch -->
+                    <div class="flex items-center mb-2">
+                      <label
+                        :for="'weather-alarm-' + station.id"
+                        class="cursor-pointer flex items-center"
+                        title="Toggle Alarm"
+                      >
+                        <svg
+                          class="w-5 h-5 mr-2 text-gray-500 hover:text-blue-600 transition-colors"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        >
+                          <circle cx="12" cy="13" r="8"></circle>
+                          <path d="M12 9v4l2 2"></path>
+                          <path d="m5 3 2 2"></path>
+                          <path d="m19 3-2 2"></path>
+                        </svg>
+                        <div
+                          class="relative inline-block w-10 h-5 transition duration-200 ease-in-out"
+                        >
+                          <input
+                            type="checkbox"
+                            :id="'weather-alarm-' + station.id"
+                            :checked="weatherAlarmsEnabled[station.id] !== false"
+                            @change="weatherAlarmsEnabled[station.id] = ($event.target as HTMLInputElement).checked"
+                            class="opacity-0 w-0 h-0 peer"
+                          />
+                          <div
+                            class="absolute cursor-pointer top-0 left-0 right-0 bottom-0 bg-gray-300 dark:bg-gray-600 rounded-full transition-all duration-300 peer-checked:bg-orange-500"
+                          ></div>
+                          <div
+                            class="absolute cursor-pointer h-4 w-4 left-0.5 bottom-0.5 bg-white rounded-full transition-all duration-300 peer-checked:translate-x-5"
+                          ></div>
+                        </div>
+                      </label>
+                    </div>
                     <div class="flex-grow">
                       <WeatherStationChart
                         :stationId="station.id"

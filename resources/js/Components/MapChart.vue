@@ -278,7 +278,7 @@ const updatePointsData = () => {
         // Calculate scaling factor based on zoom, ensuring it does not shrink below base size
         const baseZoom = 11;
         const currentZoom = map.getZoom();
-        const zoomScale = Math.max(1, Math.pow(1.3, currentZoom - baseZoom));
+        const zoomScale = Math.max(1, Math.pow(1.5, currentZoom - baseZoom));
 
         // Base sizes
         const baseOuter = 58;
