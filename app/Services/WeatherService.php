@@ -20,7 +20,7 @@ class WeatherService
     }
 
     /**
-     * Fetch observations for a specific date range.
+     * Fetch observations for a specific date range concurrently.
      *
      * @param string $startDate 'YYYY-MM-DD'
      * @param string $endDate   'YYYY-MM-DD'
@@ -31,83 +31,94 @@ class WeatherService
         $start = Carbon::parse($startDate);
         $end = Carbon::parse($endDate);
 
+        $datesToFetch = [];
+        for ($date = $start->copy(); $date->lte($end); $date->addDay()) {
+            $datesToFetch[] = [
+                'formatted' => $date->format('Ymd'),
+                'isToday' => $date->isToday(),
+            ];
+        }
+
+        if (empty($datesToFetch)) {
+            return collect();
+        }
+
+        // Fetch all dates concurrently using Laravel Http::pool to prevent PHP script execution timeout
+        $responses = Http::pool(function ($pool) use ($datesToFetch) {
+            $requests = [];
+            foreach ($datesToFetch as $dInfo) {
+                if ($dInfo['isToday']) {
+                    $endpoint = "http://api.weather.com/v2/pws/observations/all/1day";
+                    $queryParams = [
+                        'apiKey' => $this->apiKey,
+                        'stationId' => $this->stationId,
+                        'numericPrecision' => 'decimal',
+                        'format' => 'json',
+                        'units' => 'm',
+                    ];
+                } else {
+                    $endpoint = "http://api.weather.com/v2/pws/history/all";
+                    $queryParams = [
+                        'apiKey' => $this->apiKey,
+                        'stationId' => $this->stationId,
+                        'numericPrecision' => 'decimal',
+                        'format' => 'json',
+                        'units' => 'm',
+                        'date' => $dInfo['formatted'],
+                    ];
+                }
+
+                $requests[] = $pool->timeout(20)
+                    ->withoutVerifying()
+                    ->withOptions([
+                        'curl' => [
+                            CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
+                        ],
+                    ])
+                    ->withHeaders([
+                        'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+                    ])->get($endpoint, $queryParams);
+            }
+            return $requests;
+        });
+
         $allRows = collect();
 
-        // Loop through each date in the range
-        for ($date = $start->copy(); $date->lte($end); $date->addDay()) {
-            $formattedDate = $date->format('Ymd');
-            $isToday = $date->isToday();
+        foreach ($responses as $response) {
+            if ($response instanceof \Illuminate\Http\Client\Response && $response->successful()) {
+                $observations = $response->json('observations', []);
 
-            if ($isToday) {
-                $endpoint = "http://api.weather.com/v2/pws/observations/all/1day";
-                $queryParams = [
-                    'apiKey' => $this->apiKey,
-                    'stationId' => $this->stationId,
-                    'numericPrecision' => 'decimal',
-                    'format' => 'json',
-                    'units' => 'm',
-                ];
+                $parsedObservations = collect($observations)->map(function ($obs) {
+                    $metric = $obs['metric'] ?? [];
+                    
+                    // Format display time
+                    $obsTime = $obs['obsTimeLocal'] ?? '';
+
+                    $windDir = $obs['winddirAvg'] ?? $obs['winddir'] ?? null;
+
+                    return [
+                        'date_time'            => $obsTime,
+                        'temperature'          => $metric['tempAvg'] ?? $metric['temp'] ?? null,
+                        'heat_index'           => $metric['heatindexAvg'] ?? $metric['heatIndex'] ?? null,
+                        'dewpoint'             => $metric['dewptAvg'] ?? $metric['dewpt'] ?? null,
+                        'humidity'             => $obs['humidityAvg'] ?? $obs['humidity'] ?? null,
+                        'wind_speed'           => $metric['windspeedAvg'] ?? $metric['windSpeed'] ?? null,
+                        'wind_direction'       => $windDir,
+                        'wind_gust'            => $metric['windgustAvg'] ?? $metric['windGust'] ?? null,
+                        'pressure'             => $metric['pressureMax'] ?? $metric['pressure'] ?? null,
+                        'precipitation_rate'   => $metric['precipRate'] ?? null,
+                        'precipitation_total'  => $metric['precipTotal'] ?? null,
+                        'uv'                   => $obs['uvHigh'] ?? $obs['uv'] ?? 0,
+                        'solar_radiation'      => $obs['solarRadiationHigh'] ?? $obs['solarRadiation'] ?? 0,
+                    ];
+                });
+
+                $allRows = $allRows->concat($parsedObservations);
             } else {
-                $endpoint = "http://api.weather.com/v2/pws/history/all";
-                $queryParams = [
-                    'apiKey' => $this->apiKey,
-                    'stationId' => $this->stationId,
-                    'numericPrecision' => 'decimal',
-                    'format' => 'json',
-                    'units' => 'm',
-                    'date' => $formattedDate,
-                ];
+                if ($response instanceof \Illuminate\Http\Client\Response) {
+                    logger()->warning("Failed to fetch weather data for station {$this->stationId}: " . $response->status());
+                }
             }
-
-            $response = Http::timeout(15)
-                ->withoutVerifying()
-                ->withOptions([
-                    'curl' => [
-                        CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
-                    ],
-                ])
-                ->withHeaders([
-                    'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-                ])->get($endpoint, $queryParams);
-
-            if ($response->failed()) {
-                logger()->warning("Failed to fetch weather data for station {$this->stationId} on date {$date->toDateString()}: " . $response->status() . " - " . $response->body());
-                continue;
-            }
-
-            $observations = $response->json('observations', []);
-
-            $parsedObservations = collect($observations)->map(function ($obs) {
-                $metric = $obs['metric'] ?? [];
-
-                // Format display time
-                $obsTime = $obs['obsTimeLocal'] ?? '';
-
-                // $windDir = $obs['winddirAvg'] ?? $obs['winddir'] ?? null;
-                // if (is_numeric($windDir)) {
-                //     $cardinals = ["North", "NNE", "NE", "ENE", "East", "ESE", "SE", "SSE", "South", "SSW", "SW", "WSW", "West", "WNW", "NW", "NNW"];
-                //     $index = (int) round(($windDir % 360) / 22.5);
-                //     $windDir = $cardinals[$index % 16];
-                // }
-
-                return [
-                    'date_time' => $obsTime,
-                    'temperature' => $metric['tempAvg'] ?? $metric['temp'] ?? null,
-                    'heat_index' => $metric['heatindexAvg'] ?? $metric['heatIndex'] ?? null,
-                    'dewpoint' => $metric['dewptAvg'] ?? $metric['dewpt'] ?? null,
-                    'humidity' => $obs['humidityAvg'] ?? $obs['humidity'] ?? null,
-                    'wind_speed' => $metric['windspeedAvg'] ?? $metric['windSpeed'] ?? null,
-                    'wind_direction' => $obs['winddirAvg'] ?? $obs['winddir'] ?? null,
-                    'wind_gust' => $metric['windgustAvg'] ?? $metric['windGust'] ?? null,
-                    'pressure' => $metric['pressureMax'] ?? $metric['pressure'] ?? null,
-                    'precipitation_rate' => $metric['precipRate'] ?? null,
-                    'precipitation_total' => $metric['precipTotal'] ?? null,
-                    'uv' => $obs['uvHigh'] ?? $obs['uv'] ?? 0,
-                    'solar_radiation' => $obs['solarRadiationHigh'] ?? $obs['solarRadiation'] ?? 0,
-                ];
-            });
-
-            $allRows = $allRows->concat($parsedObservations);
         }
 
         return $allRows;

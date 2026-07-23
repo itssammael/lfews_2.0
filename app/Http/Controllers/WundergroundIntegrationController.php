@@ -14,6 +14,8 @@ class WundergroundIntegrationController extends Controller
     public function index(Request $request)
     {
         \Illuminate\Support\Facades\Gate::authorize('can-read');
+        set_time_limit(300);
+        ini_set('memory_limit', '512M');
 
         $stations = WeatherStation::whereNotNull('station_id')
             ->where('station_id', '!=', '')
