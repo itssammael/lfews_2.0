@@ -348,6 +348,17 @@ onMounted(() => {
         </div>
       </ResponsiveNavLink>
 
+      <ResponsiveNavLink
+        :href="route('wunderground-integration.index')"
+        :active="route().current('wunderground-integration.*')"
+        @click="$emit('closeMobile')"
+      >
+        <div class="flex items-center">
+             <img src="/images/weather-station.png" alt="WunderGround Integration" class="w-8 h-8 mr-2" />
+             <span class="text-xs font-bold" :class="{'block': showSidebar, 'hidden': ! showSidebar}">WunderGround Integration</span>
+        </div>
+      </ResponsiveNavLink>
+
 
 
 

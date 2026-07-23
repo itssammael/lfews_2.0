@@ -107,6 +107,9 @@ Route::middleware([
     Route::post('/data-migration/import', [\App\Http\Controllers\DataMigrationController::class, 'import'])->name('data-migration.import')
         ->middleware('can:can-create');
 
+    Route::get('/wunderground-integration', [\App\Http\Controllers\WundergroundIntegrationController::class, 'index'])->name('wunderground-integration.index')
+        ->middleware('can:can-read');
+
     Route::post('/connectivity/ping', [\App\Http\Controllers\ConnectivityController::class, 'ping'])
         ->name('connectivity.ping')
         ->middleware('can:can-read');
