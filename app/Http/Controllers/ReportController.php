@@ -187,7 +187,10 @@ class ReportController extends Controller
                 'dewpoint',
                 'heat_index',
                 'precipitation_rate',
-                'precipitation_total'
+                'precipitation_total',
+                'wind_speed',
+                'wind_direction',
+                'wind_gust'
             )
             ->fromSub(function ($subQuery) use ($startDate, $endDate, $request, $isAllStations) {
                 $subQuery->select(
@@ -199,8 +202,13 @@ class ReportController extends Controller
                     'heat_index',
                     'precipitation_rate',
                     'precipitation_total',
+                    'wind_speed',
+                    'wind_direction',
+                    'wind_gust',
                     'date_time',
-                    DB::raw('ROW_NUMBER() OVER (PARTITION BY weather_station_id, DATE(date_time) ORDER BY ' . ($request->report === 'Heat Index' ? 'heat_index DESC, date_time DESC' : 'date_time DESC') . ') as `rank`')
+                    DB::raw('ROW_NUMBER() OVER (PARTITION BY weather_station_id, DATE(date_time) ORDER BY ' . 
+                        ($request->report === 'Heat Index' ? 'heat_index DESC, date_time DESC' : 
+                         ($request->report === 'Wind Speed' ? 'wind_speed DESC, date_time DESC' : 'date_time DESC')) . ') as `rank`')
                 )
                     ->from('weather_station_observation_data')
                     ->whereBetween('date_time', [$startDate, $endDate])
@@ -226,6 +234,9 @@ class ReportController extends Controller
                 'heat_index' => (float) $record->heat_index,
                 'precipitation_rate' => (float) $record->precipitation_rate,
                 'precipitation_total' => (float) $record->precipitation_total,
+                'wind_speed' => (float) $record->wind_speed,
+                'wind_direction' => (float) $record->wind_direction,
+                'wind_gust' => (float) $record->wind_gust,
                 'date_time' => $record->date_only . ' 23:59:00',
             ];
         });
@@ -246,6 +257,30 @@ class ReportController extends Controller
             } else {
                 $stationNames = [$request->station];
             }
+        } else if ($request->report === 'Wind Speed') {
+            $chartData = $summaryResults->groupBy('date_only')->map(function ($items, $date) {
+                $entry = ['date' => $date];
+                foreach ($items as $item) {
+                    $entry[$item->station_name] = (float) $item->wind_speed;
+                }
+                return $entry;
+            })->values()->toArray();
+
+            if ($isAllStations) {
+                $stationNames = WeatherStation::whereHas('observations', function ($q) use ($startDate, $endDate) {
+                    $q->whereBetween('date_time', [$startDate, $endDate]);
+                })->pluck('name')->toArray();
+            } else {
+                $stationNames = [$request->station];
+            }
+        } else if (str_contains($request->report, 'Wind Direction')) {
+            if ($isAllStations) {
+                $stationNames = WeatherStation::whereHas('observations', function ($q) use ($startDate, $endDate) {
+                    $q->whereBetween('date_time', [$startDate, $endDate]);
+                })->pluck('name')->toArray();
+            } else {
+                $stationNames = [$request->station];
+            }
         }
 
         return response()->json([
@@ -258,6 +293,9 @@ class ReportController extends Controller
                     'heat_index' => (float) $record->heat_index,
                     'precipitation_rate' => (float) $record->precipitation_rate,
                     'precipitation_total' => (float) $record->precipitation_total,
+                    'wind_speed' => (float) $record->wind_speed,
+                    'wind_direction' => (float) $record->wind_direction,
+                    'wind_gust' => (float) $record->wind_gust,
                     'date_time' => $record->date_time,
                 ];
             }),
