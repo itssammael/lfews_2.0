@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\SystemSetting;
 use App\Models\WeatherStation;
+use App\Models\WeatherStationObservationData;
 use App\Services\WeatherService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -62,5 +63,93 @@ class WundergroundIntegrationController extends Controller
             'apiKeyUsed' => $apiKey,
             'error' => $error,
         ]);
+    }
+
+    public function import(Request $request)
+    {
+        \Illuminate\Support\Facades\Gate::authorize('can-create');
+        $request->validate([
+            'station_id' => 'required',
+            'rows' => 'required|array',
+        ]);
+
+        $stationIdentifier = $request->input('station_id');
+        $station = WeatherStation::where('station_id', $stationIdentifier)
+            ->orWhere('id', $stationIdentifier)
+            ->first();
+
+        if (!$station) {
+            return response()->json(['error' => 'Weather station not found.'], 404);
+        }
+
+        $targetId = $station->id;
+        $data = $request->input('rows');
+
+        $numericFields = [
+            'temperature',
+            'heat_index',
+            'dewpoint',
+            'humidity',
+            'wind_speed',
+            'wind_direction',
+            'wind_gust',
+            'pressure',
+            'precipitation_rate',
+            'precipitation_total',
+            'uv',
+            'solar_radiation',
+        ];
+        $nullableFields = ['uv', 'solar_radiation'];
+
+        foreach ($data as $row) {
+            $normalized = [];
+            foreach ($row as $key => $val) {
+                $normalized[strtolower(trim($key))] = $val;
+            }
+
+            $dateTimeVal = $normalized['date_time']
+                ?? $normalized['date']
+                ?? $normalized['datetime']
+                ?? $normalized['timestamp']
+                ?? now()->toDateTimeString();
+
+            $cleanedRow = [
+                'weather_station_id' => $targetId,
+                'date_time' => $dateTimeVal,
+            ];
+
+            foreach ($numericFields as $field) {
+                if (array_key_exists($field, $normalized)) {
+                    $val = $normalized[$field];
+                    $default = in_array($field, $nullableFields) ? null : 0;
+                    $cleanedRow[$field] = $this->cleanNumeric($val, $default);
+                } else {
+                    if (!in_array($field, $nullableFields)) {
+                        $cleanedRow[$field] = 0;
+                    }
+                }
+            }
+
+            WeatherStationObservationData::create($cleanedRow);
+        }
+
+        return response()->json(['message' => 'Data imported successfully.']);
+    }
+
+    private function cleanNumeric($value, $default = 0)
+    {
+        if ($value === null || $value === '') {
+            return $default;
+        }
+        if (is_numeric($value)) {
+            return $value + 0;
+        }
+        if (is_string($value)) {
+            $cleaned = preg_replace('/[^\d\.\-]/', '', str_replace(',', '', trim($value)));
+            if ($cleaned !== '' && is_numeric($cleaned)) {
+                return (float) $cleaned;
+            }
+        }
+        return $default;
     }
 }
