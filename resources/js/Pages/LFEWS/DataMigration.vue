@@ -60,13 +60,23 @@ const hpaToInHg = (hpa: number) => {
   return hpa / 33.8639;
 };
 
+const parseNum = (v: any): number => {
+  if (v === null || v === undefined) return NaN;
+  if (typeof v === "number") return v;
+  if (typeof v === "string") {
+    const cleaned = v.replace(/,/g, "").replace(/[^\d.-]/g, "");
+    return parseFloat(cleaned);
+  }
+  return NaN;
+};
+
 const toggleTemperatureUnit = () => {
   const targetCols = ["temperature", "heat_index", "dewpoint"];
 
   uploadedData.value = uploadedData.value.map((row) => {
     const newRow = { ...row };
     targetCols.forEach((col) => {
-      const val = parseFloat(newRow[col]);
+      const val = parseNum(newRow[col]);
       if (!isNaN(val)) {
         if (convertTemperature.value) {
           // Converting F to C
@@ -90,7 +100,7 @@ const toggleUnitConversion = () => {
 
     // Convert Precipitation
     precipCols.forEach((col) => {
-      const val = parseFloat(newRow[col]);
+      const val = parseNum(newRow[col]);
       if (!isNaN(val)) {
         if (convertInToMm.value) {
           newRow[col] = inToMm(val).toFixed(2);
@@ -102,7 +112,7 @@ const toggleUnitConversion = () => {
 
     // Convert Pressure
     pressureCols.forEach((col) => {
-      const val = parseFloat(newRow[col]);
+      const val = parseNum(newRow[col]);
       if (!isNaN(val)) {
         if (convertInToMm.value) {
           newRow[col] = inHgToHpa(val).toFixed(2);
@@ -125,7 +135,12 @@ const cleanData = () => {
     const newRow = { ...row };
     Object.keys(newRow).forEach((key) => {
       if (typeof newRow[key] === "string") {
-        newRow[key] = newRow[key].replace(unitRegex, "").trim();
+        let val = newRow[key].replace(unitRegex, "").trim();
+        const isDateKey = key.toLowerCase().includes("date") || key.toLowerCase().includes("time");
+        if (!isDateKey) {
+          val = val.replace(/,/g, "");
+        }
+        newRow[key] = val;
       }
     });
     return newRow;
