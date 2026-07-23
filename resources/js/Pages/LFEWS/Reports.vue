@@ -4,6 +4,7 @@ import { ref, onMounted, watch, nextTick, onUnmounted, computed } from 'vue';
 import * as am5 from '@amcharts/amcharts5';
 import * as am5xy from '@amcharts/amcharts5/xy';
 import am5themes_Animated from '@amcharts/amcharts5/themes/Animated';
+import * as am5radar from '@amcharts/amcharts5/radar';
 import { Exporting } from "@amcharts/amcharts5/plugins/exporting";
 import axios from 'axios';
 import * as XLSX from 'xlsx';
@@ -40,10 +41,18 @@ const months = [
 
 // Form states
 const selectedReport = ref('Rain');
-const reportTypes = ['Rain', 'Heat Index', 'Water Level'];
+const reportTypes = [
+    'Rain', 
+    'Heat Index', 
+    'Water Level', 
+    'Prevailing Wind Direction & Frequency', 
+    'Wind Speed'
+];
 const rainReportType = ref('Monthly');
 const heatIndexReportType = ref('Monthly');
 const waterLevelReportType = ref('Monthly');
+const windDirectionReportType = ref('Monthly');
+const windSpeedReportType = ref('Monthly');
 
 const currentMonth = new Date().toLocaleString('default', { month: 'long' });
 const currentYear = new Date().getFullYear();
@@ -72,6 +81,22 @@ const waterLevelReport = ref({
     to: ''
 });
 
+const detailWindDirectionReport = ref({
+    month: currentMonth,
+    year: currentYear.toString(),
+    from: '',
+    to: '',
+    station: 'All'
+});
+
+const detailWindSpeedReport = ref({
+    month: currentMonth,
+    year: currentYear.toString(),
+    from: '',
+    to: '',
+    station: 'All'
+});
+
 const isGenerating = ref(false);
 const hasSearched = ref(false);
 
@@ -79,6 +104,8 @@ const hasSearched = ref(false);
 const rainChartDiv = ref<HTMLElement | null>(null);
 const heatIndexChartDiv = ref<HTMLElement | null>(null);
 const waterLevelChartDiv = ref<HTMLElement | null>(null);
+const windDirectionChartDiv = ref<HTMLElement | null>(null);
+const windSpeedChartDiv = ref<HTMLElement | null>(null);
 
 const waterLevelRecords = ref<any[]>([]);
 const waterLevelSummaryRecords = ref<any[]>([]);
@@ -87,11 +114,17 @@ const rainRecords = ref<any[]>([]);
 const rainSummaryRecords = ref<any[]>([]);
 const heatIndexRecords = ref<any[]>([]);
 const heatIndexSummaryRecords = ref<any[]>([]);
+const windDirectionRecords = ref<any[]>([]);
+const windDirectionSummaryRecords = ref<any[]>([]);
+const windSpeedRecords = ref<any[]>([]);
+const windSpeedSummaryRecords = ref<any[]>([]);
 
 // Tab States
 const waterLevelActiveTab = ref('');
 const rainActiveTab = ref('');
 const heatIndexActiveTab = ref('');
+const windDirectionActiveTab = ref('');
+const windSpeedActiveTab = ref('');
 
 // Tab Lists
 const waterLevelTabs = computed(() => {
@@ -121,6 +154,24 @@ const heatIndexTabs = computed(() => {
     return tabs;
 });
 
+const windDirectionTabs = computed(() => {
+    const stations = [...new Set(windDirectionRecords.value.map(r => r.station_name))];
+    const tabs = stations.sort();
+    if (detailWindDirectionReport.value.station === 'All' && windDirectionSummaryRecords.value.length > 0) {
+        return ['Summary', ...tabs];
+    }
+    return tabs;
+});
+
+const windSpeedTabs = computed(() => {
+    const stations = [...new Set(windSpeedRecords.value.map(r => r.station_name))];
+    const tabs = stations.sort();
+    if (detailWindSpeedReport.value.station === 'All' && windSpeedSummaryRecords.value.length > 0) {
+        return ['Summary', ...tabs];
+    }
+    return tabs;
+});
+
 // Filtered Records (based on tab)
 const filteredWaterLevelRecords = computed(() => {
     if (waterLevelReport.value.sensor !== 'All') return waterLevelRecords.value;
@@ -141,6 +192,20 @@ const filteredHeatIndexRecords = computed(() => {
     const activeTab = heatIndexActiveTab.value || (heatIndexTabs.value.length > 0 ? heatIndexTabs.value[0] : '');
     if (activeTab === 'Summary') return heatIndexSummaryRecords.value;
     return heatIndexRecords.value.filter(r => r.station_name === activeTab);
+});
+
+const filteredWindDirectionRecords = computed(() => {
+    if (detailWindDirectionReport.value.station !== 'All') return windDirectionRecords.value;
+    const activeTab = windDirectionActiveTab.value || (windDirectionTabs.value.length > 0 ? windDirectionTabs.value[0] : '');
+    if (activeTab === 'Summary') return windDirectionSummaryRecords.value;
+    return windDirectionRecords.value.filter(r => r.station_name === activeTab);
+});
+
+const filteredWindSpeedRecords = computed(() => {
+    if (detailWindSpeedReport.value.station !== 'All') return windSpeedRecords.value;
+    const activeTab = windSpeedActiveTab.value || (windSpeedTabs.value.length > 0 ? windSpeedTabs.value[0] : '');
+    if (activeTab === 'Summary') return windSpeedSummaryRecords.value;
+    return windSpeedRecords.value.filter(r => r.station_name === activeTab);
 });
 
 // Pagination
@@ -164,6 +229,105 @@ const paginatedHeatIndexRecords = computed(() => {
     return filteredHeatIndexRecords.value.slice(start, start + itemsPerPage);
 });
 const heatIndexTotalPages = computed(() => Math.ceil(filteredHeatIndexRecords.value.length / itemsPerPage));
+
+const paginatedWindDirectionRecords = computed(() => {
+    const start = (currentPage.value - 1) * itemsPerPage;
+    return filteredWindDirectionRecords.value.slice(start, start + itemsPerPage);
+});
+const windDirectionTotalPages = computed(() => Math.ceil(filteredWindDirectionRecords.value.length / itemsPerPage));
+
+const paginatedWindSpeedRecords = computed(() => {
+    const start = (currentPage.value - 1) * itemsPerPage;
+    return filteredWindSpeedRecords.value.slice(start, start + itemsPerPage);
+});
+const windSpeedTotalPages = computed(() => Math.ceil(filteredWindSpeedRecords.value.length / itemsPerPage));
+
+// Cardinal Direction Helpers
+const CARDINAL_DIRECTIONS = ['North', 'North East', 'East', 'South East', 'South', 'South West', 'West', 'North West'];
+
+const getCardinalDirection = (deg: number | string | null | undefined): string => {
+    if (deg === null || deg === undefined || deg === '' || isNaN(Number(deg))) return 'N/A';
+    const angle = ((Number(deg) % 360) + 360) % 360;
+    if (angle >= 337.5 || angle < 22.5) return 'North';
+    if (angle >= 22.5 && angle < 67.5) return 'North East';
+    if (angle >= 67.5 && angle < 112.5) return 'East';
+    if (angle >= 112.5 && angle < 157.5) return 'South East';
+    if (angle >= 157.5 && angle < 202.5) return 'South';
+    if (angle >= 202.5 && angle < 247.5) return 'South West';
+    if (angle >= 247.5 && angle < 292.5) return 'West';
+    if (angle >= 292.5 && angle < 337.5) return 'North West';
+    return 'N/A';
+};
+
+const getCardinalAbbr = (deg: number | string | null | undefined): string => {
+    const dir = getCardinalDirection(deg);
+    const map: Record<string, string> = {
+        'North': 'N', 'North East': 'NE', 'East': 'E', 'South East': 'SE',
+        'South': 'S', 'South West': 'SW', 'West': 'W', 'North West': 'NW'
+    };
+    return map[dir] || 'N/A';
+};
+
+const computeDirectionFrequencies = (records: any[]) => {
+    const counts: Record<string, number> = {
+        'North': 0, 'North East': 0, 'East': 0, 'South East': 0,
+        'South': 0, 'South West': 0, 'West': 0, 'North West': 0
+    };
+    const speedSums: Record<string, number> = {
+        'North': 0, 'North East': 0, 'East': 0, 'South East': 0,
+        'South': 0, 'South West': 0, 'West': 0, 'North West': 0
+    };
+
+    let validCount = 0;
+    records.forEach(r => {
+        if (r.wind_direction !== null && r.wind_direction !== undefined && !isNaN(Number(r.wind_direction))) {
+            const dir = getCardinalDirection(r.wind_direction);
+            if (counts[dir] !== undefined) {
+                counts[dir]++;
+                speedSums[dir] += Number(r.wind_speed || 0);
+                validCount++;
+            }
+        }
+    });
+
+    let prevailingDir = 'North';
+    let maxCount = -1;
+
+    const data = CARDINAL_DIRECTIONS.map(dir => {
+        const count = counts[dir];
+        const freq = validCount > 0 ? parseFloat(((count / validCount) * 100).toFixed(1)) : 0;
+        const avgSpeed = count > 0 ? parseFloat((speedSums[dir] / count).toFixed(1)) : 0;
+
+        if (count > maxCount) {
+            maxCount = count;
+            prevailingDir = dir;
+        }
+
+        return {
+            direction: dir,
+            frequency: freq,
+            count: count,
+            avgSpeed: avgSpeed
+        };
+    });
+
+    const prevailingFreq = validCount > 0 ? parseFloat(((counts[prevailingDir] / validCount) * 100).toFixed(1)) : 0;
+    const prevailingAvgSpeed = counts[prevailingDir] > 0 ? parseFloat((speedSums[prevailingDir] / counts[prevailingDir]).toFixed(1)) : 0;
+
+    return {
+        chartData: data,
+        totalObservations: validCount,
+        prevailingDir,
+        prevailingFreq,
+        prevailingAvgSpeed
+    };
+};
+
+const activePrevailingDirectionSummary = computed(() => {
+    const records = filteredWindDirectionRecords.value;
+    if (!records || records.length === 0) return null;
+    return computeDirectionFrequencies(records);
+});
 
 // Matrix Summary Logic
 const getDaysInMonth = (monthNameOrIndex: string | number, year: number) => {
@@ -288,6 +452,72 @@ const waterLevelSummaryMatrix = computed(() => {
         return acc;
     }, {});
     return { sensors, rows, averages };
+});
+
+const windDirectionSummaryMatrix = computed(() => {
+    if (detailWindDirectionReport.value.station !== 'All' || windDirectionSummaryRecords.value.length === 0) return null;
+    const stations = [...new Set(windDirectionRecords.value.map(r => r.station_name))].sort();
+    
+    const rows = CARDINAL_DIRECTIONS.map(dir => {
+        const row: any = { direction: dir };
+        stations.forEach(station => {
+            const stationRecs = windDirectionRecords.value.filter(r => r.station_name === station);
+            const freqResult = computeDirectionFrequencies(stationRecs);
+            const item = freqResult.chartData.find(d => d.direction === dir);
+            row[station] = item ? `${item.frequency}% (${item.count})` : '0.0%';
+        });
+        return row;
+    });
+
+    const prevailingRow: any = { direction: 'PREVAILING DIRECTION' };
+    stations.forEach(station => {
+        const stationRecs = windDirectionRecords.value.filter(r => r.station_name === station);
+        const freqResult = computeDirectionFrequencies(stationRecs);
+        prevailingRow[station] = `${freqResult.prevailingDir} (${freqResult.prevailingFreq}%)`;
+    });
+
+    return { stations, rows, prevailingRow };
+});
+
+const windSpeedSummaryMatrix = computed(() => {
+    if (detailWindSpeedReport.value.station !== 'All' || windSpeedSummaryRecords.value.length === 0) return null;
+    const stations = [...new Set(windSpeedRecords.value.map(r => r.station_name))].sort();
+    let days: any[] = [];
+    if (windSpeedReportType.value === 'Monthly') {
+        const year = parseInt(detailWindSpeedReport.value.year);
+        const numDays = getDaysInMonth(detailWindSpeedReport.value.month, year);
+        for (let i = 1; i <= numDays; i++) days.push({ label: i.toString(), day: i });
+    } else {
+        const start = new Date(detailWindSpeedReport.value.from);
+        const end = new Date(detailWindSpeedReport.value.to);
+        let curr = new Date(start);
+        while (curr <= end) {
+            days.push({ label: curr.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), dateStr: curr.toISOString().split('T')[0] });
+            curr.setDate(curr.getDate() + 1);
+        }
+    }
+    const rows = days.map(day => {
+        const row: any = { dateLabel: day.label };
+        stations.forEach(station => {
+            const record = windSpeedSummaryRecords.value.find(r => {
+                const rDate = new Date(r.date_time);
+                return r.station_name === station && (windSpeedReportType.value === 'Monthly' ? rDate.getDate() === day.day : r.date_time.startsWith(day.dateStr));
+            });
+            row[station] = record ? record.wind_speed : '-';
+        });
+        return row;
+    });
+    const averages = stations.reduce((acc: any, s) => {
+        const vals = rows.map(r => r[s]).filter(v => typeof v === 'number');
+        acc[s] = vals.length > 0 ? (vals.reduce((sum, v) => sum + v, 0) / vals.length).toFixed(2) : '0.00';
+        return acc;
+    }, {});
+    const maxes = stations.reduce((acc: any, s) => {
+        const vals = rows.map(r => r[s]).filter(v => typeof v === 'number');
+        acc[s] = vals.length > 0 ? Math.max(...vals).toFixed(2) : '0.00';
+        return acc;
+    }, {});
+    return { stations, rows, averages, maxes };
 });
 
 let activeChartRoot: am5.Root | null = null;
@@ -1207,6 +1437,163 @@ const initStationHeatmapChart = (root: am5.Root, data: any[], stations: any[], n
     return root;
 };
 
+const initWindDirectionRadarChart = (
+    rootElement: HTMLElement, 
+    title: string, 
+    dataByStation: Record<string, any[]>, 
+    isSummary: boolean = false
+) => {
+    const root = setupChartRoot(rootElement);
+
+    const chart = root.container.children.push(am5radar.RadarChart.new(root, {
+        panX: false,
+        panY: false,
+        wheelX: "none",
+        wheelY: "none",
+        startAngle: -90,
+        endAngle: 270,
+        innerRadius: am5.percent(10),
+        layout: am5.VerticalLayout.new(root, {})
+    }));
+
+    chart.children.unshift(am5.Label.new(root, {
+        text: title,
+        fontSize: 18,
+        fontWeight: "600",
+        textAlign: "center",
+        x: am5.percent(50),
+        centerX: am5.percent(50),
+        paddingTop: 10,
+        paddingBottom: 20
+    }));
+
+    let xRenderer = am5radar.AxisRendererCircular.new(root, {
+        minGridDistance: 30
+    });
+
+    xRenderer.labels.template.setAll({
+        fontSize: 12,
+        fontWeight: "600",
+        fill: am5.color(0x334155)
+    });
+
+    let xAxis = chart.xAxes.push(am5xy.CategoryAxis.new(root, {
+        categoryField: "direction",
+        renderer: xRenderer,
+        tooltip: am5.Tooltip.new(root, {})
+    }));
+
+    xAxis.data.setAll(CARDINAL_DIRECTIONS.map(d => ({ direction: d })));
+
+    let yRenderer = am5radar.AxisRendererRadial.new(root, {
+        axisAngle: 90
+    });
+
+    let yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, {
+        min: 0,
+        numberFormat: "#.#'%'",
+        renderer: yRenderer
+    }));
+
+    if (isSummary) {
+        const legend = chart.children.push(am5.Legend.new(root, {
+            centerX: am5.p50,
+            x: am5.p50,
+            paddingTop: 15
+        }));
+
+        const stationEntries = Object.entries(dataByStation);
+        const allPossibleNames = Array.from(new Set(props.stations.map(s => s.name)));
+
+        stationEntries.forEach(([stationName, stationRecords], idx) => {
+            const freqResult = computeDirectionFrequencies(stationRecords);
+            const nameIndex = allPossibleNames.indexOf(stationName);
+            const colorIndex = nameIndex >= 0 ? nameIndex % colors.length : idx % colors.length;
+            const seriesColor = am5.color(colors[colorIndex]);
+
+            const series = chart.series.push(am5radar.RadarLineSeries.new(root, {
+                name: stationName,
+                xAxis: xAxis,
+                yAxis: yAxis,
+                valueYField: "frequency",
+                categoryXField: "direction",
+                stroke: seriesColor,
+                fill: seriesColor,
+                tooltip: am5.Tooltip.new(root, {
+                    labelText: "[bold]{name}[/]\n{categoryX}: {valueY}%\nCount: {count} obs\nAve. Speed: {avgSpeed} kph",
+                    getFillFromSprite: false
+                })
+            }));
+
+            series.fills.template.setAll({
+                visible: true,
+                fillOpacity: 0.25
+            });
+
+            series.strokes.template.setAll({
+                strokeWidth: 2
+            });
+
+            series.bullets.push(function () {
+                return am5.Bullet.new(root, {
+                    sprite: am5.Circle.new(root, {
+                        radius: 4,
+                        fill: seriesColor
+                    })
+                });
+            });
+
+            series.data.setAll(freqResult.chartData);
+            series.appear(1000);
+        });
+
+        legend.data.setAll(chart.series.values);
+    } else {
+        const stationName = Object.keys(dataByStation)[0] || 'Station';
+        const stationRecords = dataByStation[stationName] || [];
+        const freqResult = computeDirectionFrequencies(stationRecords);
+        const primaryColor = am5.color(0xfd7b38);
+
+        const series = chart.series.push(am5radar.RadarLineSeries.new(root, {
+            name: title,
+            xAxis: xAxis,
+            yAxis: yAxis,
+            valueYField: "frequency",
+            categoryXField: "direction",
+            stroke: primaryColor,
+            fill: primaryColor,
+            tooltip: am5.Tooltip.new(root, {
+                labelText: "{categoryX}: [bold]{valueY}%[/]\nCount: {count} obs\nAve. Speed: {avgSpeed} kph"
+            })
+        }));
+
+        series.fills.template.setAll({
+            visible: true,
+            fillOpacity: 0.35
+        });
+
+        series.strokes.template.setAll({
+            strokeWidth: 3
+        });
+
+        series.bullets.push(function () {
+            return am5.Bullet.new(root, {
+                sprite: am5.Circle.new(root, {
+                    radius: 5,
+                    fill: primaryColor
+                })
+            });
+        });
+
+        series.data.setAll(freqResult.chartData);
+        series.appear(1000);
+    }
+
+    chart.appear(1000, 100);
+
+    return root;
+};
+
 const renderChart = async (chartData?: any[], seriesNames: string[] = []) => {
     await nextTick(); // Wait for v-if DOM updates to ensure refs are available
 
@@ -1270,6 +1657,28 @@ const renderChart = async (chartData?: any[], seriesNames: string[] = []) => {
             activeChartRoot = initWaterLevelRangeChart(chartDiv, chartData || [], waterLevelThresholds.value);
             return;
         }
+    } else if (selectedReport.value === 'Prevailing Wind Direction & Frequency') {
+        chartDiv = windDirectionChartDiv.value;
+        const station = detailWindDirectionReport.value.station;
+        title = `Prevailing Wind Direction & Frequency Chart - ${windDirectionReportType.value === 'Monthly' ? detailWindDirectionReport.value.month + ' ' + detailWindDirectionReport.value.year : detailWindDirectionReport.value.from + ' - ' + detailWindDirectionReport.value.to}`;
+        
+        if (chartDiv && windDirectionRecords.value.length > 0) {
+            if (station === 'All') {
+                const dataByStation: Record<string, any[]> = {};
+                windDirectionRecords.value.forEach(r => {
+                    if (!dataByStation[r.station_name]) dataByStation[r.station_name] = [];
+                    dataByStation[r.station_name].push(r);
+                });
+                activeChartRoot = initWindDirectionRadarChart(chartDiv, title, dataByStation, true);
+            } else {
+                activeChartRoot = initWindDirectionRadarChart(chartDiv, title, { [station]: windDirectionRecords.value }, false);
+            }
+            return;
+        }
+    } else if (selectedReport.value === 'Wind Speed') {
+        chartDiv = windSpeedChartDiv.value;
+        title = `Wind Speed Chart - ${windSpeedReportType.value === 'Monthly' ? detailWindSpeedReport.value.month + ' ' + detailWindSpeedReport.value.year : detailWindSpeedReport.value.from + ' - ' + detailWindSpeedReport.value.to}`;
+        unit = ' kph';
     }
 
     if (!chartData || chartData.length === 0) {
@@ -1369,13 +1778,27 @@ const handleWaterLevelReport = async () => {
 };
 
 const handleWeatherReport = async () => {
-    const isRain = selectedReport.value === 'Rain';
-    const filters = isRain ? detailRainReport.value : heatIndexReport.value;
-    const reportType = isRain ? rainReportType.value : heatIndexReportType.value;
+    let reportName = selectedReport.value;
+    let filters: any;
+    let reportType: string;
+
+    if (reportName === 'Rain') {
+        filters = detailRainReport.value;
+        reportType = rainReportType.value;
+    } else if (reportName === 'Heat Index') {
+        filters = heatIndexReport.value;
+        reportType = heatIndexReportType.value;
+    } else if (reportName === 'Prevailing Wind Direction & Frequency') {
+        filters = detailWindDirectionReport.value;
+        reportType = windDirectionReportType.value;
+    } else { // Wind Speed
+        filters = detailWindSpeedReport.value;
+        reportType = windSpeedReportType.value;
+    }
 
     const response = await axios.get('/reports/weather-observation-data', {
         params: {
-            report: selectedReport.value,
+            report: reportName,
             station: filters.station,
             reportType: reportType,
             year: filters.year,
@@ -1384,8 +1807,8 @@ const handleWeatherReport = async () => {
             to: filters.to
         }
     });
-    
-    if (isRain) {
+
+    if (reportName === 'Rain') {
         rainRecords.value = response.data.records;
         rainSummaryRecords.value = response.data.summaryRecords || [];
         rainActiveTab.value = detailRainReport.value.station === 'All' ? 'Summary' : '';
@@ -1398,11 +1821,22 @@ const handleWeatherReport = async () => {
             }));
         }
         await renderChart(chartData, response.data.stationNames);
-    } else {
+    } else if (reportName === 'Heat Index') {
         heatIndexRecords.value = response.data.records;
         heatIndexSummaryRecords.value = response.data.summaryRecords || [];
         heatIndexActiveTab.value = heatIndexReport.value.station === 'All' ? 'Summary' : '';
         await renderChart();
+    } else if (reportName === 'Prevailing Wind Direction & Frequency') {
+        windDirectionRecords.value = response.data.records;
+        windDirectionSummaryRecords.value = response.data.summaryRecords || [];
+        windDirectionActiveTab.value = detailWindDirectionReport.value.station === 'All' ? 'Summary' : '';
+        await renderChart(undefined, response.data.stationNames);
+    } else if (reportName === 'Wind Speed') {
+        windSpeedRecords.value = response.data.records;
+        windSpeedSummaryRecords.value = response.data.summaryRecords || [];
+        windSpeedActiveTab.value = detailWindSpeedReport.value.station === 'All' ? 'Summary' : '';
+        let chartData = response.data.chartData || [];
+        await renderChart(chartData, response.data.stationNames);
     }
 };
 
@@ -1412,16 +1846,16 @@ const generateReport = async () => {
     rainActiveTab.value = '';
     heatIndexActiveTab.value = '';
     waterLevelActiveTab.value = '';
+    windDirectionActiveTab.value = '';
+    windSpeedActiveTab.value = '';
     currentPage.value = 1;
     hasSearched.value = true;
 
     try {
         if (selectedReport.value === 'Water Level') {
             await handleWaterLevelReport();
-        } else if (selectedReport.value === 'Rain' || selectedReport.value === 'Heat Index') {
-            await handleWeatherReport();
         } else {
-            await renderChart();
+            await handleWeatherReport();
         }
     } catch (error) {
         console.error(`Error generating ${selectedReport.value} report:`, error);
@@ -1440,12 +1874,16 @@ watch(selectedReport, () => {
     rainRecords.value = [];
     heatIndexRecords.value = [];
     waterLevelRecords.value = [];
+    windDirectionRecords.value = [];
+    windSpeedRecords.value = [];
     clearCharts();
     currentPage.value = 1;
     hasSearched.value = false;
     rainActiveTab.value = '';
     heatIndexActiveTab.value = '';
     waterLevelActiveTab.value = '';
+    windDirectionActiveTab.value = '';
+    windSpeedActiveTab.value = '';
 });
 
 onMounted(() => {
@@ -1453,6 +1891,8 @@ onMounted(() => {
     if (props.weatherStationYears.includes(currentYear)) {
         detailRainReport.value.year = currentYear.toString();
         heatIndexReport.value.year = currentYear.toString();
+        detailWindDirectionReport.value.year = currentYear.toString();
+        detailWindSpeedReport.value.year = currentYear.toString();
     }
     if (props.waterLevelYears.includes(currentYear)) {
         waterLevelReport.value.year = currentYear.toString();
@@ -1518,6 +1958,35 @@ const exportToExcel = () => {
                 month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' 
             })
         });
+    } else if (selectedReport.value === 'Prevailing Wind Direction & Frequency') {
+        records = windDirectionRecords.value;
+        filenamePrefix = 'Prevailing_Wind_Direction_Data_Report';
+        sheetName = 'Wind Direction Data';
+        headers = (record: any, index: number) => ({
+            'No.': index + 1,
+            'Station Name': record.station_name,
+            'Wind Direction (°)': record.wind_direction,
+            'Cardinal Point': `${getCardinalDirection(record.wind_direction)} (${getCardinalAbbr(record.wind_direction)})`,
+            'Wind Speed (kph)': record.wind_speed,
+            'Wind Gust (kph)': record.wind_gust,
+            'Date & Time': new Date(record.date_time).toLocaleString('en-US', { 
+                month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' 
+            })
+        });
+    } else if (selectedReport.value === 'Wind Speed') {
+        records = windSpeedRecords.value;
+        filenamePrefix = 'Wind_Speed_Data_Report';
+        sheetName = 'Wind Speed Data';
+        headers = (record: any, index: number) => ({
+            'No.': index + 1,
+            'Station Name': record.station_name,
+            'Wind Speed (kph)': record.wind_speed,
+            'Wind Gust (kph)': record.wind_gust,
+            'Wind Direction': `${record.wind_direction}° (${getCardinalAbbr(record.wind_direction)})`,
+            'Date & Time': new Date(record.date_time).toLocaleString('en-US', { 
+                month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' 
+            })
+        });
     }
 
     if (records.length === 0) return;
@@ -1526,7 +1995,9 @@ const exportToExcel = () => {
 
     const isAll = (selectedReport.value === 'Water Level' && waterLevelReport.value.sensor === 'All') ||
                   (selectedReport.value === 'Rain' && detailRainReport.value.station === 'All') ||
-                  (selectedReport.value === 'Heat Index' && heatIndexReport.value.station === 'All');
+                  (selectedReport.value === 'Heat Index' && heatIndexReport.value.station === 'All') ||
+                  (selectedReport.value === 'Prevailing Wind Direction & Frequency' && detailWindDirectionReport.value.station === 'All') ||
+                  (selectedReport.value === 'Wind Speed' && detailWindSpeedReport.value.station === 'All');
 
     if (isAll) {
         const groupKey = selectedReport.value === 'Water Level' ? 'sensor_name' : 'station_name';
@@ -1570,6 +2041,18 @@ const exportToExcel = () => {
         } else {
             suffix = `${heatIndexReport.value.from}_to_${heatIndexReport.value.to}`;
         }
+    } else if (selectedReport.value === 'Prevailing Wind Direction & Frequency') {
+        if (windDirectionReportType.value === 'Monthly') {
+            suffix = `${detailWindDirectionReport.value.month}_${detailWindDirectionReport.value.year}`;
+        } else {
+            suffix = `${detailWindDirectionReport.value.from}_to_${detailWindDirectionReport.value.to}`;
+        }
+    } else if (selectedReport.value === 'Wind Speed') {
+        if (windSpeedReportType.value === 'Monthly') {
+            suffix = `${detailWindSpeedReport.value.month}_${detailWindSpeedReport.value.year}`;
+        } else {
+            suffix = `${detailWindSpeedReport.value.from}_to_${detailWindSpeedReport.value.to}`;
+        }
     }
 
     const filename = `${filenamePrefix}_${suffix}.xlsx`;
@@ -1604,9 +2087,47 @@ const exportSummaryToExcel = () => {
         suffix = waterLevelReportType.value === 'Monthly' 
             ? `${waterLevelReport.value.month}_${waterLevelReport.value.year}` 
             : `${waterLevelReport.value.from}_to_${waterLevelReport.value.to}`;
+    } else if (selectedReport.value === 'Prevailing Wind Direction & Frequency') {
+        matrix = windDirectionSummaryMatrix.value;
+        filenamePrefix = 'Prevailing_Wind_Direction_Summary_Report';
+        sheetName = 'Wind Direction Summary';
+        suffix = windDirectionReportType.value === 'Monthly' 
+            ? `${detailWindDirectionReport.value.month}_${detailWindDirectionReport.value.year}` 
+            : `${detailWindDirectionReport.value.from}_to_${detailWindDirectionReport.value.to}`;
+    } else if (selectedReport.value === 'Wind Speed') {
+        matrix = windSpeedSummaryMatrix.value;
+        filenamePrefix = 'Wind_Speed_Summary_Report';
+        sheetName = 'Wind Speed Summary';
+        suffix = windSpeedReportType.value === 'Monthly' 
+            ? `${detailWindSpeedReport.value.month}_${detailWindSpeedReport.value.year}` 
+            : `${detailWindSpeedReport.value.from}_to_${detailWindSpeedReport.value.to}`;
     }
 
     if (!matrix) return;
+
+    if (selectedReport.value === 'Prevailing Wind Direction & Frequency') {
+        const devices = matrix.stations;
+        const rows = matrix.rows.map((row: any) => {
+            const rowData: any = { 'Direction Axis': row.direction };
+            devices.forEach((device: string) => {
+                rowData[device] = row[device];
+            });
+            return rowData;
+        });
+        const prevailingRow: any = { 'Direction Axis': 'PREVAILING DIRECTION' };
+        devices.forEach((device: string) => {
+            prevailingRow[device] = matrix.prevailingRow[device];
+        });
+        rows.push({});
+        rows.push(prevailingRow);
+
+        const worksheet = XLSX.utils.json_to_sheet(rows);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+        const filename = `${filenamePrefix}_${suffix}.xlsx`;
+        XLSX.writeFile(workbook, filename);
+        return;
+    }
 
     const devices = matrix.stations || matrix.sensors;
     const rows = matrix.rows.map((row: any) => {
@@ -1628,6 +2149,16 @@ const exportSummaryToExcel = () => {
         rows.push({}); // Empty row
         rows.push(totalRow);
         rows.push(averageRow);
+    } else if (selectedReport.value === 'Wind Speed') {
+        const averageRow: any = { 'Date': 'Ave. Wind Speed/day' };
+        const maxRow: any = { 'Date': 'Max Wind Speed' };
+        devices.forEach((device: string) => {
+            averageRow[device] = `${matrix.averages[device]} kph`;
+            maxRow[device] = `${matrix.maxes[device]} kph`;
+        });
+        rows.push({}); // Empty row
+        rows.push(averageRow);
+        rows.push(maxRow);
     } else {
         // Averages for Heat Index and Water Level
         const label = selectedReport.value === 'Heat Index' ? 'Ave. Heat Index/day' : 'Ave. Water Level/day';
@@ -1670,6 +2201,18 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                     suffix = `${heatIndexReport.value.month}_${heatIndexReport.value.year}`;
                 } else {
                     suffix = `${heatIndexReport.value.from}_to_${heatIndexReport.value.to}`;
+                }
+            } else if (selectedReport.value === 'Prevailing Wind Direction & Frequency') {
+                if (windDirectionReportType.value === 'Monthly') {
+                    suffix = `${detailWindDirectionReport.value.month}_${detailWindDirectionReport.value.year}`;
+                } else {
+                    suffix = `${detailWindDirectionReport.value.from}_to_${detailWindDirectionReport.value.to}`;
+                }
+            } else if (selectedReport.value === 'Wind Speed') {
+                if (windSpeedReportType.value === 'Monthly') {
+                    suffix = `${detailWindSpeedReport.value.month}_${detailWindSpeedReport.value.year}`;
+                } else {
+                    suffix = `${detailWindSpeedReport.value.from}_to_${detailWindSpeedReport.value.to}`;
                 }
             }
 
@@ -1930,9 +2473,125 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                             </button>
                         </div>
                     </div>
+                    <!-- Prevailing Wind Direction & Frequency Report -->
+                    <div v-if="selectedReport === 'Prevailing Wind Direction & Frequency'" class="space-y-4">
+                        <h3 class="text-lg sm:text-xl font-bold text-gray-800 uppercase flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
+                            Weather Observation (<span class="italic">Prevailing Wind Direction & Frequency</span>)
+                            <span class="text-[10px] sm:text-sm font-normal italic text-gray-600 opacity-50 capitalize">Frequency distribution of wind directions across 8 cardinal points</span>
+                        </h3>
+                        <div class="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-4 items-start sm:items-center">
+                            <select v-model="windDirectionReportType" class="w-full sm:w-40 uppercase bg-white border border-gray-200 text-gray-800 text-xs sm:text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2 sm:p-2.5 font-bold tracking-wider">
+                                <option value="Monthly">Monthly</option>
+                                <option value="Date Range">Date Range</option>
+                            </select>
+
+                            <div v-if="windDirectionReportType === 'Monthly'" class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                                <select v-model="detailWindDirectionReport.month" class="w-full sm:w-40 uppercase bg-white border border-gray-200 text-gray-800 text-xs sm:text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2 sm:p-2.5 font-bold tracking-wider">
+                                    <option value="" disabled selected>SELECT MONTH</option>
+                                    <option v-for="m in months" :key="m" :value="m">{{ m }}</option>
+                                </select>
+
+                                <select v-model="detailWindDirectionReport.year" class="w-full sm:w-32 uppercase bg-white border border-gray-200 text-gray-800 text-xs sm:text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2 sm:p-2.5 font-bold tracking-wider">
+                                    <option value="" disabled selected>SELECT YEAR</option>
+                                    <option v-for="y in weatherStationYears" :key="y" :value="y.toString()">{{ y }}</option>
+                                </select>
+                            </div>
+                            
+                            <div v-else class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                                <div class="flex items-center gap-2 w-full sm:w-auto">
+                                    <span class="text-gray-400 font-bold text-[10px] uppercase flex-shrink-0 w-8">FROM</span>
+                                    <div class="relative w-full sm:w-40 h-[40px] sm:h-[50px] bg-white border border-gray-200 rounded-sm">
+                                        <span class="absolute left-3 top-1 text-black font-bold text-[8px] sm:text-[10px] uppercase pointer-events-none z-10">DATE</span>
+                                        <input type="date" v-model="detailWindDirectionReport.from" class="w-full h-full bg-transparent border-none text-gray-500 text-xs sm:text-sm focus:ring-0 block px-2.5 pt-3 sm:pt-4 font-bold" />
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center gap-2 w-full sm:w-auto">
+                                    <span class="text-gray-400 font-bold text-[10px] uppercase flex-shrink-0 w-8">TO</span>
+                                    <div class="relative w-full sm:w-40 h-[40px] sm:h-[50px] bg-white border border-gray-200 rounded-sm">
+                                        <span class="absolute left-3 top-1 text-black font-bold text-[8px] sm:text-[10px] uppercase pointer-events-none z-10">DATE</span>
+                                        <input type="date" v-model="detailWindDirectionReport.to" class="w-full h-full bg-transparent border-none text-gray-500 text-xs sm:text-sm focus:ring-0 block px-2.5 pt-3 sm:pt-4 font-bold" />
+                                    </div>
+                                </div>
+                            </div>
+                            <select v-model="detailWindDirectionReport.station" class="w-full sm:w-56 uppercase bg-white border border-gray-200 text-gray-800 text-xs sm:text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2 sm:p-2.5 font-bold tracking-wider">
+                                <option value="" disabled selected>SELECT STATION</option>
+                                <option v-for="station in stations" :key="station.id" :value="station.name">{{ station.name }}</option>
+                                <option value="All">All Stations</option>
+                            </select>
+
+                            <button 
+                                @click="generateReport" 
+                                :disabled="isGenerating"
+                                class="w-full sm:w-auto bg-blue-900 hover:bg-blue-800 disabled:bg-gray-400 text-white px-8 py-2 sm:py-2.5 rounded-sm font-bold uppercase tracking-wider text-xs sm:text-sm transition-colors flex justify-center items-center gap-2"
+                            >
+                                <span v-if="isGenerating" class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
+                                {{ isGenerating ? 'Generating...' : 'Generate' }}
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Wind Speed Report -->
+                    <div v-if="selectedReport === 'Wind Speed'" class="space-y-4">
+                        <h3 class="text-lg sm:text-xl font-bold text-gray-800 uppercase flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
+                            Weather Observation (<span class="italic">Wind Speed</span>)
+                            <span class="text-[10px] sm:text-sm font-normal italic text-gray-600 opacity-50 capitalize">Daily wind speed metrics and observation data</span>
+                        </h3>
+                        <div class="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-4 items-start sm:items-center">
+                            <select v-model="windSpeedReportType" class="w-full sm:w-40 uppercase bg-white border border-gray-200 text-gray-800 text-xs sm:text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2 sm:p-2.5 font-bold tracking-wider">
+                                <option value="Monthly">Monthly</option>
+                                <option value="Date Range">Date Range</option>
+                            </select>
+
+                            <div v-if="windSpeedReportType === 'Monthly'" class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                                <select v-model="detailWindSpeedReport.month" class="w-full sm:w-40 uppercase bg-white border border-gray-200 text-gray-800 text-xs sm:text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2 sm:p-2.5 font-bold tracking-wider">
+                                    <option value="" disabled selected>SELECT MONTH</option>
+                                    <option v-for="m in months" :key="m" :value="m">{{ m }}</option>
+                                </select>
+
+                                <select v-model="detailWindSpeedReport.year" class="w-full sm:w-32 uppercase bg-white border border-gray-200 text-gray-800 text-xs sm:text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2 sm:p-2.5 font-bold tracking-wider">
+                                    <option value="" disabled selected>SELECT YEAR</option>
+                                    <option v-for="y in weatherStationYears" :key="y" :value="y.toString()">{{ y }}</option>
+                                </select>
+                            </div>
+
+                            <div v-else class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                                <div class="flex items-center gap-2 w-full sm:w-auto">
+                                    <span class="text-gray-400 font-bold text-[10px] uppercase flex-shrink-0 w-8">FROM</span>
+                                    <div class="relative w-full sm:w-40 h-[40px] sm:h-[50px] bg-white border border-gray-200 rounded-sm">
+                                        <span class="absolute left-3 top-1 text-black font-bold text-[8px] sm:text-[10px] uppercase pointer-events-none z-10">DATE</span>
+                                        <input type="date" v-model="detailWindSpeedReport.from" class="w-full h-full bg-transparent border-none text-gray-500 text-xs sm:text-sm focus:ring-0 block px-2.5 pt-3 sm:pt-4 font-bold" />
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center gap-2 w-full sm:w-auto">
+                                    <span class="text-gray-400 font-bold text-[10px] uppercase flex-shrink-0 w-8">TO</span>
+                                    <div class="relative w-full sm:w-40 h-[40px] sm:h-[50px] bg-white border border-gray-200 rounded-sm">
+                                        <span class="absolute left-3 top-1 text-black font-bold text-[8px] sm:text-[10px] uppercase pointer-events-none z-10">DATE</span>
+                                        <input type="date" v-model="detailWindSpeedReport.to" class="w-full h-full bg-transparent border-none text-gray-500 text-xs sm:text-sm focus:ring-0 block px-2.5 pt-3 sm:pt-4 font-bold" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <select v-model="detailWindSpeedReport.station" class="w-full sm:w-56 uppercase bg-white border border-gray-200 text-gray-800 text-xs sm:text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2 sm:p-2.5 font-bold tracking-wider">
+                                <option value="" disabled selected>SELECT STATION</option>
+                                <option v-for="station in stations" :key="station.id" :value="station.name">{{ station.name }}</option>
+                                <option value="All">All Stations</option>
+                            </select>
+
+                            <button 
+                                @click="generateReport" 
+                                :disabled="isGenerating"
+                                class="w-full sm:w-auto bg-blue-900 hover:bg-blue-800 disabled:bg-gray-400 text-white px-8 py-2 sm:py-2.5 rounded-sm font-bold uppercase tracking-wider text-xs sm:text-sm transition-colors flex justify-center items-center gap-2"
+                            >
+                                <span v-if="isGenerating" class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
+                                {{ isGenerating ? 'Generating...' : 'Generate' }}
+                            </button>
+                        </div>
+                    </div>
                     
                     <!-- Graphical Reports -->
-                    <div v-if="rainRecords.length > 0 || heatIndexRecords.length > 0 || waterLevelRecords.length > 0" class="space-y-8 pt-8 mb-12">
+                    <div v-if="rainRecords.length > 0 || heatIndexRecords.length > 0 || waterLevelRecords.length > 0 || windDirectionRecords.length > 0 || windSpeedRecords.length > 0" class="space-y-8 pt-8 mb-12">
                         <!-- Rain Chart -->
                         <div v-show="selectedReport === 'Rain' && rainRecords.length > 0" class="space-y-2">
                             <div class="flex justify-between items-center bg-white p-2 border-b border-gray-50 rounded-t-xl">
@@ -2504,14 +3163,349 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                                 </div>
                             </div>
                         </div>
+                        <!-- Prevailing Wind Direction & Frequency Chart -->
+                        <div v-show="selectedReport === 'Prevailing Wind Direction & Frequency' && windDirectionRecords.length > 0" class="space-y-4">
+                            <div class="flex justify-between items-center bg-white p-2 border-b border-gray-50 rounded-t-xl">
+                                <button 
+                                    @click="downloadChart" 
+                                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow-sm font-bold uppercase tracking-wider text-[11px] transition-all flex items-center gap-2 active:scale-95"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                    Download Chart
+                                </button>
+                                <h4 class="font-bold text-gray-400 uppercase text-[10px] tracking-[0.2em] pr-4">Prevailing Wind Direction & Frequency</h4>
+                            </div>
+
+                            <!-- Summary Badge / Key Metric Cards -->
+                            <div v-if="activePrevailingDirectionSummary" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div class="bg-gradient-to-r from-orange-500 to-amber-600 text-white p-4 rounded-xl shadow-sm flex flex-col justify-center items-center text-center">
+                                    <span class="text-[10px] uppercase font-bold tracking-widest opacity-80">Prevailing Wind Direction</span>
+                                    <span class="text-2xl font-black uppercase mt-1">{{ activePrevailingDirectionSummary.prevailingDir }}</span>
+                                    <span class="text-xs font-bold opacity-90">({{ activePrevailingDirectionSummary.prevailingFreq }}% Frequency)</span>
+                                </div>
+                                <div class="bg-white border border-gray-200 p-4 rounded-xl shadow-sm flex flex-col justify-center items-center text-center">
+                                    <span class="text-[10px] uppercase font-bold text-gray-400 tracking-widest">Total Observations</span>
+                                    <span class="text-2xl font-black text-gray-800 mt-1">{{ activePrevailingDirectionSummary.totalObservations }}</span>
+                                    <span class="text-xs text-gray-500 font-medium">Recorded Samples</span>
+                                </div>
+                                <div class="bg-white border border-gray-200 p-4 rounded-xl shadow-sm flex flex-col justify-center items-center text-center">
+                                    <span class="text-[10px] uppercase font-bold text-gray-400 tracking-widest">Ave Speed (Prevailing Dir)</span>
+                                    <span class="text-2xl font-black text-gray-800 mt-1">{{ activePrevailingDirectionSummary.prevailingAvgSpeed }} <span class="text-xs font-bold">kph</span></span>
+                                    <span class="text-xs text-gray-500 font-medium">In {{ activePrevailingDirectionSummary.prevailingDir }} Vector</span>
+                                </div>
+                            </div>
+
+                            <div class="bg-white p-4 rounded-xl border-2 border-orange-500 shadow-md h-[450px] sm:h-[550px] w-full" ref="windDirectionChartDiv"></div>
+
+                            <!-- Results Data Table -->
+                            <div v-if="windDirectionRecords.length > 0" class="bg-white border border-gray-200 rounded-sm mt-8 overflow-hidden">
+                                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center py-3 px-4 border-b border-gray-100 gap-4">
+                                    <h4 class="font-bold text-gray-600 uppercase text-xs sm:text-sm">Prevailing Wind Direction & Frequency Data Table</h4>
+                                    <div class="flex gap-2 w-full sm:w-auto">
+                                        <button 
+                                            v-if="(windDirectionActiveTab || windDirectionTabs[0]) === 'Summary'"
+                                            @click="exportSummaryToExcel" 
+                                            class="bg-green-700 hover:bg-green-600 text-white px-4 py-1.5 rounded-sm font-bold uppercase tracking-wider text-[10px] transition-colors flex items-center gap-2"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
+                                            Export Summary
+                                        </button>
+                                        <button 
+                                            v-else
+                                            @click="exportToExcel" 
+                                            class="bg-green-700 hover:bg-green-600 text-white px-4 py-1.5 rounded-sm font-bold uppercase tracking-wider text-[10px] transition-colors flex items-center gap-2"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
+                                            Export Data
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Tab Navigation -->
+                                <div v-if="detailWindDirectionReport.station === 'All' && windDirectionTabs.length > 1" class="flex flex-wrap gap-2 border-b border-gray-100 px-4 pt-2 bg-gray-50/30">
+                                    <button 
+                                        v-for="tab in windDirectionTabs" 
+                                        :key="tab"
+                                        @click="windDirectionActiveTab = tab; currentPage = 1"
+                                        :class="[
+                                            'px-6 py-2.5 text-[10px] font-bold uppercase tracking-widest transition-all relative',
+                                            (windDirectionActiveTab || windDirectionTabs[0]) === tab 
+                                                ? 'text-blue-600' 
+                                                : 'text-gray-400 hover:text-gray-600'
+                                        ]"
+                                    >
+                                        {{ tab }}
+                                        <div v-if="(windDirectionActiveTab || windDirectionTabs[0]) === tab" class="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600"></div>
+                                    </button>
+                                </div>
+
+                                <!-- Summary Matrix Table for Wind Direction -->
+                                <div v-if="(windDirectionActiveTab || windDirectionTabs[0]) === 'Summary' && windDirectionSummaryMatrix" class="overflow-x-auto">
+                                    <table class="w-full text-left border-collapse">
+                                        <thead class="bg-gray-100 border-b border-gray-200">
+                                            <tr>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase border-r border-gray-200">Direction Axis</th>
+                                                <th v-for="station in windDirectionSummaryMatrix.stations" :key="station" class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center border-r border-gray-200">
+                                                    {{ station }}
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-100">
+                                            <tr v-for="(row, idx) in windDirectionSummaryMatrix.rows" :key="idx" class="hover:bg-gray-50 transition-colors">
+                                                <td class="px-4 py-2 text-sm text-gray-700 font-bold border-r border-gray-200 flex items-center justify-between">
+                                                    <span>{{ row.direction }}</span>
+                                                    <span class="text-xs text-gray-400 font-mono">({{ getCardinalAbbr(row.direction) }})</span>
+                                                </td>
+                                                <td v-for="station in windDirectionSummaryMatrix.stations" :key="station" class="px-4 py-2 text-xs font-bold text-center border-r border-gray-200 text-gray-800">
+                                                    {{ row[station] }}
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                        <tfoot class="bg-orange-50 border-t-2 border-orange-200">
+                                            <tr class="font-black">
+                                                <td class="px-4 py-3 text-xs text-orange-900 uppercase border-r border-orange-200">Prevailing Direction</td>
+                                                <td v-for="station in windDirectionSummaryMatrix.stations" :key="station" class="px-4 py-3 text-xs text-orange-800 text-center border-r border-orange-200 font-bold">
+                                                    {{ windDirectionSummaryMatrix.prevailingRow[station] }}
+                                                </td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+
+                                <!-- Detailed Data Table for Wind Direction -->
+                                <div v-else class="overflow-x-auto">
+                                    <table class="w-full text-left min-w-[700px]">
+                                        <thead class="bg-gray-100 border-b border-gray-200">
+                                            <tr>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">No.</th>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">Station Name</th>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Wind Direction (°)</th>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Cardinal Point</th>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Wind Speed (kph)</th>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Wind Gust (kph)</th>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Date & Time</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-100">
+                                            <tr v-for="(record, index) in paginatedWindDirectionRecords" :key="index" class="hover:bg-gray-50 transition-colors">
+                                                <td class="px-4 py-3 text-sm text-gray-500 font-bold font-mono">{{ (currentPage - 1) * itemsPerPage + index + 1 }}</td>
+                                                <td class="px-4 py-3 text-sm text-gray-800 font-bold uppercase tracking-wider">{{ record.station_name }}</td>
+                                                <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">{{ record.wind_direction }}°</td>
+                                                <td class="px-4 py-3 text-sm text-center font-bold">
+                                                    <span class="px-2.5 py-1 rounded bg-orange-100 text-orange-800 text-xs">
+                                                        {{ getCardinalDirection(record.wind_direction) }} ({{ getCardinalAbbr(record.wind_direction) }})
+                                                    </span>
+                                                </td>
+                                                <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">{{ record.wind_speed }}</td>
+                                                <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">{{ record.wind_gust }}</td>
+                                                <td class="px-4 py-3 text-sm text-gray-500 font-bold text-center">
+                                                    {{ new Date(record.date_time).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) }}
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <!-- Pagination Controls -->
+                                <div v-if="(windDirectionActiveTab || windDirectionTabs[0]) !== 'Summary' && windDirectionTotalPages > 1" class="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-100">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Page {{ currentPage }} of {{ windDirectionTotalPages }}</span>
+                                        <span class="text-[10px] text-gray-300 font-bold uppercase tracking-widest">({{ filteredWindDirectionRecords.length }} records)</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <button 
+                                            @click="currentPage--" 
+                                            :disabled="currentPage === 1"
+                                            class="p-1 rounded-sm bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                                            </svg>
+                                        </button>
+                                        <button 
+                                            @click="currentPage++" 
+                                            :disabled="currentPage === windDirectionTotalPages"
+                                            class="p-1 rounded-sm bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Wind Speed Chart -->
+                        <div v-show="selectedReport === 'Wind Speed' && windSpeedRecords.length > 0" class="space-y-4">
+                            <div class="flex justify-between items-center bg-white p-2 border-b border-gray-50 rounded-t-xl">
+                                <button 
+                                    @click="downloadChart" 
+                                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow-sm font-bold uppercase tracking-wider text-[11px] transition-all flex items-center gap-2 active:scale-95"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                    Download Chart
+                                </button>
+                                <h4 class="font-bold text-gray-400 uppercase text-[10px] tracking-[0.2em] pr-4">Wind Speed Report</h4>
+                            </div>
+                            <div class="bg-white p-2 border-2 border-orange-500 rounded-2xl shadow-md h-[400px] sm:h-[600px] w-full" ref="windSpeedChartDiv"></div>
+
+                            <!-- Results Data Table for Wind Speed -->
+                            <div v-if="windSpeedRecords.length > 0" class="bg-white border border-gray-200 rounded-sm mt-8 overflow-hidden">
+                                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center py-3 px-4 border-b border-gray-100 gap-4">
+                                    <h4 class="font-bold text-gray-600 uppercase text-xs sm:text-sm">Wind Speed Data Table</h4>
+                                    <div class="flex gap-2 w-full sm:w-auto">
+                                        <button 
+                                            v-if="(windSpeedActiveTab || windSpeedTabs[0]) === 'Summary'"
+                                            @click="exportSummaryToExcel" 
+                                            class="bg-green-700 hover:bg-green-600 text-white px-4 py-1.5 rounded-sm font-bold uppercase tracking-wider text-[10px] transition-colors flex items-center gap-2"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
+                                            Export Summary
+                                        </button>
+                                        <button 
+                                            v-else
+                                            @click="exportToExcel" 
+                                            class="bg-green-700 hover:bg-green-600 text-white px-4 py-1.5 rounded-sm font-bold uppercase tracking-wider text-[10px] transition-colors flex items-center gap-2"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
+                                            Export Data
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Wind Speed Tab Navigation -->
+                                <div v-if="detailWindSpeedReport.station === 'All' && windSpeedTabs.length > 1" class="flex flex-wrap gap-2 border-b border-gray-100 px-4 pt-2 bg-gray-50/30">
+                                    <button 
+                                        v-for="tab in windSpeedTabs" 
+                                        :key="tab"
+                                        @click="windSpeedActiveTab = tab; currentPage = 1"
+                                        :class="[
+                                            'px-6 py-2.5 text-[10px] font-bold uppercase tracking-widest transition-all relative',
+                                            (windSpeedActiveTab || windSpeedTabs[0]) === tab 
+                                                ? 'text-blue-600' 
+                                                : 'text-gray-400 hover:text-gray-600'
+                                        ]"
+                                    >
+                                        {{ tab }}
+                                        <div v-if="(windSpeedActiveTab || windSpeedTabs[0]) === tab" class="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600"></div>
+                                    </button>
+                                </div>
+
+                                <!-- Wind Speed Matrix View for Summary -->
+                                <div v-if="(windSpeedActiveTab || windSpeedTabs[0]) === 'Summary' && windSpeedSummaryMatrix" class="overflow-x-auto">
+                                    <table class="w-full text-left border-collapse">
+                                        <thead class="bg-gray-100 border-b border-gray-200">
+                                            <tr>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase border-r border-gray-200">Date</th>
+                                                <th v-for="station in windSpeedSummaryMatrix.stations" :key="station" class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center border-r border-gray-200">
+                                                    {{ station }} (kph)
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-100">
+                                            <tr v-for="(row, idx) in windSpeedSummaryMatrix.rows" :key="idx" class="hover:bg-gray-50 transition-colors">
+                                                <td class="px-4 py-2 text-sm text-gray-500 font-bold border-r border-gray-200">{{ row.dateLabel }}</td>
+                                                <td v-for="station in windSpeedSummaryMatrix.stations" :key="station" class="px-4 py-2 text-xs font-bold text-center border-r border-gray-200 text-gray-800">
+                                                    {{ row[station] }}
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                        <tfoot class="bg-gray-50 border-t-2 border-gray-200">
+                                            <tr class="font-bold">
+                                                <td class="px-4 py-3 text-[10px] text-gray-600 uppercase border-r border-gray-200">Ave. Wind Speed/day</td>
+                                                <td v-for="station in windSpeedSummaryMatrix.stations" :key="station" class="px-4 py-3 text-sm text-blue-700 text-center border-r border-gray-200">
+                                                    {{ windSpeedSummaryMatrix.averages[station] }} kph
+                                                </td>
+                                            </tr>
+                                            <tr class="font-bold bg-orange-50/50">
+                                                <td class="px-4 py-3 text-[10px] text-orange-800 uppercase border-r border-gray-200">Max Wind Speed</td>
+                                                <td v-for="station in windSpeedSummaryMatrix.stations" :key="station" class="px-4 py-3 text-sm text-orange-700 text-center border-r border-gray-200">
+                                                    {{ windSpeedSummaryMatrix.maxes[station] }} kph
+                                                </td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+
+                                <div v-else class="overflow-x-auto">
+                                    <table class="w-full text-left min-w-[700px]">
+                                        <thead class="bg-gray-100 border-b border-gray-200">
+                                            <tr>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">No.</th>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">Station Name</th>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Wind Speed (kph)</th>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Wind Gust (kph)</th>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Wind Direction</th>
+                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Date & Time</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-100">
+                                            <tr v-for="(record, index) in paginatedWindSpeedRecords" :key="index" class="hover:bg-gray-50 transition-colors">
+                                                <td class="px-4 py-3 text-sm text-gray-500 font-bold font-mono">{{ (currentPage - 1) * itemsPerPage + index + 1 }}</td>
+                                                <td class="px-4 py-3 text-sm text-gray-800 font-bold uppercase tracking-wider">{{ record.station_name }}</td>
+                                                <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">{{ record.wind_speed }}</td>
+                                                <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">{{ record.wind_gust }}</td>
+                                                <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">
+                                                    {{ record.wind_direction }}° ({{ getCardinalAbbr(record.wind_direction) }})
+                                                </td>
+                                                <td class="px-4 py-3 text-sm text-gray-500 font-bold text-center">
+                                                    {{ new Date(record.date_time).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) }}
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <!-- Pagination Controls -->
+                                <div v-if="(windSpeedActiveTab || windSpeedTabs[0]) !== 'Summary' && windSpeedTotalPages > 1" class="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-100">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Page {{ currentPage }} of {{ windSpeedTotalPages }}</span>
+                                        <span class="text-[10px] text-gray-300 font-bold uppercase tracking-widest">({{ filteredWindSpeedRecords.length }} records)</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <button 
+                                            @click="currentPage--" 
+                                            :disabled="currentPage === 1"
+                                            class="p-1 rounded-sm bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                                            </svg>
+                                        </button>
+                                        <button 
+                                            @click="currentPage++" 
+                                            :disabled="currentPage === windSpeedTotalPages"
+                                            class="p-1 rounded-sm bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- No Report Placeholder -->
                     <div v-else class="py-20 flex flex-col items-center justify-center space-y-4 border-2 border-dashed border-gray-100 rounded-sm bg-gray-50/50 mt-8">
                         <div class="relative">
-                            <div v-if="hasSearched && rainRecords.length === 0 && heatIndexRecords.length === 0 && waterLevelRecords.length === 0" class="absolute -inset-1 bg-gradient-to-r from-red-600 to-red-400 rounded-full blur opacity-25 animate-pulse"></div>
+                            <div v-if="hasSearched && rainRecords.length === 0 && heatIndexRecords.length === 0 && waterLevelRecords.length === 0 && windDirectionRecords.length === 0 && windSpeedRecords.length === 0" class="absolute -inset-1 bg-gradient-to-r from-red-600 to-red-400 rounded-full blur opacity-25 animate-pulse"></div>
                             <div v-else class="absolute -inset-1 bg-gradient-to-r from-blue-600 to-blue-400 rounded-full blur opacity-25 animate-pulse"></div>
-                            <div v-if="hasSearched && rainRecords.length === 0 && heatIndexRecords.length === 0 && waterLevelRecords.length === 0" class="relative bg-white p-4 rounded-full shadow-sm">
+                            <div v-if="hasSearched && rainRecords.length === 0 && heatIndexRecords.length === 0 && waterLevelRecords.length === 0 && windDirectionRecords.length === 0 && windSpeedRecords.length === 0" class="relative bg-white p-4 rounded-full shadow-sm">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                                 </svg>
@@ -2524,8 +3518,8 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                             
                         </div>
                         <div class="text-center space-y-1">
-                            <h3 class="text-lg font-bold text-gray-700 uppercase tracking-wider">{{ hasSearched && rainRecords.length === 0 && heatIndexRecords.length === 0 && waterLevelRecords.length === 0 ? 'No Records found' : 'No Report Generated yet' }}</h3>
-                            <p class="text-sm text-gray-400 font-medium">{{ hasSearched && rainRecords.length === 0 && heatIndexRecords.length === 0 && waterLevelRecords.length === 0 ? 'Try adjusting your filters or date range.' : 'Please select your parameters above and click the "Generate" button.' }}</p>
+                            <h3 class="text-lg font-bold text-gray-700 uppercase tracking-wider">{{ hasSearched && rainRecords.length === 0 && heatIndexRecords.length === 0 && waterLevelRecords.length === 0 && windDirectionRecords.length === 0 && windSpeedRecords.length === 0 ? 'No Records found' : 'No Report Generated yet' }}</h3>
+                            <p class="text-sm text-gray-400 font-medium">{{ hasSearched && rainRecords.length === 0 && heatIndexRecords.length === 0 && waterLevelRecords.length === 0 && windDirectionRecords.length === 0 && windSpeedRecords.length === 0 ? 'Try adjusting your filters or date range.' : 'Please select your parameters above and click the "Generate" button.' }}</p>
                         </div>
                     </div>
                 </div>

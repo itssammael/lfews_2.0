@@ -4,6 +4,9 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -20,7 +23,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-       // URL::forceScheme('https');
+        // URL::forceScheme('https');
+
+        RateLimiter::for('global', function (Request $request) {
+            return Limit::perMinute(100)->by($request->user()?->id ?: $request->ip());
+        });
 
         \Illuminate\Support\Facades\Gate::define('admin-only', function ($user) {
             return $user->roles->contains('name', 'admin');
