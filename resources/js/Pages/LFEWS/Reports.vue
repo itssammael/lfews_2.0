@@ -1705,7 +1705,7 @@ const renderChart = async (chartData?: any[], seriesNames: string[] = []) => {
 
     } else if (selectedReport.value === 'Water Level') {
         chartDiv = waterLevelChartDiv.value;
-        title = 'Water Level';
+        title = `Water Level Report - ${waterLevelReportType.value === 'Monthly' ? waterLevelReport.value.month + ' ' + waterLevelReport.value.year : waterLevelReport.value.from + ' - ' + waterLevelReport.value.to}`;
         unit = 'm';
 
         if (chartDiv && waterLevelRecords.value.length > 0 && waterLevelReport.value.sensor !== 'All') {
@@ -3102,7 +3102,7 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                                     </button>
                                     <h4 class="font-bold text-gray-400 uppercase text-[10px] tracking-[0.2em] pr-4">Water Level Report</h4>
                                 </div>
-                                <div class="bg-white p-4 rounded-xl border border-gray-200 w-full shadow-sm" ref="waterLevelChartDiv"></div>
+                                <div class="bg-white p-4 rounded-xl border border-gray-200 w-full shadow-sm h-[400px] sm:h-[500px]" ref="waterLevelChartDiv"></div>
                                 <div class="text-center text-xs font-bold text-gray-800 uppercase">Timestamp</div>
                             </div>
 
