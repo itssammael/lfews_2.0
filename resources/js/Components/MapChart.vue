@@ -45,46 +45,55 @@ let map: L.Map | null = null;
 const markersLayer = L.layerGroup();
 const barangaysGroup = L.featureGroup();
 
-const getHeatIndexColor = (heatIndex: number) => {
-    if (!props.hiSettings || props.hiSettings.length === 0) {
-        if (heatIndex >= 52) return '#990000'; // Extreme Danger - Dark Red
-        if (heatIndex >= 42) return '#cc0000'; // Danger - Red
-        if (heatIndex >= 33) return '#ff9900'; // Extreme Caution - Orange
-        if (heatIndex >= 28) return '#ffcc00'; // Caution - Yellow
-        return '#33cc33'; // Normal - Green
-    }
+const defaultHiSettings = [
+    { color: '#33cc33', advice: "Heat Index within bearable parameters.", label: "Normal", temprange: '< 27°C' },
+    { color: '#ffcc00', advice: "HEAT ALERT. Fatigue is possible with prolonged exposure and activity. Continuing activity could result in heat cramps.", label: "Caution", temprange: '28°C - 32°C' },
+    { color: '#ff9900', advice: "HEAT ALERT. Heat cramps and heat exhaustion are possible. Continuing activity could result in heatstroke.", label: "Ext. Caution", temprange: '33°C - 41°C' },
+    { color: '#cc0000', advice: "EXTREME HEAT ALERT. Heat cramps and heat exhaustion are likely. Heatstroke is probable with continued exposure.", label: "Danger", temprange: '42°C - 51°C' },
+    { color: '#990000', advice: "EXTREME HEAT ALERT. Heatstroke is highly likely with continued exposure.", label: "Extreme Danger", temprange: '>= 52°C' }
+];
 
-    // Iterate through settings to find the matching range
-    // We reverse to check higher ranges first (e.g., >= 52 before >= 42)
-    for (const setting of [...props.hiSettings].reverse()) {
-        const range = setting.temprange;
-        try {
-            if (range.includes('>=')) {
-                const val = parseFloat(range.replace(/>=/g, '').trim());
-                if (heatIndex >= val) return setting.color;
-            } else if (range.includes('<=')) {
-                const val = parseFloat(range.replace(/<=/g, '').trim());
-                if (heatIndex <= val) return setting.color;
-            } else if (range.includes('>')) {
-                const val = parseFloat(range.replace(/>/g, '').trim());
-                if (heatIndex > val) return setting.color;
-            } else if (range.includes('<')) {
-                const val = parseFloat(range.replace(/</g, '').trim());
-                // Handle gap if heat index is slightly below the warning bounds (e.g. 27.5 for < 27 condition if needed, but < works fine alone)
-                if (heatIndex < val) return setting.color;
-            } else if (range.includes('-')) {
-                const parts = range.split('-').map((p: string) => parseFloat(p.trim()));
-                // Add 1 to the upper bound to effectively cover float values like 41.5 in a 33-41 range (as [33, 42))
-                if (heatIndex >= parts[0] && heatIndex < (parts[1] + 1)) return setting.color;
-            }
-        } catch (e) {
-            console.error("Error parsing temprange:", range, e);
+const isValueInTempRange = (val: number, temprange: string): boolean => {
+    if (!temprange) return false;
+    const cleanRange = temprange.replace(/°[CF]/gi, '').trim();
+
+    if (cleanRange.includes('>=')) {
+        const threshold = parseFloat(cleanRange.replace(/>=/g, '').trim());
+        return !isNaN(threshold) && val >= threshold;
+    }
+    if (cleanRange.includes('<=')) {
+        const threshold = parseFloat(cleanRange.replace(/<=/g, '').trim());
+        return !isNaN(threshold) && val <= threshold;
+    }
+    if (cleanRange.includes('>')) {
+        const threshold = parseFloat(cleanRange.replace(/>/g, '').trim());
+        return !isNaN(threshold) && val > threshold;
+    }
+    if (cleanRange.includes('<')) {
+        const threshold = parseFloat(cleanRange.replace(/</g, '').trim());
+        if (isNaN(threshold)) return false;
+        const upperBound = Number.isInteger(threshold) ? threshold + 1 : threshold;
+        return val < upperBound;
+    }
+    if (cleanRange.includes('-')) {
+        const parts = cleanRange.split('-').map(p => parseFloat(p.trim()));
+        if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+            const upperBound = Number.isInteger(parts[1]) ? parts[1] + 1 : parts[1];
+            return val >= parts[0] && val < upperBound;
+        }
+    }
+    return false;
+};
+
+const getHeatIndexColor = (heatIndex: number) => {
+    const settings = (props.hiSettings && props.hiSettings.length > 0) ? props.hiSettings : defaultHiSettings;
+    for (const setting of [...settings].reverse()) {
+        if (isValueInTempRange(heatIndex, setting.temprange)) {
+            return setting.color;
         }
     }
 
-    // Default to the first setting's color or normal green if no match found
-    // also gracefully covers gap values like 27.5 lying between < 27 and 28-32
-    return props.hiSettings?.[0]?.color || '#33cc33';
+    return settings[0]?.color || '#33cc33';
 };
 
 const transformGeometry = (geometry: any) => {

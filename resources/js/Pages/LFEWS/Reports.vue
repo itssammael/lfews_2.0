@@ -401,20 +401,53 @@ const heatIndexSummaryMatrix = computed(() => {
     }
     const rows = days.map(day => {
         const row: any = { dateLabel: day.label };
+
         stations.forEach(station => {
-            const record = heatIndexSummaryRecords.value.find(r => {
+            const stationDayRecords = heatIndexRecords.value.filter(r => {
+                const rDate = new Date(r.date_time);
+                const matchDate = heatIndexReportType.value === 'Monthly' 
+                    ? rDate.getDate() === day.day 
+                    : r.date_time.startsWith(day.dateStr);
+                return r.station_name === station && matchDate;
+            });
+
+            const summaryRec = heatIndexSummaryRecords.value.find(r => {
                 const rDate = new Date(r.date_time);
                 return r.station_name === station && (heatIndexReportType.value === 'Monthly' ? rDate.getDate() === day.day : r.date_time.startsWith(day.dateStr));
             });
-            row[station] = record ? record.heat_index : '-';
+
+            row[station + '_hi'] = summaryRec ? summaryRec.heat_index : '-';
+
+            if (stationDayRecords.length > 0) {
+                const validTemps = stationDayRecords.map(r => Number(r.temperature)).filter(v => !isNaN(v));
+                const validHums = stationDayRecords.map(r => Number(r.humidity)).filter(v => !isNaN(v));
+
+                row[station + '_avg_temp'] = validTemps.length > 0 
+                    ? (validTemps.reduce((sum, v) => sum + v, 0) / validTemps.length).toFixed(1) 
+                    : '-';
+                row[station + '_avg_hum'] = validHums.length > 0 
+                    ? (validHums.reduce((sum, v) => sum + v, 0) / validHums.length).toFixed(1) 
+                    : '-';
+            } else {
+                row[station + '_avg_temp'] = '-';
+                row[station + '_avg_hum'] = '-';
+            }
         });
         return row;
     });
-    const averages = stations.reduce((acc: any, s) => {
-        const vals = rows.map(r => r[s]).filter(v => typeof v === 'number');
-        acc[s] = vals.length > 0 ? (vals.reduce((sum, v) => sum + v, 0) / vals.length).toFixed(2) : '0.00';
-        return acc;
-    }, {});
+
+    const averages: any = {};
+    stations.forEach(s => {
+        const hiVals = rows.map(r => r[s + '_hi']).filter(v => typeof v === 'number');
+        averages[s + '_hi'] = hiVals.length > 0 ? (hiVals.reduce((sum, v) => sum + v, 0) / hiVals.length).toFixed(2) : '0.00';
+
+        const tempVals = rows.map(r => parseFloat(r[s + '_avg_temp'])).filter(v => !isNaN(v));
+        averages[s + '_avg_temp'] = tempVals.length > 0 ? (tempVals.reduce((sum, v) => sum + v, 0) / tempVals.length).toFixed(1) : '-';
+
+        const humVals = rows.map(r => parseFloat(r[s + '_avg_hum'])).filter(v => !isNaN(v));
+        averages[s + '_avg_hum'] = humVals.length > 0 ? (humVals.reduce((sum, v) => sum + v, 0) / humVals.length).toFixed(1) : '-';
+    });
+
     return { stations, rows, averages };
 });
 
@@ -531,43 +564,65 @@ const colors = [
     0x13b766, // Complementary Green (for Pink)
 ];
 
+const defaultHiSettings = [
+    { color: '#33cc33', advice: "Heat Index within bearable parameters.", label: "Normal", temprange: '< 27°C' },
+    { color: '#ffcc00', advice: "HEAT ALERT. Fatigue is possible with prolonged exposure and activity. Continuing activity could result in heat cramps.", label: "Caution", temprange: '28°C - 32°C' },
+    { color: '#ff9900', advice: "HEAT ALERT. Heat cramps and heat exhaustion are possible. Continuing activity could result in heatstroke.", label: "Ext. Caution", temprange: '33°C - 41°C' },
+    { color: '#cc0000', advice: "EXTREME HEAT ALERT. Heat cramps and heat exhaustion are likely. Heatstroke is probable with continued exposure.", label: "Danger", temprange: '42°C - 51°C' },
+    { color: '#990000', advice: "EXTREME HEAT ALERT. Heatstroke is highly likely with continued exposure.", label: "Extreme Danger", temprange: '>= 52°C' }
+];
+
+const activeHiSettings = computed(() => {
+    if (props.hiSettings && props.hiSettings.length > 0) {
+        return props.hiSettings;
+    }
+    return defaultHiSettings;
+});
+
+const isValueInTempRange = (val: number, temprange: string): boolean => {
+    if (!temprange) return false;
+    const cleanRange = temprange.replace(/°[CF]/gi, '').trim();
+
+    if (cleanRange.includes('>=')) {
+        const threshold = parseFloat(cleanRange.replace(/>=/g, '').trim());
+        return !isNaN(threshold) && val >= threshold;
+    }
+    if (cleanRange.includes('<=')) {
+        const threshold = parseFloat(cleanRange.replace(/<=/g, '').trim());
+        return !isNaN(threshold) && val <= threshold;
+    }
+    if (cleanRange.includes('>')) {
+        const threshold = parseFloat(cleanRange.replace(/>/g, '').trim());
+        return !isNaN(threshold) && val > threshold;
+    }
+    if (cleanRange.includes('<')) {
+        const threshold = parseFloat(cleanRange.replace(/</g, '').trim());
+        if (isNaN(threshold)) return false;
+        const upperBound = Number.isInteger(threshold) ? threshold + 1 : threshold;
+        return val < upperBound;
+    }
+    if (cleanRange.includes('-')) {
+        const parts = cleanRange.split('-').map(p => parseFloat(p.trim()));
+        if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+            const upperBound = Number.isInteger(parts[1]) ? parts[1] + 1 : parts[1];
+            return val >= parts[0] && val < upperBound;
+        }
+    }
+    return false;
+};
+
 const getHeatIndexColor = (heatIndex: number | string | null | undefined) => {
     const hi = Number(heatIndex);
     if (isNaN(hi) || heatIndex === '-' || heatIndex === null) return 'transparent';
 
-    if (!props.hiSettings || props.hiSettings.length === 0) {
-        if (hi >= 52) return '#990000'; // Extreme Danger
-        if (hi >= 42) return '#cc0000'; // Danger
-        if (hi >= 33) return '#ff9900'; // Extreme Caution
-        if (hi >= 28) return '#ffcc00'; // Caution
-        return '#33cc33'; // Normal
-    }
-
-    for (const setting of [...props.hiSettings].reverse()) {
-        const range = setting.temprange;
-        try {
-            if (range.includes('>=')) {
-                const val = parseFloat(range.replace(/>=/g, '').trim());
-                if (hi >= val) return setting.color;
-            } else if (range.includes('<=')) {
-                const val = parseFloat(range.replace(/<=/g, '').trim());
-                if (hi <= val) return setting.color;
-            } else if (range.includes('>')) {
-                const val = parseFloat(range.replace(/>/g, '').trim());
-                if (hi > val) return setting.color;
-            } else if (range.includes('<')) {
-                const val = parseFloat(range.replace(/</g, '').trim());
-                if (hi < val) return setting.color;
-            } else if (range.includes('-')) {
-                const parts = range.split('-').map(p => parseFloat(p.trim()));
-                if (hi >= parts[0] && hi <= parts[1]) return setting.color;
-            }
-        } catch (e) {
-            console.error("Error parsing temprange:", range, e);
+    const settings = activeHiSettings.value;
+    for (const setting of [...settings].reverse()) {
+        if (isValueInTempRange(hi, setting.temprange)) {
+            return setting.color;
         }
     }
 
-    return props.hiSettings[0]?.color || '#33cc33';
+    return settings[0]?.color || '#33cc33';
 };
 
 const getTextColorForBg = (bgColor: string) => {
@@ -2132,9 +2187,17 @@ const exportSummaryToExcel = () => {
     const devices = matrix.stations || matrix.sensors;
     const rows = matrix.rows.map((row: any) => {
         const rowData: any = { 'Date': row.dateLabel };
-        devices.forEach((device: string) => {
-            rowData[device] = row[device];
-        });
+        if (selectedReport.value === 'Heat Index' && matrix.stations) {
+            devices.forEach((station: string) => {
+                rowData[`${station} Max Heat Index (°C)`] = row[station + '_hi'];
+                rowData[`${station} Daily Ave. Temp (°C)`] = row[station + '_avg_temp'] !== '-' ? `${row[station + '_avg_temp']}°C` : '-';
+                rowData[`${station} Ave. Humidity (%)`] = row[station + '_avg_hum'] !== '-' ? `${row[station + '_avg_hum']}%` : '-';
+            });
+        } else {
+            devices.forEach((device: string) => {
+                rowData[device] = row[device];
+            });
+        }
         return rowData;
     });
 
@@ -2159,10 +2222,18 @@ const exportSummaryToExcel = () => {
         rows.push({}); // Empty row
         rows.push(averageRow);
         rows.push(maxRow);
+    } else if (selectedReport.value === 'Heat Index' && matrix.stations) {
+        const averageRow: any = { 'Date': 'Ave. / day' };
+        devices.forEach((station: string) => {
+            averageRow[`${station} Max Heat Index (°C)`] = matrix.averages[station + '_hi'];
+            averageRow[`${station} Daily Ave. Temp (°C)`] = matrix.averages[station + '_avg_temp'] !== '-' ? `${matrix.averages[station + '_avg_temp']}°C` : '-';
+            averageRow[`${station} Ave. Humidity (%)`] = matrix.averages[station + '_avg_hum'] !== '-' ? `${matrix.averages[station + '_avg_hum']}%` : '-';
+        });
+        rows.push({}); // Empty row
+        rows.push(averageRow);
     } else {
-        // Averages for Heat Index and Water Level
-        const label = selectedReport.value === 'Heat Index' ? 'Ave. Heat Index/day' : 'Ave. Water Level/day';
-        const averageRow: any = { 'Date': label };
+        // Averages for Water Level
+        const averageRow: any = { 'Date': 'Ave. Water Level/day' };
         devices.forEach((device: string) => {
             averageRow[device] = matrix.averages[device];
         });
@@ -2790,8 +2861,8 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                             <div class="bg-white p-4 rounded-xl border border-gray-200 w-full shadow-sm" :class="heatIndexReport.station === 'All' ? 'h-[350px] sm:h-[450px]' : 'h-[400px] sm:h-[500px]'" ref="heatIndexChartDiv"></div>
                             
                             <!-- Heat Index Legend -->
-                            <div v-if="hiSettings && hiSettings.length > 0" class="mt-6 flex flex-wrap justify-center gap-8 py-6 px-8 bg-white rounded-xl shadow-sm border border-gray-100">
-                                <div v-for="(setting, index) in hiSettings" :key="index" class="flex flex-col items-center gap-1 group cursor-help">
+                            <div class="mt-6 flex flex-wrap justify-center gap-8 py-6 px-8 bg-white rounded-xl shadow-sm border border-gray-100">
+                                <div v-for="(setting, index) in activeHiSettings" :key="index" class="flex flex-col items-center gap-1 group cursor-help">
                                     <div class="flex items-center gap-3">
                                         <div 
                                             class="w-5 h-5 rounded-full border border-gray-200 shadow-sm"
@@ -2884,35 +2955,66 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                                     <table class="w-full text-left border-collapse">
                                         <thead class="bg-gray-100 border-b border-gray-200">
                                             <tr>
-                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase border-r border-gray-200">Date</th>
-                                                <th v-for="station in heatIndexSummaryMatrix.stations" :key="station" class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center border-r border-gray-200">
-                                                    {{ station }} (°C)
+                                                <th rowspan="2" class="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase border-r border-gray-200 align-middle">Date</th>
+                                                <th 
+                                                    v-for="station in heatIndexSummaryMatrix.stations" 
+                                                    :key="station" 
+                                                    colspan="3" 
+                                                    class="px-4 py-2 text-xs font-bold text-gray-700 uppercase text-center border-r border-gray-300 bg-gray-200/80"
+                                                >
+                                                    {{ station }}
                                                 </th>
+                                            </tr>
+                                            <tr class="bg-gray-100/90 border-t border-gray-200">
+                                                <template v-for="station in heatIndexSummaryMatrix.stations" :key="station + '_subheaders'">
+                                                    <th class="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase text-center border-r border-gray-200">
+                                                        Heat Index (°C)
+                                                    </th>
+                                                    <th class="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase text-center border-r border-gray-200">
+                                                        Daily Ave. Temp (°C)
+                                                    </th>
+                                                    <th class="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase text-center border-r border-gray-300">
+                                                        Ave. Humidity (%)
+                                                    </th>
+                                                </template>
                                             </tr>
                                         </thead>
                                         <tbody class="divide-y divide-gray-100">
                                             <tr v-for="(row, idx) in heatIndexSummaryMatrix.rows" :key="idx" class="hover:bg-gray-50 transition-colors">
                                                 <td class="px-4 py-2 text-sm text-gray-500 font-bold border-r border-gray-200">{{ row.dateLabel }}</td>
-                                                <td 
-                                                    v-for="station in heatIndexSummaryMatrix.stations" 
-                                                    :key="station" 
-                                                    class="px-4 py-2 text-[10px] sm:text-xs font-bold text-center border-r border-gray-200"
-                                                    :style="{ 
-                                                        backgroundColor: getHeatIndexColor(row[station]),
-                                                        color: getTextColorForBg(getHeatIndexColor(row[station]))
-                                                    }"
-                                                >
-                                                    {{ row[station] }}
-                                                    
-                                                </td>
+                                                <template v-for="station in heatIndexSummaryMatrix.stations" :key="station + '_data'">
+                                                    <td 
+                                                        class="px-3 py-2 text-[10px] sm:text-xs font-bold text-center border-r border-gray-200"
+                                                        :style="{ 
+                                                            backgroundColor: getHeatIndexColor(row[station + '_hi']),
+                                                            color: getTextColorForBg(getHeatIndexColor(row[station + '_hi']))
+                                                        }"
+                                                    >
+                                                        {{ row[station + '_hi'] }}
+                                                    </td>
+                                                    <td class="px-3 py-2 text-[10px] sm:text-xs font-bold text-center border-r border-gray-200 text-gray-700 bg-gray-50/30">
+                                                        {{ row[station + '_avg_temp'] !== '-' ? row[station + '_avg_temp'] + '°C' : '-' }}
+                                                    </td>
+                                                    <td class="px-3 py-2 text-[10px] sm:text-xs font-bold text-center border-r border-gray-300 text-gray-700 bg-gray-50/30">
+                                                        {{ row[station + '_avg_hum'] !== '-' ? row[station + '_avg_hum'] + '%' : '-' }}
+                                                    </td>
+                                                </template>
                                             </tr>
                                         </tbody>
                                         <tfoot class="bg-gray-50 border-t-2 border-gray-200">
                                             <tr class="font-bold">
-                                                <td class="px-4 py-3 text-[10px] text-gray-600 uppercase border-r border-gray-200">Ave. Heat Index/day</td>
-                                                <td v-for="station in heatIndexSummaryMatrix.stations" :key="station" class="px-4 py-3 text-sm text-green-700 text-center border-r border-gray-200">
-                                                    {{ heatIndexSummaryMatrix.averages[station] }}
-                                                </td>
+                                                <td class="px-4 py-3 text-[10px] text-gray-600 uppercase border-r border-gray-200">Ave. / day</td>
+                                                <template v-for="station in heatIndexSummaryMatrix.stations" :key="station + '_foot'">
+                                                    <td class="px-3 py-3 text-xs text-green-700 text-center border-r border-gray-200">
+                                                        {{ heatIndexSummaryMatrix.averages[station + '_hi'] }}
+                                                    </td>
+                                                    <td class="px-3 py-3 text-xs text-blue-700 text-center border-r border-gray-200">
+                                                        {{ heatIndexSummaryMatrix.averages[station + '_avg_temp'] !== '-' ? heatIndexSummaryMatrix.averages[station + '_avg_temp'] + '°C' : '-' }}
+                                                    </td>
+                                                    <td class="px-3 py-3 text-xs text-blue-700 text-center border-r border-gray-300">
+                                                        {{ heatIndexSummaryMatrix.averages[station + '_avg_hum'] !== '-' ? heatIndexSummaryMatrix.averages[station + '_avg_hum'] + '%' : '-' }}
+                                                    </td>
+                                                </template>
                                             </tr>
                                         </tfoot>
                                     </table>

@@ -258,31 +258,54 @@ const isWeatherAlertDismissed = (stationId: number) => {
   return dismissedWeatherAlerts.value[stationId] === true;
 };
 
+const defaultHiSettings = [
+  { color: '#33cc33', advice: "Heat Index within bearable parameters.", label: "Normal", temprange: '< 27°C' },
+  { color: '#ffcc00', advice: "HEAT ALERT. Fatigue is possible with prolonged exposure and activity. Continuing activity could result in heat cramps.", label: "Caution", temprange: '28°C - 32°C' },
+  { color: '#ff9900', advice: "HEAT ALERT. Heat cramps and heat exhaustion are possible. Continuing activity could result in heatstroke.", label: "Ext. Caution", temprange: '33°C - 41°C' },
+  { color: '#cc0000', advice: "EXTREME HEAT ALERT. Heat cramps and heat exhaustion are likely. Heatstroke is probable with continued exposure.", label: "Danger", temprange: '42°C - 51°C' },
+  { color: '#990000', advice: "EXTREME HEAT ALERT. Heatstroke is highly likely with continued exposure.", label: "Extreme Danger", temprange: '>= 52°C' }
+];
+
+const isValueInTempRange = (val: number, temprange: string): boolean => {
+  if (!temprange) return false;
+  const cleanRange = temprange.replace(/°[CF]/gi, '').trim();
+
+  if (cleanRange.includes('>=')) {
+    const threshold = parseFloat(cleanRange.replace(/>=/g, '').trim());
+    return !isNaN(threshold) && val >= threshold;
+  }
+  if (cleanRange.includes('<=')) {
+    const threshold = parseFloat(cleanRange.replace(/<=/g, '').trim());
+    return !isNaN(threshold) && val <= threshold;
+  }
+  if (cleanRange.includes('>')) {
+    const threshold = parseFloat(cleanRange.replace(/>/g, '').trim());
+    return !isNaN(threshold) && val > threshold;
+  }
+  if (cleanRange.includes('<')) {
+    const threshold = parseFloat(cleanRange.replace(/</g, '').trim());
+    if (isNaN(threshold)) return false;
+    const upperBound = Number.isInteger(threshold) ? threshold + 1 : threshold;
+    return val < upperBound;
+  }
+  if (cleanRange.includes('-')) {
+    const parts = cleanRange.split('-').map(p => parseFloat(p.trim()));
+    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+      const upperBound = Number.isInteger(parts[1]) ? parts[1] + 1 : parts[1];
+      return val >= parts[0] && val < upperBound;
+    }
+  }
+  return false;
+};
+
 const getHeatIndexAlertInfo = (heatIndex: any) => {
   const val = Number(heatIndex);
-  if (!props.hiSettings || props.hiSettings.length === 0) return null;
+  if (isNaN(val)) return null;
+  const settings = (props.hiSettings && props.hiSettings.length > 0) ? props.hiSettings : defaultHiSettings;
 
-  for (const setting of [...props.hiSettings].reverse()) {
-    const range = setting.temprange;
-    try {
-      if (range.includes('>=')) {
-        const threshold = parseFloat(range.replace(/>=/g, '').trim());
-        if (val >= threshold) return setting;
-      } else if (range.includes('<=')) {
-        const threshold = parseFloat(range.replace(/<=/g, '').trim());
-        if (val <= threshold) return setting;
-      } else if (range.includes('>')) {
-        const threshold = parseFloat(range.replace(/>/g, '').trim());
-        if (val > threshold) return setting;
-      } else if (range.includes('<')) {
-        const threshold = parseFloat(range.replace(/</g, '').trim());
-        if (val < threshold) return setting;
-      } else if (range.includes('-')) {
-        const parts = range.split('-').map(p => parseFloat(p.trim()));
-        if (val >= parts[0] && val <= parts[1]) return setting;
-      }
-    } catch (e) {
-      console.error("Error parsing range:", range, e);
+  for (const setting of [...settings].reverse()) {
+    if (isValueInTempRange(val, setting.temprange)) {
+      return setting;
     }
   }
   return null;
