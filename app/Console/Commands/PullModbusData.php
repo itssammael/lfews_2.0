@@ -39,29 +39,40 @@ class PullModbusData extends Command
 
             foreach ($sensors as $sensor) {
                 try {
-                    $data = $modbusService->readModbusData(
-                        $sensor->ip,
-                        (int) $sensor->port,
-                        1, // startAddress (from previous requirement)
-                        6, // quantity
-                        (int) $sensor->slave_id,
-                        3.0// timeout
-                    );
+                    if ($sensor->mode === 'ModBus') {
+                        $data = $modbusService->readModbusData(
+                            $sensor->ip,
+                            (int) $sensor->port,
+                            1, // startAddress (from previous requirement)
+                            6, // quantity
+                            (int) $sensor->slave_id,
+                            3.0// timeout
+                        );
 
-                    if ($data[5] !== 0) {
+                        if ($data[5] !== 0) {
+                            $results[$sensor->id] = [
+                                'sensor_id' => $sensor->id,
+                                'name' => $sensor->name,
+                                'success' => true,
+                                'data' => $data[5] / 10,
+                                'timestamp' => now()->toDateTimeString(),
+                            ];
+
+                            WaterLevelSensorData::create([
+                                'water_level_sensor_id' => $sensor->id,
+                                'sensor_data' => $data[5] / 10,
+                                'date' => now()->toDateTimeString(),
+                            ]);
+                        }
+                    } else {
+                        $waterLevel = $this->pullBynWLSSensor($sensor);
                         $results[$sensor->id] = [
                             'sensor_id' => $sensor->id,
                             'name' => $sensor->name,
                             'success' => true,
-                            'data' => $data[5] / 10,
+                            'data' => $waterLevel,
                             'timestamp' => now()->toDateTimeString(),
                         ];
-
-                        WaterLevelSensorData::create([
-                            'water_level_sensor_id' => $sensor->id,
-                            'sensor_data' => $data[5] / 10,
-                            'date' => now()->toDateTimeString(),
-                        ]);
                     }
                 } catch (\Exception $e) {
                     $results[$sensor->id] = [
@@ -120,5 +131,63 @@ class PullModbusData extends Command
 
             sleep((int) $timeout);
         }
+    }
+
+    private function pullBynWLSSensor($sensor)
+    {
+        $mode = is_array($sensor) ? ($sensor['mode'] ?? '') : ($sensor->mode ?? '');
+        $ip = is_array($sensor) ? ($sensor['ip'] ?? '') : ($sensor->ip ?? '');
+        $sensorId = is_array($sensor) ? ($sensor['id'] ?? null) : ($sensor->id ?? null);
+
+        $sensormode = explode("/", $mode);
+        $apikey = $sensormode[1] ?? '';
+
+        if (!preg_match("~^(?:f|ht)tps?://~i", $ip)) {
+            $ip = "http://" . $ip;
+        }
+
+        $url = $ip . "/api/waterlevel?api_key=" . $apikey;
+
+        $curl = curl_init();
+        curl_setopt_array($curl, array(
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_ENCODING => "",
+            CURLOPT_MAXREDIRS => 10,
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+            CURLOPT_CUSTOMREQUEST => "GET",
+            CURLOPT_HTTPHEADER => array(
+                "X-MB-API-KEY: " . $apikey,
+                "cache-control: no-cache"
+            ),
+        ));
+
+        $response = curl_exec($curl);
+        $err = curl_error($curl);
+
+        curl_close($curl);
+
+        if ($err) {
+            throw new \Exception("cURL Error #" . $err);
+        }
+
+        $data = json_decode($response, true);
+
+        if (!is_array($data)) {
+            throw new \Exception("Invalid JSON response from sensor API: " . $response);
+        }
+
+        $waterLevel = isset($data['water_level']) ? (float) $data['water_level'] : 0;
+
+        if ($sensorId) {
+            WaterLevelSensorData::create([
+                'water_level_sensor_id' => $sensorId,
+                'sensor_data' => $waterLevel,
+                'date' => now()->toDateTimeString(),
+            ]);
+        }
+
+        return $waterLevel;
     }
 }
