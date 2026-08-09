@@ -274,7 +274,7 @@ class WaterLevelSensorController extends Controller
                         'timestamp' => now()->toDateTimeString(),
                     ];
                     } else {
-                        $data = $this->pullBynWLSSensor($sensor);
+                        $data = $this->pullNodeMcuSensor($sensor);
                         //  dd($data);
                          $results[$sensor->id] = [
                         'sensor_id' => $sensor->id,
@@ -359,7 +359,7 @@ class WaterLevelSensorController extends Controller
             return $errorResult;
         }
     }
-    public function pullBynWLSSensor($sensor)
+    public function pullNodeMcuSensor($sensor)
     {
        
         $mode = is_array($sensor) ? ($sensor['mode'] ?? '') : ($sensor->mode ?? '');

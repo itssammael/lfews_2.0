@@ -58,14 +58,15 @@ class PullModbusData extends Command
                                 'timestamp' => now()->toDateTimeString(),
                             ];
 
-                            WaterLevelSensorData::create([
-                                'water_level_sensor_id' => $sensor->id,
-                                'sensor_data' => $data[5] / 10,
-                                'date' => now()->toDateTimeString(),
-                            ]);
+                            // WaterLevelSensorData::create([
+                            //     'water_level_sensor_id' => $sensor->id,
+                            //     'sensor_data' => $data[5] / 10,
+                            //     'date' => now()->toDateTimeString(),
+                            // ]);
                         }
                     } else {
-                        $waterLevel = $this->pullBynWLSSensor($sensor);
+                        $this->info('[ Pulling NodeMCU Sensor sensors.');
+                        $waterLevel = $this->pullNodeMcuSensor($sensor);
                         $results[$sensor->id] = [
                             'sensor_id' => $sensor->id,
                             'name' => $sensor->name,
@@ -74,6 +75,12 @@ class PullModbusData extends Command
                             'timestamp' => now()->toDateTimeString(),
                         ];
                     }
+
+                    WaterLevelSensorData::create([
+                        'water_level_sensor_id' => $sensor->id,
+                        'sensor_data' => $sensor->mode === "ModBus" ? $data[5] / 10 : $waterLevel,
+                        'date' => now()->toDateTimeString(),
+                    ]);
                 } catch (\Exception $e) {
                     $results[$sensor->id] = [
                         'sensor_id' => $sensor->id,
@@ -133,8 +140,10 @@ class PullModbusData extends Command
         }
     }
 
-    private function pullBynWLSSensor($sensor)
+    private function pullNodeMcuSensor($sensor)
     {
+            $this->info('[ Pulling NodeMCU Sensor sensors.');
+
         $mode = is_array($sensor) ? ($sensor['mode'] ?? '') : ($sensor->mode ?? '');
         $ip = is_array($sensor) ? ($sensor['ip'] ?? '') : ($sensor->ip ?? '');
         $sensorId = is_array($sensor) ? ($sensor['id'] ?? null) : ($sensor->id ?? null);
@@ -180,13 +189,7 @@ class PullModbusData extends Command
 
         $waterLevel = isset($data['water_level']) ? (float) $data['water_level'] : 0;
 
-        if ($sensorId) {
-            WaterLevelSensorData::create([
-                'water_level_sensor_id' => $sensorId,
-                'sensor_data' => $waterLevel,
-                'date' => now()->toDateTimeString(),
-            ]);
-        }
+      
 
         return $waterLevel;
     }
