@@ -252,39 +252,14 @@ class WaterLevelSensorController extends Controller
             }
             set_time_limit(60);
 
-            $sensors = \App\Models\WaterLevelSensor::where('state', 1)->get();
+            $sensors = WaterLevelSensor::where('state', 1)->get();
             $results = [];
 
             foreach ($sensors as $sensor) {
                 try {
-                    if ($sensor->mode === 'ModBus') {
-                        $data = $modbusService->readModbusData(
-                            $sensor->ip,
-                            (int) $sensor->port,
-                            1,
-                            6,
-                            (int) $sensor->slave_id,
-                            1.5
-                        );
-                         $results[$sensor->id] = [
-                        'sensor_id' => $sensor->id,
-                        'name' => $sensor->name,
-                        'success' => true,
-                        'data' =>  $data[5] / 10,
-                        'timestamp' => now()->toDateTimeString(),
-                    ];
-                    } else {
-                        $data = $this->pullNodeMcuSensor($sensor);
-                        //  dd($data);
-                         $results[$sensor->id] = [
-                        'sensor_id' => $sensor->id,
-                        'name' => $sensor->name,
-                        'success' => true,
-                        'data' => $data,
-                        'timestamp' => now()->toDateTimeString(),
-                    ];
-                    }
-                   
+
+                    $result = $this->formatSensorData($sensor, $modbusService);
+                    $results[$sensor->id] = $result;
 
                 } catch (\Exception $e) {
                     $results[$sensor->id] = [
@@ -297,50 +272,7 @@ class WaterLevelSensorController extends Controller
                 }
             }
 
-            // Update latest data
-            \Illuminate\Support\Facades\Cache::put('latest_modbus_data', $results, 60);
-
-            // Update history
-            $history = \Illuminate\Support\Facades\Cache::get('modbus_history', []);
-
-            if (empty($history)) {
-                $todayData = WaterLevelSensorData::whereDate('date', Carbon::today())
-                    ->orderBy('date_time', 'asc')
-                    ->limit(50)
-                    ->get();
-
-                foreach ($todayData as $entry) {
-                    if (!isset($history[$entry->water_level_sensor_id])) {
-                        $history[$entry->water_level_sensor_id] = [];
-                    }
-                    $history[$entry->water_level_sensor_id][] = [
-                        'value' => $entry->sensor_data,
-                        'timestamp' => $entry->date,
-                    ];
-
-                }
-            }
-
-            foreach ($results as $sensorId => $result) {
-
-                if ($result['success']) {
-                    if (!isset($history[$sensorId])) {
-                        $history[$sensorId] = [];
-                    }
-
-                    $history[$sensorId][] = [
-                        'value' => $result['data'],
-                        'timestamp' => $result['timestamp']
-                    ];
-
-                    // Keep only last 50 points per sensor
-                    if (count($history[$sensorId]) > 50) {
-                        array_shift($history[$sensorId]);
-                    }
-                }
-            }
-
-            \Illuminate\Support\Facades\Cache::put('modbus_history', $history, 60); // 24 hours
+            $this->updateModbusCache($results);
 
             \Illuminate\Support\Facades\Cache::forget($lockKey);
 
@@ -359,9 +291,78 @@ class WaterLevelSensorController extends Controller
             return $errorResult;
         }
     }
+
+    public function updateModbusCache(array $results): void
+    {
+        // Update latest data
+        \Illuminate\Support\Facades\Cache::put('latest_modbus_data', $results, 60);
+
+        // Update history
+        $history = \Illuminate\Support\Facades\Cache::get('modbus_history', []);
+
+        if (empty($history)) {
+            $todayData = WaterLevelSensorData::whereDate('date', Carbon::today())
+                ->orderBy('date', 'asc')
+                ->limit(50)
+                ->get();
+
+            foreach ($todayData as $entry) {
+                if (!isset($history[$entry->water_level_sensor_id])) {
+                    $history[$entry->water_level_sensor_id] = [];
+                }
+                $history[$entry->water_level_sensor_id][] = [
+                    'value' => $entry->sensor_data,
+                    'timestamp' => $entry->date,
+                ];
+            }
+        }
+
+        foreach ($results as $sensorId => $result) {
+            if (isset($result['success']) && $result['success']) {
+                if (!isset($history[$sensorId])) {
+                    $history[$sensorId] = [];
+                }
+
+                $history[$sensorId][] = [
+                    'value' => $result['data'],
+                    'timestamp' => $result['timestamp']
+                ];
+
+                // Keep only last 50 points per sensor
+                if (count($history[$sensorId]) > 50) {
+                    array_shift($history[$sensorId]);
+                }
+            }
+        }
+
+        \Illuminate\Support\Facades\Cache::put('modbus_history', $history, 60);
+    }
+    public function formatSensorData($sensor, $modbusService)
+    {
+        if ($sensor->mode === 'ModBus') {
+            $modbusData = $modbusService->readModbusData(
+                $sensor->ip,
+                (int) $sensor->port,
+                1,
+                6,
+                (int) $sensor->slave_id,
+                1.5
+            );
+            $data = $modbusData[5] / 10;
+        } else {
+            $data = $this->pullNodeMcuSensor($sensor);
+        }
+        return [
+            'sensor_id' => $sensor->id,
+            'name' => $sensor->name,
+            'success' => true,
+            'data' => $data,
+            'timestamp' => now()->toDateTimeString(),
+        ];
+    }
     public function pullNodeMcuSensor($sensor)
     {
-       
+
         $mode = is_array($sensor) ? ($sensor['mode'] ?? '') : ($sensor->mode ?? '');
         $ip = is_array($sensor) ? ($sensor['ip'] ?? '') : ($sensor->ip ?? '');
         $sensorId = is_array($sensor) ? ($sensor['id'] ?? null) : ($sensor->id ?? null);
@@ -406,14 +407,6 @@ class WaterLevelSensorController extends Controller
         }
 
         $waterLevel = isset($data['water_level']) ? (float) $data['water_level'] : 0;
-
-        if ($sensorId) {
-            WaterLevelSensorData::create([
-                'water_level_sensor_id' => $sensorId,
-                'sensor_data' => $waterLevel,
-                'date' => now()->toDateTimeString(),
-            ]);
-        }
 
         return $waterLevel;
     }
