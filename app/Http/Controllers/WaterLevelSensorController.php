@@ -273,7 +273,7 @@ class WaterLevelSensorController extends Controller
                         'sensor_id' => $sensor->id,
                         'name' => $sensor->name,
                         'success' => true,
-                        'data' => $sensor->mode === 'modbus' ? $data[5] / 10 : $data,
+                        'data' => $sensor->mode === 'ModBus' ? $data[5] / 10 : $data,
                         'timestamp' => now()->toDateTimeString(),
                     ];
 
