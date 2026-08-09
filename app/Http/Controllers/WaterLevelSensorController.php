@@ -266,16 +266,25 @@ class WaterLevelSensorController extends Controller
                             (int) $sensor->slave_id,
                             1.5
                         );
-                    } else {
-                        $data = $this->pullBynWLSSensor($sensor);
-                    }
-                    $results[$sensor->id] = [
+                         $results[$sensor->id] = [
                         'sensor_id' => $sensor->id,
                         'name' => $sensor->name,
                         'success' => true,
-                        'data' => $sensor->mode === 'ModBus' ? $data[5] / 10 : $data,
+                        'data' =>  $data[5] / 10,
                         'timestamp' => now()->toDateTimeString(),
                     ];
+                    } else {
+                        $data = $this->pullBynWLSSensor($sensor);
+                        //  dd($data);
+                         $results[$sensor->id] = [
+                        'sensor_id' => $sensor->id,
+                        'name' => $sensor->name,
+                        'success' => true,
+                        'data' => $data,
+                        'timestamp' => now()->toDateTimeString(),
+                    ];
+                    }
+                   
 
                 } catch (\Exception $e) {
                     $results[$sensor->id] = [
@@ -352,6 +361,7 @@ class WaterLevelSensorController extends Controller
     }
     public function pullBynWLSSensor($sensor)
     {
+       
         $mode = is_array($sensor) ? ($sensor['mode'] ?? '') : ($sensor->mode ?? '');
         $ip = is_array($sensor) ? ($sensor['ip'] ?? '') : ($sensor->ip ?? '');
         $sensorId = is_array($sensor) ? ($sensor['id'] ?? null) : ($sensor->id ?? null);
