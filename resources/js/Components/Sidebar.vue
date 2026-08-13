@@ -354,7 +354,7 @@ onMounted(() => {
         @click="$emit('closeMobile')"
       >
         <div class="flex items-center">
-             <img src="/images/weather-station.png" alt="WunderGround Integration" class="w-8 h-8 mr-2" />
+             <img src="/images/wundergroud_icon.png" alt="WunderGround Integration" class="w-8 h-8 mr-2" />
              <span class="text-xs font-bold" :class="{'block': showSidebar, 'hidden': ! showSidebar}">WunderGround Integration</span>
         </div>
       </ResponsiveNavLink>

@@ -12,7 +12,7 @@ class DashboardController extends Controller
     {
         \Illuminate\Support\Facades\Gate::authorize('can-read');
 
-        $stations = \App\Models\WeatherStation::with('location')->get();
+        $stations = \App\Models\WeatherStation::with('location')->where('state', 1)->get();
         $historyWeatherData = [];
 
         foreach ($stations as $station) {
@@ -40,21 +40,36 @@ class DashboardController extends Controller
         }
 
         $startTimestamp = \Carbon\Carbon::yesterday()->timestamp;
-        
+        $endTimestamp = \Carbon\Carbon::today()->addDays(8)->timestamp;
+
         $tides = \App\Models\Tide::where('dt', '>=', $startTimestamp)
+            ->where('dt', '<=', $endTimestamp)
             ->orderBy('dt', 'asc')
             ->get()
             ->groupBy(function ($tide) {
                 return \Illuminate\Support\Carbon::parse($tide->date)->format('Y-m-d');
             });
 
+        if ($tides->isEmpty()) {
+            $tideController = new TideController();
+            $tideController->syncTides();
+
+            $tides = \App\Models\Tide::where('dt', '>=', $startTimestamp)
+                ->where('dt', '<=', $endTimestamp)
+                ->orderBy('dt', 'asc')
+                ->get()
+                ->groupBy(function ($tide) {
+                    return \Illuminate\Support\Carbon::parse($tide->date)->format('Y-m-d');
+                });
+        }
+
         $tideHeights = \App\Models\TideHeight::where('dt', '>=', $startTimestamp)
-            ->where('dt', '<=', \Carbon\Carbon::today()->addDays(5)->timestamp)
+            ->where('dt', '<=', $endTimestamp)
             ->orderBy('dt', 'asc')
             ->get();
 
         return Inertia::render('LFEWS/Dashboard', [
-            'sensors' => \App\Models\WaterLevelSensor::all(),
+            'sensors' => \App\Models\WaterLevelSensor::where('state', 1)->get(),
             'stations' => $stations,
             'latestData' => \Illuminate\Support\Facades\Cache::get('latest_modbus_data'),
             'historyData' => \Illuminate\Support\Facades\Cache::get('modbus_history', []),

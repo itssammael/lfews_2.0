@@ -77,7 +77,7 @@ const sortedDates = computed(() => {
                         </td>
                         <td v-for="date in sortedDates" :key="date" class="p-4 border border-gray-200 dark:border-gray-700">
                             <div class="flex flex-col space-y-4">
-                                <div v-for="tide in props.tides[date].filter(t => t.type === 'High')" :key="tide.id" class="text-center group">
+                                <div v-for="tide in props.tides[date].filter(t => t.type?.toLowerCase() === 'high')" :key="tide.id" class="text-center group">
                                     <div class="font-bold text-gray-800 dark:text-gray-100 text-lg tracking-tight group-hover:text-blue-600 transition-colors">{{ formatTime(tide.date) }}</div>
                                     <div class="text-gray-500 dark:text-gray-400 font-semibold text-xs">{{ tide.height.toFixed(2) }}m</div>
                                 </div>
@@ -96,7 +96,7 @@ const sortedDates = computed(() => {
                         </td>
                         <td v-for="date in sortedDates" :key="date" class="p-4 border border-gray-200 dark:border-gray-700">
                             <div class="flex flex-col space-y-4">
-                                <div v-for="tide in props.tides[date].filter(t => t.type === 'Low')" :key="tide.id" class="text-center group">
+                                <div v-for="tide in props.tides[date].filter(t => t.type?.toLowerCase() === 'low')" :key="tide.id" class="text-center group">
                                     <div class="font-bold text-teal-700 dark:text-teal-400 text-lg tracking-tight group-hover:text-teal-500 transition-colors">{{ formatTime(tide.date) }}</div>
                                     <div class="text-gray-500 dark:text-gray-400 font-semibold text-xs">{{ tide.height.toFixed(2) }}m</div>
                                 </div>

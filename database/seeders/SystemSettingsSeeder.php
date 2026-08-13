@@ -48,5 +48,16 @@ class SystemSettingsSeeder extends Seeder
                 'description' => 'API Key configuration for Weather Station Setup.',
             ]
         );
+
+        SystemSetting::updateOrCreate(
+            ['name' => 'windy_api'],
+            [
+                'value' => [
+                    'name' => 'Windy API',
+                    'key' => 'ftgRewCaEDuirgiq7pA9dBXm9dP3qOoi',
+                ],
+                'description' => 'API Key configuration for Windy API integration.',
+            ]
+        );
     }
 }

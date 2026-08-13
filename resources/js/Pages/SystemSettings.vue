@@ -104,6 +104,20 @@ const submitApiKey = () => {
     });
 };
 
+const windyApiForm = useForm({
+    name: 'windy_api',
+    value: props.settings?.windy_api || {
+        name: 'Windy API',
+        key: 'ftgRewCaEDuirgiq7pA9dBXm9dP3qOoi'
+    },
+});
+
+const submitWindyApi = () => {
+    windyApiForm.post(route('system-settings.update'), {
+        preserveScroll: true,
+    });
+};
+
 </script>
 
 <template>
@@ -283,6 +297,54 @@ const submitApiKey = () => {
 
                         <PrimaryButton :class="{ 'opacity-25': apiKeyForm.processing }" :disabled="apiKeyForm.processing">
                             Save API Key
+                        </PrimaryButton>
+                    </template>
+                </FormSection>
+
+                <SectionBorder />
+
+                <FormSection @submitted="submitWindyApi">
+                    <template #title>
+                        Windy API
+                    </template>
+
+                    <template #description>
+                        Configuration for Windy API connection and integration key.
+                    </template>
+
+                    <template #form>
+                        <div class="col-span-6 sm:col-span-4">
+                            <InputLabel for="windy_api_name" value="API Name" />
+                            <TextInput
+                                id="windy_api_name"
+                                v-model="windyApiForm.value.name"
+                                type="text"
+                                class="mt-1 block w-full"
+                                autocomplete="off"
+                            />
+                            <InputError :message="windyApiForm.errors.value" class="mt-2" />
+                        </div>
+
+                        <div class="col-span-6 sm:col-span-4">
+                            <InputLabel for="windy_api_key_val" value="API Key" />
+                            <TextInput
+                                id="windy_api_key_val"
+                                v-model="windyApiForm.value.key"
+                                type="text"
+                                class="mt-1 block w-full"
+                                autocomplete="off"
+                            />
+                            <InputError :message="windyApiForm.errors.value" class="mt-2" />
+                        </div>
+                    </template>
+
+                    <template #actions>
+                        <ActionMessage :on="windyApiForm.recentlySuccessful" class="me-3">
+                            Saved.
+                        </ActionMessage>
+
+                        <PrimaryButton :class="{ 'opacity-25': windyApiForm.processing }" :disabled="windyApiForm.processing">
+                            Save Windy API Key
                         </PrimaryButton>
                     </template>
                 </FormSection>

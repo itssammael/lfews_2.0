@@ -9,6 +9,7 @@ import WindCompass from "@/Components/WindCompass.vue";
 import Checkbox from "@/Components/Checkbox.vue";
 import InputLabel from "@/Components/InputLabel.vue";
 import TidalExtremes from "@/Components/TidalExtremes.vue";
+import WindyMap from "@/Components/WindyMap.vue";
 import { useDashboardSettings } from "@/Composables/useDashboardSettings";
 
 declare function route(name: string, params?: any, absolute?: boolean): string;
@@ -95,6 +96,17 @@ const props = defineProps<{
 
 const page = usePage();
 const flashResult = computed(() => page.props.flash.modbusResult);
+
+const windyApiKey = computed(() => {
+  const windySetting = (page.props as any).system_settings?.windy_api;
+  if (typeof windySetting === 'object' && windySetting?.key) {
+    return windySetting.key;
+  }
+  if (typeof windySetting === 'string' && windySetting.trim() !== '') {
+    return windySetting;
+  }
+  return 'ftgRewCaEDuirgiq7pA9dBXm9dP3qOoi';
+});
 
 // Use latestData prop if available, otherwise fallback to flash
 // Normalize to always be a Record/mapped object
@@ -334,6 +346,7 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters, showT
           v-if="showWaterLevelSensors"
           class="bg-transparent p-4 sm:p-8 pt-2"
         >
+        
           <!--Water level sensors data -->
           <div class="overflow-hidden">
             <div
@@ -662,10 +675,15 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters, showT
               </div>
             </div>
           </div>
+
         </div>
-        <div v-if="showWeatherStations" class="bg-transparent p-4 sm:p-8 pt-2">
+        <div v-if="showWeatherStations" class="flex flex-col lg:flex-row bg-transparent p-4 sm:p-8 pt-2 gap-6">
+          <!--Windy Forecast map Display -->
+          <div class="w-full lg:w-2/5">
+            <WindyMap :apiKey="windyApiKey" />
+          </div>
           <!--Weather Station data -->
-          <div class="overflow-hidden">
+          <div class="w-full lg:w-3/5 overflow-hidden">
             <div
               class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 space-y-4 sm:space-y-0"
             >
@@ -944,7 +962,7 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters, showT
                             >Rain Rate</span
                           >
                           <div class="flex items-baseline mt-1">
-                            <span class="text-3xl font-bold text-orange-500">{{
+                            <span class="text-xl font-bold text-orange-500">{{
                               Number(
                                 weatherResult[station.id]?.data
                                   ?.precipitation_rate || 0
@@ -958,10 +976,10 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters, showT
                         >
                           <span
                             class="text-[10px] font-bold text-gray-400 uppercase tracking-wider"
-                            >Rain Total</span
+                            >Total</span
                           >
                           <div class="flex items-baseline mt-1">
-                            <span class="text-3xl font-bold text-orange-600">{{
+                            <span class="text-xl font-bold text-orange-600">{{
                               Number(
                                 weatherResult[station.id]?.data
                                   ?.precipitation_total || 0
@@ -1094,7 +1112,7 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters, showT
                             :direction="
                               weatherResult[station.id].data.wind_direction
                             "
-                            :size="120"
+                            :size="80"
                           />
                         </div>
                       </div>

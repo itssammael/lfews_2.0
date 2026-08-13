@@ -151,6 +151,48 @@ onMounted(() => {
 
     series.data.setAll(data);
     series.appear(1000);
+
+    // Add Timeline marker at Current Time (NOW)
+    const now = Date.now();
+    const nowDataItem = xAxis.makeDataItem({
+        value: now
+    });
+    xAxis.createAxisRange(nowDataItem);
+
+    nowDataItem.get("grid")?.setAll({
+        stroke: am5.color(0xef4444), // Red-500 timeline marker
+        strokeOpacity: 0.9,
+        strokeWidth: 2,
+        strokeDasharray: [4, 4],
+        visible: true
+    });
+
+    const nowLabel = am5.Label.new(root, {
+        text: "NOW",
+        fontSize: 10,
+        fontWeight: "bold",
+        fill: am5.color(0xffffff),
+        paddingTop: 2,
+        paddingBottom: 2,
+        paddingLeft: 6,
+        paddingRight: 6,
+        centerX: am5.p50,
+        centerY: am5.p100,
+        dy: -4,
+        background: am5.RoundedRectangle.new(root, {
+            fill: am5.color(0xef4444),
+            cornerRadiusTL: 4,
+            cornerRadiusTR: 4,
+            cornerRadiusBL: 4,
+            cornerRadiusBR: 4
+        })
+    });
+
+    nowDataItem.set("bullet", am5xy.AxisBullet.new(root, {
+        location: 0,
+        sprite: nowLabel
+    }));
+
     chart.appear(1000, 100);
 });
 
