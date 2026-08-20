@@ -70,6 +70,8 @@ const heatIndexReport = ref({
     year: currentYear.toString(),
     from: '',
     to: '',
+    monthFrom: 'January',
+    monthTo: currentMonth,
     station: 'All'
 });
 
@@ -103,6 +105,7 @@ const hasSearched = ref(false);
 // Chart Refs
 const rainChartDiv = ref<HTMLElement | null>(null);
 const heatIndexChartDiv = ref<HTMLElement | null>(null);
+const heatIndexMonthRangeChartDiv = ref<HTMLElement | null>(null);
 const waterLevelChartDiv = ref<HTMLElement | null>(null);
 const windDirectionChartDiv = ref<HTMLElement | null>(null);
 const windSpeedChartDiv = ref<HTMLElement | null>(null);
@@ -114,6 +117,9 @@ const rainRecords = ref<any[]>([]);
 const rainSummaryRecords = ref<any[]>([]);
 const heatIndexRecords = ref<any[]>([]);
 const heatIndexSummaryRecords = ref<any[]>([]);
+const monthlyHeatIndexRecords = ref<any[]>([]);
+const monthRangeChartDataAvg = ref<any[]>([]);
+const monthRangeChartDataMax = ref<any[]>([]);
 const windDirectionRecords = ref<any[]>([]);
 const windDirectionSummaryRecords = ref<any[]>([]);
 const windSpeedRecords = ref<any[]>([]);
@@ -146,6 +152,13 @@ const rainTabs = computed(() => {
 });
 
 const heatIndexTabs = computed(() => {
+    if (heatIndexReportType.value === 'Month Range') {
+        const stations = [...new Set(monthlyHeatIndexRecords.value.map(r => r.station_name))].sort();
+        if (heatIndexReport.value.station === 'All' && monthlyHeatIndexRecords.value.length > 0) {
+            return ['Summary', ...stations];
+        }
+        return stations;
+    }
     const stations = [...new Set(heatIndexRecords.value.map(r => r.station_name))];
     const tabs = stations.sort();
     if (heatIndexReport.value.station === 'All' && heatIndexSummaryRecords.value.length > 0) {
@@ -194,6 +207,13 @@ const filteredHeatIndexRecords = computed(() => {
     return heatIndexRecords.value.filter(r => r.station_name === activeTab);
 });
 
+const filteredMonthRangeHeatIndexRecords = computed(() => {
+    if (heatIndexReport.value.station !== 'All') return monthlyHeatIndexRecords.value;
+    const activeTab = heatIndexActiveTab.value || (heatIndexTabs.value.length > 0 ? heatIndexTabs.value[0] : '');
+    if (activeTab === 'Summary') return monthlyHeatIndexRecords.value;
+    return monthlyHeatIndexRecords.value.filter(r => r.station_name === activeTab);
+});
+
 const filteredWindDirectionRecords = computed(() => {
     if (detailWindDirectionReport.value.station !== 'All') return windDirectionRecords.value;
     const activeTab = windDirectionActiveTab.value || (windDirectionTabs.value.length > 0 ? windDirectionTabs.value[0] : '');
@@ -229,6 +249,12 @@ const paginatedHeatIndexRecords = computed(() => {
     return filteredHeatIndexRecords.value.slice(start, start + itemsPerPage);
 });
 const heatIndexTotalPages = computed(() => Math.ceil(filteredHeatIndexRecords.value.length / itemsPerPage));
+
+const paginatedMonthRangeHeatIndexRecords = computed(() => {
+    const start = (currentPage.value - 1) * itemsPerPage;
+    return filteredMonthRangeHeatIndexRecords.value.slice(start, start + itemsPerPage);
+});
+const monthRangeHeatIndexTotalPages = computed(() => Math.ceil(filteredMonthRangeHeatIndexRecords.value.length / itemsPerPage));
 
 const paginatedWindDirectionRecords = computed(() => {
     const start = (currentPage.value - 1) * itemsPerPage;
@@ -451,6 +477,34 @@ const heatIndexSummaryMatrix = computed(() => {
     return { stations, rows, averages };
 });
 
+const heatIndexMonthRangeSummaryMatrix = computed(() => {
+    if (heatIndexReport.value.station !== 'All' || monthlyHeatIndexRecords.value.length === 0) return null;
+    const stations = [...new Set(monthlyHeatIndexRecords.value.map(r => r.station_name))].sort();
+    const uniqueMonths = [...new Set(monthlyHeatIndexRecords.value.map(r => r.month))];
+
+    const rows = uniqueMonths.map(month => {
+        const row: any = { monthLabel: month };
+        stations.forEach(station => {
+            const record = monthlyHeatIndexRecords.value.find(r => r.station_name === station && r.month === month);
+            row[station + '_avg'] = record && record.avg_heat_index !== '-' ? record.avg_heat_index : '-';
+            row[station + '_max'] = record && record.max_heat_index !== '-' ? record.max_heat_index : '-';
+        });
+        return row;
+    });
+
+    const averages: any = {};
+    const maxes: any = {};
+    stations.forEach(station => {
+        const avgVals = rows.map(r => Number(r[station + '_avg'])).filter(v => !isNaN(v));
+        const maxVals = rows.map(r => Number(r[station + '_max'])).filter(v => !isNaN(v));
+
+        averages[station + '_avg'] = avgVals.length > 0 ? (avgVals.reduce((a, b) => a + b, 0) / avgVals.length).toFixed(2) : '-';
+        maxes[station + '_max'] = maxVals.length > 0 ? Math.max(...maxVals).toFixed(2) : '-';
+    });
+
+    return { stations, months: uniqueMonths, rows, averages, maxes };
+});
+
 const waterLevelSummaryMatrix = computed(() => {
     if (waterLevelReport.value.sensor !== 'All' || waterLevelSummaryRecords.value.length === 0) return null;
     const sensors = [...new Set(waterLevelRecords.value.map(r => r.sensor_name))].sort();
@@ -553,6 +607,7 @@ const windSpeedSummaryMatrix = computed(() => {
     return { stations, rows, averages, maxes };
 });
 
+let activeChartRoots: am5.Root[] = [];
 let activeChartRoot: am5.Root | null = null;
 
 const colors = [
@@ -1649,18 +1704,224 @@ const initWindDirectionRadarChart = (
     return root;
 };
 
+const initMonthRangeCombinedChart = (
+    rootElement: HTMLElement, 
+    title: string, 
+    dataAvg: any[], 
+    dataMax: any[], 
+    seriesNames: string[], 
+    unit: string = '°C'
+) => {
+    const root = setupChartRoot(rootElement);
+    activeChartRoots.push(root);
+    activeChartRoot = root;
+
+    const chart = root.container.children.push(am5xy.XYChart.new(root, {
+        panX: true,
+        panY: true,
+        wheelX: "panX",
+        wheelY: "zoomX",
+        pinchZoomX: true,
+        layout: am5.VerticalLayout.new(root, {})
+    }));
+
+    chart.children.unshift(am5.Label.new(root, {
+        text: title,
+        fontSize: 15,
+        fontWeight: "600",
+        textAlign: "center",
+        x: am5.percent(50),
+        centerX: am5.percent(50),
+        paddingTop: 10,
+        paddingBottom: 15
+    }));
+
+    let cursor = chart.set("cursor", am5xy.XYCursor.new(root, {}));
+    cursor.lineY.set("visible", false);
+
+    let xAxis = chart.xAxes.push(am5xy.CategoryAxis.new(root, {
+        maxDeviation: 0.3,
+        categoryField: "month",
+        renderer: am5xy.AxisRendererX.new(root, {
+            minGridDistance: 30,
+            minorGridEnabled: true
+        }),
+        tooltip: am5.Tooltip.new(root, {})
+    }));
+
+    xAxis.get("renderer").labels.template.setAll({
+        rotation: -20,
+        centerY: am5.p50,
+        centerX: am5.p100,
+        paddingRight: 10,
+        fontSize: 11,
+        fontWeight: "bold"
+    });
+
+    let yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, {
+        maxDeviation: 0.3,
+        renderer: am5xy.AxisRendererY.new(root, {})
+    }));
+
+    const legend = chart.children.push(am5.Legend.new(root, {
+        centerX: am5.p50,
+        x: am5.p50,
+        paddingTop: 10
+    }));
+
+    const allPossibleNames = Array.from(new Set([
+        ...props.sensors.map(s => s.name),
+        ...props.stations.map(s => s.name)
+    ]));
+
+    // 1. ColumnSeries (Bars) for Monthly Average Heat Index per station
+    seriesNames.forEach((name) => {
+        const nameIndex = allPossibleNames.indexOf(name);
+        const colorIndex = nameIndex >= 0 ? nameIndex % colors.length : 0;
+        const seriesColor = am5.color(colors[colorIndex]);
+
+        const barSeries = chart.series.push(am5xy.ColumnSeries.new(root, {
+            name: `${name} (Ave)`,
+            xAxis: xAxis,
+            yAxis: yAxis,
+            valueYField: name,
+            categoryXField: "month",
+            fill: seriesColor,
+            stroke: seriesColor,
+            tooltip: am5.Tooltip.new(root, {
+                labelText: `{name}: {valueY}${unit}`,
+                getFillFromSprite: false,
+                autoTextColor: false
+            })
+        }));
+
+        barSeries.columns.template.setAll({
+            tooltipText: `{name}: {valueY}${unit}`,
+            width: am5.percent(90),
+            fillOpacity: 0.85,
+            tooltipY: 0,
+            strokeOpacity: 0
+        });
+
+        barSeries.bullets.push(function () {
+            return am5.Bullet.new(root, {
+                locationY: 0.5,
+                sprite: am5.Label.new(root, {
+                    text: "{valueY}" + unit,
+                    fill: am5.color(0x000000),
+                    centerY: am5.p50,
+                    centerX: am5.p50,
+                    populateText: true,
+                    fontSize: 10,
+                    fontWeight: "bold"
+                })
+            });
+        });
+
+        barSeries.get("tooltip")!.get("background")!.setAll({
+            fill: am5.color(0xffffff),
+            stroke: seriesColor,
+            strokeOpacity: 0.8,
+            fillOpacity: 0.9
+        });
+
+        barSeries.get("tooltip")!.label.setAll({
+            fill: am5.color(0x000000),
+            fontSize: 11,
+            fontWeight: "600"
+        });
+
+        barSeries.data.setAll(dataAvg);
+        barSeries.appear(1000);
+    });
+
+    // 2. LineSeries (Overlaid Line) for Monthly Max Heat Index per station
+    seriesNames.forEach((name, index) => {
+        const nameIndex = allPossibleNames.indexOf(name);
+        const colorIndex = nameIndex >= 0 ? nameIndex % colors.length : 0;
+        const seriesColor = am5.color(colors[colorIndex]);
+
+        const lineSeries = chart.series.push(am5xy.LineSeries.new(root, {
+            name: `${name} (Max)`,
+            xAxis: xAxis,
+            yAxis: yAxis,
+            valueYField: name,
+            categoryXField: "month",
+            stroke: seriesColor,
+            fill: seriesColor,
+            tooltip: am5.Tooltip.new(root, {
+                labelText: `{name}: {valueY}${unit}`,
+                getFillFromSprite: false,
+                autoTextColor: false
+            })
+        }));
+
+        lineSeries.strokes.template.setAll({
+            strokeWidth: 3
+        });
+
+        lineSeries.bullets.push(function () {
+            return am5.Bullet.new(root, {
+                sprite: am5.Circle.new(root, {
+                    radius: 5,
+                    fill: seriesColor,
+                    stroke: am5.color(0xffffff),
+                    strokeWidth: 2
+                })
+            });
+        });
+
+        lineSeries.bullets.push(function () {
+            return am5.Bullet.new(root, {
+                sprite: am5.Label.new(root, {
+                    text: "{valueY}" + unit,
+                    fill: am5.color(0x111827),
+                    centerY: am5.p100,
+                    centerX: am5.p50,
+                    dy: -8 - (index * 22),
+                    populateText: true,
+                    fontSize: 10,
+                    fontWeight: "bold",
+                    background: am5.Rectangle.new(root, {
+                        fill: am5.color(0xffffff),
+                        fillOpacity: 0.9,
+                        stroke: seriesColor,
+                        strokeWidth: 1,
+                        cornerRadiusTL: 3,
+                        cornerRadiusTR: 3,
+                        cornerRadiusBL: 3,
+                        cornerRadiusBR: 3
+                    })
+                })
+            });
+        });
+
+        lineSeries.get("tooltip")!.get("background")!.setAll({
+            fill: am5.color(0xffffff),
+            stroke: seriesColor,
+            strokeOpacity: 0.8,
+            fillOpacity: 0.9
+        });
+
+        lineSeries.get("tooltip")!.label.setAll({
+            fill: am5.color(0x000000),
+            fontSize: 11,
+            fontWeight: "600"
+        });
+
+        lineSeries.data.setAll(dataMax);
+        lineSeries.appear(1000);
+    });
+
+    xAxis.data.setAll(dataAvg);
+    legend.data.setAll(chart.series.values);
+    return root;
+};
+
 const renderChart = async (chartData?: any[], seriesNames: string[] = []) => {
     await nextTick(); // Wait for v-if DOM updates to ensure refs are available
 
-    // Dispose existing chart if any to prevent memory leaks and conflicts
-    if (activeChartRoot) {
-        try {
-            activeChartRoot.dispose();
-        } catch (e) {
-            console.warn("Error disposing chart root:", e);
-        }
-        activeChartRoot = null;
-    }
+    clearCharts();
 
     // Determine target element based on report type
     let chartDiv: HTMLElement | null = null;
@@ -1675,9 +1936,26 @@ const renderChart = async (chartData?: any[], seriesNames: string[] = []) => {
 
         if (chartDiv && rainRecords.value.length > 0 && station !== 'All') {
             activeChartRoot = initRainMixedChart(chartDiv, title, chartData || [], rainRecords.value, station);
+            if (activeChartRoot) activeChartRoots.push(activeChartRoot);
             return;
         }
     } else if (selectedReport.value === 'Heat Index') {
+        if (heatIndexReportType.value === 'Month Range') {
+            const chartDiv = heatIndexMonthRangeChartDiv.value;
+            const sNames = seriesNames.length > 0 ? seriesNames : (props.stations ? props.stations.map(s => s.name) : []);
+
+            if (chartDiv && (monthRangeChartDataAvg.value.length > 0 || monthRangeChartDataMax.value.length > 0)) {
+                initMonthRangeCombinedChart(
+                    chartDiv,
+                    `Monthly Average & Max Heat Index per Station (${heatIndexReport.value.monthFrom} - ${heatIndexReport.value.monthTo} ${heatIndexReport.value.year})`,
+                    monthRangeChartDataAvg.value,
+                    monthRangeChartDataMax.value,
+                    sNames
+                );
+            }
+            return;
+        }
+
         chartDiv = heatIndexChartDiv.value;
         title = 'Heat Index';
         unit = '°C';
@@ -1685,6 +1963,7 @@ const renderChart = async (chartData?: any[], seriesNames: string[] = []) => {
         // Special handling for Heat Index Heatmap
         if (chartDiv && heatIndexRecords.value.length > 0) {
             const root = am5.Root.new(chartDiv);
+            activeChartRoots.push(root);
             activeChartRoot = root;
             root.setThemes([am5themes_Animated.new(root)]);
             
@@ -1710,6 +1989,7 @@ const renderChart = async (chartData?: any[], seriesNames: string[] = []) => {
 
         if (chartDiv && waterLevelRecords.value.length > 0 && waterLevelReport.value.sensor !== 'All') {
             activeChartRoot = initWaterLevelRangeChart(chartDiv, chartData || [], waterLevelThresholds.value);
+            if (activeChartRoot) activeChartRoots.push(activeChartRoot);
             return;
         }
     } else if (selectedReport.value === 'Prevailing Wind Direction & Frequency') {
@@ -1728,6 +2008,7 @@ const renderChart = async (chartData?: any[], seriesNames: string[] = []) => {
             } else {
                 activeChartRoot = initWindDirectionRadarChart(chartDiv, title, { [station]: windDirectionRecords.value }, false);
             }
+            if (activeChartRoot) activeChartRoots.push(activeChartRoot);
             return;
         }
     } else if (selectedReport.value === 'Wind Speed') {
@@ -1742,17 +2023,96 @@ const renderChart = async (chartData?: any[], seriesNames: string[] = []) => {
 
     if (chartDiv) {
         activeChartRoot = initChart(chartDiv, title, chartData, seriesNames, true, unit);
+        if (activeChartRoot) activeChartRoots.push(activeChartRoot);
     }
 };
 
 const clearCharts = () => {
-    if (activeChartRoot) {
+    activeChartRoots.forEach(root => {
+        try {
+            if (root && !root.isDisposed()) {
+                root.dispose();
+            }
+        } catch (e) {
+            console.warn("Error disposing chart root:", e);
+        }
+    });
+    activeChartRoots = [];
+    if (activeChartRoot && !activeChartRoot.isDisposed()) {
         try {
             activeChartRoot.dispose();
         } catch (e) {
-            console.warn("Error disposing chart:", e);
+            console.warn("Error disposing activeChartRoot:", e);
         }
-        activeChartRoot = null;
+    }
+    activeChartRoot = null;
+};
+
+const handleWeatherReport = async () => {
+    let reportName = selectedReport.value;
+    let filters: any;
+    let reportType: string;
+
+    if (reportName === 'Rain') {
+        filters = detailRainReport.value;
+        reportType = rainReportType.value;
+    } else if (reportName === 'Heat Index') {
+        filters = heatIndexReport.value;
+        reportType = heatIndexReportType.value;
+    } else if (reportName === 'Prevailing Wind Direction & Frequency') {
+        filters = detailWindDirectionReport.value;
+        reportType = windDirectionReportType.value;
+    } else { // Wind Speed
+        filters = detailWindSpeedReport.value;
+        reportType = windSpeedReportType.value;
+    }
+
+    const response = await axios.get('/reports/weather-observation-data', {
+        params: {
+            report: reportName,
+            station: filters.station,
+            reportType: reportType,
+            year: filters.year,
+            month: filters.month,
+            from: filters.from,
+            to: filters.to,
+            monthFrom: filters.monthFrom,
+            monthTo: filters.monthTo
+        }
+    });
+
+    if (reportName === 'Rain') {
+        rainRecords.value = response.data.records;
+        rainSummaryRecords.value = response.data.summaryRecords || [];
+        rainActiveTab.value = detailRainReport.value.station === 'All' ? 'Summary' : '';
+        
+        let chartData = response.data.chartData || [];
+        if (rainReportType.value === 'Monthly' && detailRainReport.value.station === 'All') {
+            chartData = chartData.map((item: any) => ({
+                ...item,
+                date: item.date.split(' ')[1] || item.date
+            }));
+        }
+        await renderChart(chartData, response.data.stationNames);
+    } else if (reportName === 'Heat Index') {
+        heatIndexRecords.value = response.data.records;
+        heatIndexSummaryRecords.value = response.data.summaryRecords || [];
+        monthlyHeatIndexRecords.value = response.data.monthlyHeatIndexRecords || [];
+        monthRangeChartDataAvg.value = response.data.chartDataAvg || [];
+        monthRangeChartDataMax.value = response.data.chartDataMax || [];
+        heatIndexActiveTab.value = heatIndexReport.value.station === 'All' ? 'Summary' : '';
+        await renderChart(undefined, response.data.stationNames);
+    } else if (reportName === 'Prevailing Wind Direction & Frequency') {
+        windDirectionRecords.value = response.data.records;
+        windDirectionSummaryRecords.value = response.data.summaryRecords || [];
+        windDirectionActiveTab.value = detailWindDirectionReport.value.station === 'All' ? 'Summary' : '';
+        await renderChart(undefined, response.data.stationNames);
+    } else if (reportName === 'Wind Speed') {
+        windSpeedRecords.value = response.data.records;
+        windSpeedSummaryRecords.value = response.data.summaryRecords || [];
+        windSpeedActiveTab.value = detailWindSpeedReport.value.station === 'All' ? 'Summary' : '';
+        let chartData = response.data.chartData || [];
+        await renderChart(chartData, response.data.stationNames);
     }
 };
 
@@ -1829,70 +2189,6 @@ const handleWaterLevelReport = async () => {
         return row;
     }).sort((a, b) => a.timestamp - b.timestamp);
 
-    await renderChart(chartData, sensorNames);
-};
-
-const handleWeatherReport = async () => {
-    let reportName = selectedReport.value;
-    let filters: any;
-    let reportType: string;
-
-    if (reportName === 'Rain') {
-        filters = detailRainReport.value;
-        reportType = rainReportType.value;
-    } else if (reportName === 'Heat Index') {
-        filters = heatIndexReport.value;
-        reportType = heatIndexReportType.value;
-    } else if (reportName === 'Prevailing Wind Direction & Frequency') {
-        filters = detailWindDirectionReport.value;
-        reportType = windDirectionReportType.value;
-    } else { // Wind Speed
-        filters = detailWindSpeedReport.value;
-        reportType = windSpeedReportType.value;
-    }
-
-    const response = await axios.get('/reports/weather-observation-data', {
-        params: {
-            report: reportName,
-            station: filters.station,
-            reportType: reportType,
-            year: filters.year,
-            month: filters.month,
-            from: filters.from,
-            to: filters.to
-        }
-    });
-
-    if (reportName === 'Rain') {
-        rainRecords.value = response.data.records;
-        rainSummaryRecords.value = response.data.summaryRecords || [];
-        rainActiveTab.value = detailRainReport.value.station === 'All' ? 'Summary' : '';
-        
-        let chartData = response.data.chartData || [];
-        if (rainReportType.value === 'Monthly' && detailRainReport.value.station === 'All') {
-            chartData = chartData.map((item: any) => ({
-                ...item,
-                date: item.date.split(' ')[1] || item.date
-            }));
-        }
-        await renderChart(chartData, response.data.stationNames);
-    } else if (reportName === 'Heat Index') {
-        heatIndexRecords.value = response.data.records;
-        heatIndexSummaryRecords.value = response.data.summaryRecords || [];
-        heatIndexActiveTab.value = heatIndexReport.value.station === 'All' ? 'Summary' : '';
-        await renderChart();
-    } else if (reportName === 'Prevailing Wind Direction & Frequency') {
-        windDirectionRecords.value = response.data.records;
-        windDirectionSummaryRecords.value = response.data.summaryRecords || [];
-        windDirectionActiveTab.value = detailWindDirectionReport.value.station === 'All' ? 'Summary' : '';
-        await renderChart(undefined, response.data.stationNames);
-    } else if (reportName === 'Wind Speed') {
-        windSpeedRecords.value = response.data.records;
-        windSpeedSummaryRecords.value = response.data.summaryRecords || [];
-        windSpeedActiveTab.value = detailWindSpeedReport.value.station === 'All' ? 'Summary' : '';
-        let chartData = response.data.chartData || [];
-        await renderChart(chartData, response.data.stationNames);
-    }
 };
 
 const generateReport = async () => {
@@ -1999,20 +2295,33 @@ const exportToExcel = () => {
             })
         });
     } else if (selectedReport.value === 'Heat Index') {
-        records = heatIndexRecords.value;
-        filenamePrefix = 'Heat_Index_Data_Report';
-        sheetName = 'Heat Index Data';
-        headers = (record: any, index: number) => ({
-            'No.': index + 1,
-            'Station Name': record.station_name,
-            'Temperature (°C)': record.temperature,
-            'Humidity (%)': record.humidity,
-            'Dewpoint (°C)': record.dewpoint,
-            'Heat Index (°C)': record.heat_index,
-            'Date & Time': new Date(record.date_time).toLocaleString('en-US', { 
-                month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' 
-            })
-        });
+        if (heatIndexReportType.value === 'Month Range') {
+            records = monthlyHeatIndexRecords.value;
+            filenamePrefix = 'Heat_Index_Month_Range_Data_Report';
+            sheetName = 'Monthly Heat Index Data';
+            headers = (record: any, index: number) => ({
+                'No.': index + 1,
+                'Station Name': record.station_name,
+                'Month': record.month,
+                'Monthly Ave. Heat Index (°C)': record.avg_heat_index,
+                'Monthly Max Heat Index (°C)': record.max_heat_index
+            });
+        } else {
+            records = heatIndexRecords.value;
+            filenamePrefix = 'Heat_Index_Data_Report';
+            sheetName = 'Heat Index Data';
+            headers = (record: any, index: number) => ({
+                'No.': index + 1,
+                'Station Name': record.station_name,
+                'Temperature (°C)': record.temperature,
+                'Humidity (%)': record.humidity,
+                'Dewpoint (°C)': record.dewpoint,
+                'Heat Index (°C)': record.heat_index,
+                'Date & Time': new Date(record.date_time).toLocaleString('en-US', { 
+                    month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' 
+                })
+            });
+        }
     } else if (selectedReport.value === 'Prevailing Wind Direction & Frequency') {
         records = windDirectionRecords.value;
         filenamePrefix = 'Prevailing_Wind_Direction_Data_Report';
@@ -2066,7 +2375,6 @@ const exportToExcel = () => {
         Object.entries(groups).forEach(([name, groupRecords]: [string, any]) => {
             const exportData = groupRecords.map((record: any, index: number) => headers(record, index));
             const worksheet = XLSX.utils.json_to_sheet(exportData);
-            // Excel sheet names: max 31 chars, no invalid chars: \ / ? * [ ]
             const safeName = name.substring(0, 31).replace(/[\[\]\*\?\/\\]/g, '');
             XLSX.utils.book_append_sheet(workbook, worksheet, safeName || 'Data');
         });
@@ -2076,7 +2384,6 @@ const exportToExcel = () => {
         XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
     }
 
-    // Dynamic Suffix based on selection
     let suffix = '';
     if (selectedReport.value === 'Water Level') {
         if (waterLevelReportType.value === 'Monthly') {
@@ -2093,6 +2400,8 @@ const exportToExcel = () => {
     } else if (selectedReport.value === 'Heat Index') {
         if (heatIndexReportType.value === 'Monthly') {
             suffix = `${heatIndexReport.value.month}_${heatIndexReport.value.year}`;
+        } else if (heatIndexReportType.value === 'Month Range') {
+            suffix = `${heatIndexReport.value.monthFrom}_to_${heatIndexReport.value.monthTo}_${heatIndexReport.value.year}`;
         } else {
             suffix = `${heatIndexReport.value.from}_to_${heatIndexReport.value.to}`;
         }
@@ -2129,6 +2438,40 @@ const exportSummaryToExcel = () => {
             ? `${detailRainReport.value.month}_${detailRainReport.value.year}` 
             : `${detailRainReport.value.from}_to_${detailRainReport.value.to}`;
     } else if (selectedReport.value === 'Heat Index') {
+        if (heatIndexReportType.value === 'Month Range') {
+            const matrixMR = heatIndexMonthRangeSummaryMatrix.value;
+            if (!matrixMR) return;
+            filenamePrefix = 'Heat_Index_Month_Range_Summary_Report';
+            sheetName = 'Monthly Heat Index Summary';
+            suffix = `${heatIndexReport.value.monthFrom}_to_${heatIndexReport.value.monthTo}_${heatIndexReport.value.year}`;
+
+            const rows = matrixMR.rows.map((row: any) => {
+                const rowData: any = { 'Month': row.monthLabel };
+                matrixMR.stations.forEach((station: string) => {
+                    rowData[`${station} Monthly Ave. Heat Index (°C)`] = row[station + '_avg'];
+                    rowData[`${station} Monthly Max Heat Index (°C)`] = row[station + '_max'];
+                });
+                return rowData;
+            });
+
+            const avgRow: any = { 'Month': 'Overall Monthly Ave.' };
+            const maxRow: any = { 'Month': 'Overall Monthly Max' };
+            matrixMR.stations.forEach((station: string) => {
+                avgRow[`${station} Monthly Ave. Heat Index (°C)`] = matrixMR.averages[station + '_avg'];
+                maxRow[`${station} Monthly Max Heat Index (°C)`] = matrixMR.maxes[station + '_max'];
+            });
+            rows.push({});
+            rows.push(avgRow);
+            rows.push(maxRow);
+
+            const worksheet = XLSX.utils.json_to_sheet(rows);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+            const filename = `${filenamePrefix}_${suffix}.xlsx`;
+            XLSX.writeFile(workbook, filename);
+            return;
+        }
+
         matrix = heatIndexSummaryMatrix.value;
         filenamePrefix = 'Heat_Index_Summary_Report';
         sheetName = 'Heat Index Summary';
@@ -2435,12 +2778,28 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                         <div class="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-4 items-start sm:items-center">
                             <select v-model="heatIndexReportType" class="w-full sm:w-40 uppercase bg-white border border-gray-200 text-gray-800 text-xs sm:text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2 sm:p-2.5 font-bold tracking-wider">
                                 <option value="Monthly">Monthly</option>
+                                <option value="Month Range">Month Range</option>
                                 <option value="Date Range">Date Range</option>
                             </select>
 
                             <div v-if="heatIndexReportType === 'Monthly'" class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                                 <select v-model="heatIndexReport.month" class="w-full sm:w-48 uppercase bg-white border border-gray-200 text-gray-800 text-xs sm:text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2 sm:p-2.5 font-bold tracking-wider">
                                     <option value="" disabled selected>SELECT MONTH</option>
+                                    <option v-for="m in months" :key="m" :value="m">{{ m }}</option>
+                                </select>
+
+                                <select v-model="heatIndexReport.year" class="w-full sm:w-32 uppercase bg-white border border-gray-200 text-gray-800 text-xs sm:text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2 sm:p-2.5 font-bold tracking-wider">
+                                    <option value="" disabled selected>SELECT YEAR</option>
+                                    <option v-for="y in weatherStationYears" :key="y" :value="y.toString()">{{ y }}</option>
+                                </select>
+                            </div>
+                             <div v-else-if="heatIndexReportType === 'Month Range'" class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                                <select v-model="heatIndexReport.monthFrom" class="w-full sm:w-48 uppercase bg-white border border-gray-200 text-gray-800 text-xs sm:text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2 sm:p-2.5 font-bold tracking-wider">
+                                    <option value="" disabled selected>FROM</option>
+                                    <option v-for="m in months" :key="m" :value="m">{{ m }}</option>
+                                </select>
+                                <select v-model="heatIndexReport.monthTo" class="w-full sm:w-48 uppercase bg-white border border-gray-200 text-gray-800 text-xs sm:text-sm rounded-sm focus:ring-blue-500 focus:border-blue-500 block p-2 sm:p-2.5 font-bold tracking-wider">
+                                    <option value="" disabled selected>TO</option>
                                     <option v-for="m in months" :key="m" :value="m">{{ m }}</option>
                                 </select>
 
@@ -2662,7 +3021,7 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                     </div>
                     
                     <!-- Graphical Reports -->
-                    <div v-if="rainRecords.length > 0 || heatIndexRecords.length > 0 || waterLevelRecords.length > 0 || windDirectionRecords.length > 0 || windSpeedRecords.length > 0" class="space-y-8 pt-8 mb-12">
+                    <div v-if="rainRecords.length > 0 || heatIndexRecords.length > 0 || monthlyHeatIndexRecords.length > 0 || waterLevelRecords.length > 0 || windDirectionRecords.length > 0 || windSpeedRecords.length > 0" class="space-y-8 pt-8 mb-12">
                         <!-- Rain Chart -->
                         <div v-show="selectedReport === 'Rain' && rainRecords.length > 0" class="space-y-2">
                             <div class="flex justify-between items-center bg-white p-2 border-b border-gray-50 rounded-t-xl">
@@ -2678,7 +3037,6 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                                 <h4 class="font-bold text-gray-400 uppercase text-[10px] tracking-[0.2em] pr-4">Rain Report</h4>
                             </div>
                             <div class="bg-white p-2 border-2 border-orange-500 rounded-2xl shadow-md h-[400px] sm:h-[600px] w-full" ref="rainChartDiv"></div>
-                            <!-- <div class="text-center text-xs font-bold text-gray-400 uppercase">Month</div> -->
 
                             <!-- Rain Results Table -->
                             <div v-if="rainRecords.length > 0" class="bg-white border-2 border-orange-500 rounded-2xl shadow-md overflow-hidden mt-8">
@@ -2844,244 +3202,468 @@ const downloadChart = () => { //CHART to b64 to PNG IMAGE DL
                             </div>
                         </div>
 
-                        <!-- Heat Index Chart -->
-                        <div v-show="selectedReport === 'Heat Index' && heatIndexRecords.length > 0" class="space-y-4">
-                            <div class="flex justify-between items-center bg-white p-2 border-b border-gray-50 rounded-t-xl">
-                                <button 
-                                    @click="downloadChart" 
-                                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow-sm font-bold uppercase tracking-wider text-[11px] transition-all flex items-center gap-2 active:scale-95"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                    </svg>
-                                    Download Chart
-                                </button>
-                                <h4 class="font-bold text-gray-400 uppercase text-[10px] tracking-[0.2em] pr-4">Heat Index Report</h4>
-                            </div>
-                            <div class="bg-white p-4 rounded-xl border border-gray-200 w-full shadow-sm" :class="heatIndexReport.station === 'All' ? 'h-[350px] sm:h-[450px]' : 'h-[400px] sm:h-[500px]'" ref="heatIndexChartDiv"></div>
-                            
-                            <!-- Heat Index Legend -->
-                            <div class="mt-6 flex flex-wrap justify-center gap-8 py-6 px-8 bg-white rounded-xl shadow-sm border border-gray-100">
-                                <div v-for="(setting, index) in activeHiSettings" :key="index" class="flex flex-col items-center gap-1 group cursor-help">
-                                    <div class="flex items-center gap-3">
-                                        <div 
-                                            class="w-5 h-5 rounded-full border border-gray-200 shadow-sm"
-                                            :style="{ backgroundColor: setting.color }"
-                                        ></div>
-                                        <span class="text-[11px] font-black text-gray-700 uppercase tracking-widest">{{ setting.label }}</span>
-                                    </div>
-                                    <span class="text-[10px] text-gray-400 font-bold font-mono tracking-tighter">{{ setting.temprange }}</span>
-                                    <div class="hidden group-hover:block absolute z-10 p-3 bg-white border border-gray-200 rounded-lg shadow-xl text-[10px] text-gray-600 max-w-[250px] -mt-24 text-center pointer-events-none">
-                                        {{ setting.advice }}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Heat Index Results Table -->
-                            <div v-if="heatIndexRecords.length > 0" class="bg-white border border-gray-200 rounded-sm mt-8 overflow-hidden">
-                                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center py-3 px-4 border-b border-gray-100 gap-4">
-                                    <h4 class="font-bold text-gray-600 uppercase text-xs sm:text-sm">Heat Index Data Table</h4>
-                                    <div class="flex gap-2 w-full sm:w-auto">
-                                        <button 
-                                            v-if="(heatIndexActiveTab || heatIndexTabs[0]) === 'Summary'"
-                                            @click="exportSummaryToExcel" 
-                                            class="bg-green-700 hover:bg-green-600 text-white px-4 py-1.5 rounded-sm font-bold uppercase tracking-wider text-[10px] transition-colors flex items-center gap-2"
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                            </svg>
-                                            Export Summary
-                                        </button>
-                                        <button 
-                                            v-else
-                                            @click="exportToExcel" 
-                                            class="bg-green-700 hover:bg-green-600 text-white px-4 py-1.5 rounded-sm font-bold uppercase tracking-wider text-[10px] transition-colors flex items-center gap-2"
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                            </svg>
-                                            Export Data
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <!-- Heat Index Tab Navigation -->
-                                <div v-if="heatIndexReport.station === 'All' && heatIndexTabs.length > 1" class="flex flex-wrap gap-2 border-b border-gray-100 px-4 pt-2 bg-gray-50/30">
+                        <!-- Heat Index Chart & Tables -->
+                        <div v-show="selectedReport === 'Heat Index' && (heatIndexRecords.length > 0 || monthlyHeatIndexRecords.length > 0)" class="space-y-6">
+                            <!-- Month Range Layout -->
+                            <div v-if="heatIndexReportType === 'Month Range'" class="space-y-6">
+                                <div class="flex justify-between items-center bg-white p-2 border-b border-gray-50 rounded-t-xl">
                                     <button 
-                                        v-for="tab in heatIndexTabs" 
-                                        :key="tab"
-                                        @click="heatIndexActiveTab = tab; currentPage = 1"
-                                        :class="[
-                                            'px-6 py-2.5 text-[10px] font-bold uppercase tracking-widest transition-all relative',
-                                            (heatIndexActiveTab || heatIndexTabs[0]) === tab 
-                                                ? 'text-blue-600' 
-                                                : 'text-gray-400 hover:text-gray-600'
-                                        ]"
+                                        @click="downloadChart" 
+                                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow-sm font-bold uppercase tracking-wider text-[11px] transition-all flex items-center gap-2 active:scale-95"
                                     >
-                                        {{ tab }}
-                                        <div v-if="(heatIndexActiveTab || heatIndexTabs[0]) === tab" class="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600"></div>
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                        </svg>
+                                        Download Chart
                                     </button>
+                                    <h4 class="font-bold text-gray-400 uppercase text-[10px] tracking-[0.2em] pr-4">Monthly Heat Index (Average & Max Overlay) Chart</h4>
                                 </div>
 
-                                <!-- Top Pagination Controls -->
-                                <div v-if="heatIndexTotalPages > 1" class="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
-                                    <div class="flex items-center gap-2">
-                                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Page {{ currentPage }} of {{ heatIndexTotalPages }}</span>
-                                        <span class="text-[10px] text-gray-300 font-bold uppercase tracking-widest">({{ filteredHeatIndexRecords.length }} records)</span>
-                                    </div>
-                                    <div class="flex items-center gap-2">
-                                        <button 
-                                            @click="currentPage--" 
-                                            :disabled="currentPage === 1"
-                                            class="p-1 rounded-sm bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm"
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                                            </svg>
-                                        </button>
-                                        <button 
-                                            @click="currentPage++" 
-                                            :disabled="currentPage === heatIndexTotalPages"
-                                            class="p-1 rounded-sm bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm"
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                                            </svg>
-                                        </button>
+                                <div class="bg-white p-4 rounded-xl border border-gray-200 w-full shadow-sm h-[450px] sm:h-[600px]" ref="heatIndexMonthRangeChartDiv"></div>
+
+                                <!-- Heat Index Legend -->
+                                <div class="mt-6 flex flex-wrap justify-center gap-8 py-6 px-8 bg-white rounded-xl shadow-sm border border-gray-100">
+                                    <div v-for="(setting, index) in activeHiSettings" :key="index" class="flex flex-col items-center gap-1 group cursor-help">
+                                        <div class="flex items-center gap-3">
+                                            <div 
+                                                class="w-5 h-5 rounded-full border border-gray-200 shadow-sm"
+                                                :style="{ backgroundColor: setting.color }"
+                                            ></div>
+                                            <span class="text-[11px] font-black text-gray-700 uppercase tracking-widest">{{ setting.label }}</span>
+                                        </div>
+                                        <span class="text-[10px] text-gray-400 font-bold font-mono tracking-tighter">{{ setting.temprange }}</span>
+                                        <div class="hidden group-hover:block absolute z-10 p-3 bg-white border border-gray-200 rounded-lg shadow-xl text-[10px] text-gray-600 max-w-[250px] -mt-24 text-center pointer-events-none">
+                                            {{ setting.advice }}
+                                        </div>
                                     </div>
                                 </div>
-                                <!-- Heat Index Matrix View for Summary -->
-                                <div v-if="(heatIndexActiveTab || heatIndexTabs[0]) === 'Summary' && heatIndexSummaryMatrix" class="overflow-x-auto">
-                                    <table class="w-full text-left border-collapse">
-                                        <thead class="bg-gray-100 border-b border-gray-200">
-                                            <tr>
-                                                <th rowspan="2" class="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase border-r border-gray-200 align-middle">Date</th>
-                                                <th 
-                                                    v-for="station in heatIndexSummaryMatrix.stations" 
-                                                    :key="station" 
-                                                    colspan="3" 
-                                                    class="px-4 py-2 text-xs font-bold text-gray-700 uppercase text-center border-r border-gray-300 bg-gray-200/80"
-                                                >
-                                                    {{ station }}
-                                                </th>
-                                            </tr>
-                                            <tr class="bg-gray-100/90 border-t border-gray-200">
-                                                <template v-for="station in heatIndexSummaryMatrix.stations" :key="station + '_subheaders'">
-                                                    <th class="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase text-center border-r border-gray-200">
-                                                        Heat Index (°C)
-                                                    </th>
-                                                    <th class="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase text-center border-r border-gray-200">
-                                                        Daily Ave. Temp (°C)
-                                                    </th>
-                                                    <th class="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase text-center border-r border-gray-300">
-                                                        Ave. Humidity (%)
-                                                    </th>
-                                                </template>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="divide-y divide-gray-100">
-                                            <tr v-for="(row, idx) in heatIndexSummaryMatrix.rows" :key="idx" class="hover:bg-gray-50 transition-colors">
-                                                <td class="px-4 py-2 text-sm text-gray-500 font-bold border-r border-gray-200">{{ row.dateLabel }}</td>
-                                                <template v-for="station in heatIndexSummaryMatrix.stations" :key="station + '_data'">
-                                                    <td 
-                                                        class="px-3 py-2 text-[10px] sm:text-xs font-bold text-center border-r border-gray-200"
-                                                        :style="{ 
-                                                            backgroundColor: getHeatIndexColor(row[station + '_hi']),
-                                                            color: getTextColorForBg(getHeatIndexColor(row[station + '_hi']))
-                                                        }"
+
+                                <!-- Month Range Results Table -->
+                                <div v-if="monthlyHeatIndexRecords.length > 0" class="bg-white border border-gray-200 rounded-sm mt-8 overflow-hidden">
+                                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center py-3 px-4 border-b border-gray-100 gap-4">
+                                        <h4 class="font-bold text-gray-600 uppercase text-xs sm:text-sm">Monthly Heat Index Data Table ({{ heatIndexReport.monthFrom }} - {{ heatIndexReport.monthTo }} {{ heatIndexReport.year }})</h4>
+                                        <div class="flex gap-2 w-full sm:w-auto">
+                                            <button 
+                                                v-if="(heatIndexActiveTab || heatIndexTabs[0]) === 'Summary'"
+                                                @click="exportSummaryToExcel" 
+                                                class="bg-green-700 hover:bg-green-600 text-white px-4 py-1.5 rounded-sm font-bold uppercase tracking-wider text-[10px] transition-colors flex items-center gap-2"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                </svg>
+                                                Export Summary
+                                            </button>
+                                            <button 
+                                                v-else
+                                                @click="exportToExcel" 
+                                                class="bg-green-700 hover:bg-green-600 text-white px-4 py-1.5 rounded-sm font-bold uppercase tracking-wider text-[10px] transition-colors flex items-center gap-2"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                </svg>
+                                                Export Data
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Tab Navigation -->
+                                    <div v-if="heatIndexReport.station === 'All' && heatIndexTabs.length > 1" class="flex flex-wrap gap-2 border-b border-gray-100 px-4 pt-2 bg-gray-50/30">
+                                        <button 
+                                            v-for="tab in heatIndexTabs" 
+                                            :key="tab"
+                                            @click="heatIndexActiveTab = tab; currentPage = 1"
+                                            :class="[
+                                                'px-6 py-2.5 text-[10px] font-bold uppercase tracking-widest transition-all relative',
+                                                (heatIndexActiveTab || heatIndexTabs[0]) === tab 
+                                                    ? 'text-blue-600' 
+                                                    : 'text-gray-400 hover:text-gray-600'
+                                            ]"
+                                        >
+                                            {{ tab }}
+                                            <div v-if="(heatIndexActiveTab || heatIndexTabs[0]) === tab" class="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600"></div>
+                                        </button>
+                                    </div>
+
+                                    <!-- Top Pagination Controls -->
+                                    <div v-if="(heatIndexActiveTab || heatIndexTabs[0]) !== 'Summary' && monthRangeHeatIndexTotalPages > 1" class="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Page {{ currentPage }} of {{ monthRangeHeatIndexTotalPages }}</span>
+                                            <span class="text-[10px] text-gray-300 font-bold uppercase tracking-widest">({{ filteredMonthRangeHeatIndexRecords.length }} records)</span>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <button 
+                                                @click="currentPage--" 
+                                                :disabled="currentPage === 1"
+                                                class="p-1 rounded-sm bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                                                </svg>
+                                            </button>
+                                            <button 
+                                                @click="currentPage++" 
+                                                :disabled="currentPage === monthRangeHeatIndexTotalPages"
+                                                class="p-1 rounded-sm bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Summary Matrix View -->
+                                    <div v-if="(heatIndexActiveTab || heatIndexTabs[0]) === 'Summary' && heatIndexMonthRangeSummaryMatrix" class="overflow-x-auto">
+                                        <table class="w-full text-left border-collapse">
+                                            <thead class="bg-gray-100 border-b border-gray-200">
+                                                <tr>
+                                                    <th rowspan="2" class="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase border-r border-gray-200 align-middle">Month</th>
+                                                    <th 
+                                                        v-for="station in heatIndexMonthRangeSummaryMatrix.stations" 
+                                                        :key="station" 
+                                                        colspan="2" 
+                                                        class="px-4 py-2 text-xs font-bold text-gray-700 uppercase text-center border-r border-gray-300 bg-gray-200/80"
                                                     >
-                                                        {{ row[station + '_hi'] }}
-                                                    </td>
-                                                    <td class="px-3 py-2 text-[10px] sm:text-xs font-bold text-center border-r border-gray-200 text-gray-700 bg-gray-50/30">
-                                                        {{ row[station + '_avg_temp'] !== '-' ? row[station + '_avg_temp'] + '°C' : '-' }}
-                                                    </td>
-                                                    <td class="px-3 py-2 text-[10px] sm:text-xs font-bold text-center border-r border-gray-300 text-gray-700 bg-gray-50/30">
-                                                        {{ row[station + '_avg_hum'] !== '-' ? row[station + '_avg_hum'] + '%' : '-' }}
-                                                    </td>
-                                                </template>
-                                            </tr>
-                                        </tbody>
-                                        <tfoot class="bg-gray-50 border-t-2 border-gray-200">
-                                            <tr class="font-bold">
-                                                <td class="px-4 py-3 text-[10px] text-gray-600 uppercase border-r border-gray-200">Ave. / day</td>
-                                                <template v-for="station in heatIndexSummaryMatrix.stations" :key="station + '_foot'">
-                                                    <td class="px-3 py-3 text-xs text-green-700 text-center border-r border-gray-200">
-                                                        {{ heatIndexSummaryMatrix.averages[station + '_hi'] }}
-                                                    </td>
-                                                    <td class="px-3 py-3 text-xs text-blue-700 text-center border-r border-gray-200">
-                                                        {{ heatIndexSummaryMatrix.averages[station + '_avg_temp'] !== '-' ? heatIndexSummaryMatrix.averages[station + '_avg_temp'] + '°C' : '-' }}
-                                                    </td>
-                                                    <td class="px-3 py-3 text-xs text-blue-700 text-center border-r border-gray-300">
-                                                        {{ heatIndexSummaryMatrix.averages[station + '_avg_hum'] !== '-' ? heatIndexSummaryMatrix.averages[station + '_avg_hum'] + '%' : '-' }}
-                                                    </td>
-                                                </template>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
-                                </div>
-
-                                <div v-else class="overflow-x-auto">
-                                    <table class="w-full text-left min-w-[700px]">
-                                        <thead class="bg-gray-100 border-b border-gray-200">
-                                            <tr>
-                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">No.</th>
-                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">Station Name</th>
-                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Temp (°C)</th>
-                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Humidity (%)</th>
-                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Heat Index (°C)</th>
-                                                <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Date & Time</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="divide-y divide-gray-100">
-                                            <tr v-for="(record, index) in paginatedHeatIndexRecords" :key="index" class="hover:bg-gray-50 transition-colors">
-                                                <td class="px-4 py-3 text-sm text-gray-500 font-bold font-mono">{{ (currentPage - 1) * itemsPerPage + index + 1 }}</td>
-                                                <td class="px-4 py-3 text-sm text-gray-800 font-bold uppercase tracking-wider">{{ record.station_name }}</td>
-                                                <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">{{ record.temperature }}</td>
-                                                <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">{{ record.humidity }}%</td>
-                                                <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">
-                                                    <span 
-                                                        class="px-2 py-1 rounded text-xs font-bold"
-                                                        :style="{ 
-                                                            backgroundColor: getHeatIndexColor(record.heat_index),
-                                                            color: getTextColorForBg(getHeatIndexColor(record.heat_index))
-                                                        }"
-                                                    >
-                                                        {{ record.heat_index }}°C
-                                                    </span>
-                                                </td>
-                                                <td class="px-4 py-3 text-sm text-gray-500 font-bold text-center">
-                                                    {{ new Date(record.date_time).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) }}
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-
-                                <!-- Pagination Controls -->
-                                <div v-if="(heatIndexActiveTab || heatIndexTabs[0]) !== 'Summary' && heatIndexTotalPages > 1" class="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-100">
-                                    <div class="flex items-center gap-2">
-                                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Page {{ currentPage }} of {{ heatIndexTotalPages }}</span>
-                                        <span class="text-[10px] text-gray-300 font-bold uppercase tracking-widest">({{ filteredHeatIndexRecords.length }} records)</span>
+                                                        {{ station }}
+                                                    </th>
+                                                </tr>
+                                                <tr class="bg-gray-100/90 border-t border-gray-200">
+                                                    <template v-for="station in heatIndexMonthRangeSummaryMatrix.stations" :key="station + '_subheaders'">
+                                                        <th class="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase text-center border-r border-gray-200">
+                                                            Monthly Ave. HI (°C)
+                                                        </th>
+                                                        <th class="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase text-center border-r border-gray-300">
+                                                            Monthly Max HI (°C)
+                                                        </th>
+                                                    </template>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-gray-100">
+                                                <tr v-for="(row, idx) in heatIndexMonthRangeSummaryMatrix.rows" :key="idx" class="hover:bg-gray-50 transition-colors">
+                                                    <td class="px-4 py-2 text-sm text-gray-600 font-bold border-r border-gray-200">{{ row.monthLabel }}</td>
+                                                    <template v-for="station in heatIndexMonthRangeSummaryMatrix.stations" :key="station + '_data'">
+                                                        <td 
+                                                            class="px-3 py-2 text-[10px] sm:text-xs font-bold text-center border-r border-gray-200"
+                                                            :style="{ 
+                                                                backgroundColor: getHeatIndexColor(row[station + '_avg']),
+                                                                color: getTextColorForBg(getHeatIndexColor(row[station + '_avg']))
+                                                            }"
+                                                        >
+                                                            {{ row[station + '_avg'] !== '-' ? row[station + '_avg'] + '°C' : '-' }}
+                                                        </td>
+                                                        <td 
+                                                            class="px-3 py-2 text-[10px] sm:text-xs font-bold text-center border-r border-gray-300"
+                                                            :style="{ 
+                                                                backgroundColor: getHeatIndexColor(row[station + '_max']),
+                                                                color: getTextColorForBg(getHeatIndexColor(row[station + '_max']))
+                                                            }"
+                                                        >
+                                                            {{ row[station + '_max'] !== '-' ? row[station + '_max'] + '°C' : '-' }}
+                                                        </td>
+                                                    </template>
+                                                </tr>
+                                            </tbody>
+                                            <tfoot class="bg-gray-50 border-t-2 border-gray-200">
+                                                <tr class="font-bold">
+                                                    <td class="px-4 py-3 text-[10px] text-gray-600 uppercase border-r border-gray-200">Overall Ave / Max</td>
+                                                    <template v-for="station in heatIndexMonthRangeSummaryMatrix.stations" :key="station + '_foot'">
+                                                        <td class="px-3 py-3 text-xs text-green-700 text-center border-r border-gray-200">
+                                                            {{ heatIndexMonthRangeSummaryMatrix.averages[station + '_avg'] !== '-' ? heatIndexMonthRangeSummaryMatrix.averages[station + '_avg'] + '°C' : '-' }}
+                                                        </td>
+                                                        <td class="px-3 py-3 text-xs text-red-700 text-center border-r border-gray-300">
+                                                            {{ heatIndexMonthRangeSummaryMatrix.maxes[station + '_max'] !== '-' ? heatIndexMonthRangeSummaryMatrix.maxes[station + '_max'] + '°C' : '-' }}
+                                                        </td>
+                                                    </template>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
                                     </div>
-                                    <div class="flex items-center gap-2">
+
+                                    <!-- Single Station / Station Tab View -->
+                                    <div v-else class="overflow-x-auto">
+                                        <table class="w-full text-left min-w-[600px]">
+                                            <thead class="bg-gray-100 border-b border-gray-200">
+                                                <tr>
+                                                    <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">No.</th>
+                                                    <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">Station Name</th>
+                                                    <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Month</th>
+                                                    <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Monthly Ave. Heat Index (°C)</th>
+                                                    <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Monthly Max Heat Index (°C)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-gray-100">
+                                                <tr v-for="(record, index) in paginatedMonthRangeHeatIndexRecords" :key="index" class="hover:bg-gray-50 transition-colors">
+                                                    <td class="px-4 py-3 text-sm text-gray-500 font-bold font-mono">{{ (currentPage - 1) * itemsPerPage + index + 1 }}</td>
+                                                    <td class="px-4 py-3 text-sm text-gray-800 font-bold uppercase tracking-wider">{{ record.station_name }}</td>
+                                                    <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">{{ record.month }}</td>
+                                                    <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">
+                                                        <span 
+                                                            class="px-2 py-1 rounded text-xs font-bold"
+                                                            :style="{ 
+                                                                backgroundColor: getHeatIndexColor(record.avg_heat_index),
+                                                                color: getTextColorForBg(getHeatIndexColor(record.avg_heat_index))
+                                                            }"
+                                                        >
+                                                            {{ record.avg_heat_index !== '-' ? record.avg_heat_index + '°C' : '-' }}
+                                                        </span>
+                                                    </td>
+                                                    <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">
+                                                        <span 
+                                                            class="px-2 py-1 rounded text-xs font-bold"
+                                                            :style="{ 
+                                                                backgroundColor: getHeatIndexColor(record.max_heat_index),
+                                                                color: getTextColorForBg(getHeatIndexColor(record.max_heat_index))
+                                                            }"
+                                                        >
+                                                            {{ record.max_heat_index !== '-' ? record.max_heat_index + '°C' : '-' }}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Standard Monthly / Date Range View -->
+                            <div v-else class="space-y-4">
+                                <div class="flex justify-between items-center bg-white p-2 border-b border-gray-50 rounded-t-xl">
+                                    <button 
+                                        @click="downloadChart" 
+                                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow-sm font-bold uppercase tracking-wider text-[11px] transition-all flex items-center gap-2 active:scale-95"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                        </svg>
+                                        Download Chart
+                                    </button>
+                                    <h4 class="font-bold text-gray-400 uppercase text-[10px] tracking-[0.2em] pr-4">Heat Index Report</h4>
+                                </div>
+                                <div class="bg-white p-4 rounded-xl border border-gray-200 w-full shadow-sm" :class="heatIndexReport.station === 'All' ? 'h-[350px] sm:h-[450px]' : 'h-[400px] sm:h-[500px]'" ref="heatIndexChartDiv"></div>
+                                
+                                <!-- Heat Index Legend -->
+                                <div class="mt-6 flex flex-wrap justify-center gap-8 py-6 px-8 bg-white rounded-xl shadow-sm border border-gray-100">
+                                    <div v-for="(setting, index) in activeHiSettings" :key="index" class="flex flex-col items-center gap-1 group cursor-help">
+                                        <div class="flex items-center gap-3">
+                                            <div 
+                                                class="w-5 h-5 rounded-full border border-gray-200 shadow-sm"
+                                                :style="{ backgroundColor: setting.color }"
+                                            ></div>
+                                            <span class="text-[11px] font-black text-gray-700 uppercase tracking-widest">{{ setting.label }}</span>
+                                        </div>
+                                        <span class="text-[10px] text-gray-400 font-bold font-mono tracking-tighter">{{ setting.temprange }}</span>
+                                        <div class="hidden group-hover:block absolute z-10 p-3 bg-white border border-gray-200 rounded-lg shadow-xl text-[10px] text-gray-600 max-w-[250px] -mt-24 text-center pointer-events-none">
+                                            {{ setting.advice }}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Heat Index Results Table -->
+                                <div v-if="heatIndexRecords.length > 0" class="bg-white border border-gray-200 rounded-sm mt-8 overflow-hidden">
+                                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center py-3 px-4 border-b border-gray-100 gap-4">
+                                        <h4 class="font-bold text-gray-600 uppercase text-xs sm:text-sm">Heat Index Data Table</h4>
+                                        <div class="flex gap-2 w-full sm:w-auto">
+                                            <button 
+                                                v-if="(heatIndexActiveTab || heatIndexTabs[0]) === 'Summary'"
+                                                @click="exportSummaryToExcel" 
+                                                class="bg-green-700 hover:bg-green-600 text-white px-4 py-1.5 rounded-sm font-bold uppercase tracking-wider text-[10px] transition-colors flex items-center gap-2"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                </svg>
+                                                Export Summary
+                                            </button>
+                                            <button 
+                                                v-else
+                                                @click="exportToExcel" 
+                                                class="bg-green-700 hover:bg-green-600 text-white px-4 py-1.5 rounded-sm font-bold uppercase tracking-wider text-[10px] transition-colors flex items-center gap-2"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                </svg>
+                                                Export Data
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Heat Index Tab Navigation -->
+                                    <div v-if="heatIndexReport.station === 'All' && heatIndexTabs.length > 1" class="flex flex-wrap gap-2 border-b border-gray-100 px-4 pt-2 bg-gray-50/30">
                                         <button 
-                                            @click="currentPage--" 
-                                            :disabled="currentPage === 1"
-                                            class="p-1 rounded-sm bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm"
+                                            v-for="tab in heatIndexTabs" 
+                                            :key="tab"
+                                            @click="heatIndexActiveTab = tab; currentPage = 1"
+                                            :class="[
+                                                'px-6 py-2.5 text-[10px] font-bold uppercase tracking-widest transition-all relative',
+                                                (heatIndexActiveTab || heatIndexTabs[0]) === tab 
+                                                    ? 'text-blue-600' 
+                                                    : 'text-gray-400 hover:text-gray-600'
+                                            ]"
                                         >
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                                            </svg>
+                                            {{ tab }}
+                                            <div v-if="(heatIndexActiveTab || heatIndexTabs[0]) === tab" class="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600"></div>
                                         </button>
-                                        <button 
-                                            @click="currentPage++" 
-                                            :disabled="currentPage === heatIndexTotalPages"
-                                            class="p-1 rounded-sm bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm"
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                                            </svg>
-                                        </button>
+                                    </div>
+
+                                    <!-- Top Pagination Controls -->
+                                    <div v-if="heatIndexTotalPages > 1" class="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Page {{ currentPage }} of {{ heatIndexTotalPages }}</span>
+                                            <span class="text-[10px] text-gray-300 font-bold uppercase tracking-widest">({{ filteredHeatIndexRecords.length }} records)</span>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <button 
+                                                @click="currentPage--" 
+                                                :disabled="currentPage === 1"
+                                                class="p-1 rounded-sm bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                                                </svg>
+                                            </button>
+                                            <button 
+                                                @click="currentPage++" 
+                                                :disabled="currentPage === heatIndexTotalPages"
+                                                class="p-1 rounded-sm bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <!-- Heat Index Matrix View for Summary -->
+                                    <div v-if="(heatIndexActiveTab || heatIndexTabs[0]) === 'Summary' && heatIndexSummaryMatrix" class="overflow-x-auto">
+                                        <table class="w-full text-left border-collapse">
+                                            <thead class="bg-gray-100 border-b border-gray-200">
+                                                <tr>
+                                                    <th rowspan="2" class="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase border-r border-gray-200 align-middle">Date</th>
+                                                    <th 
+                                                        v-for="station in heatIndexSummaryMatrix.stations" 
+                                                        :key="station" 
+                                                        colspan="3" 
+                                                        class="px-4 py-2 text-xs font-bold text-gray-700 uppercase text-center border-r border-gray-300 bg-gray-200/80"
+                                                    >
+                                                        {{ station }}
+                                                    </th>
+                                                </tr>
+                                                <tr class="bg-gray-100/90 border-t border-gray-200">
+                                                    <template v-for="station in heatIndexSummaryMatrix.stations" :key="station + '_subheaders'">
+                                                        <th class="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase text-center border-r border-gray-200">
+                                                            Heat Index (°C)
+                                                        </th>
+                                                        <th class="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase text-center border-r border-gray-200">
+                                                            Daily Ave. Temp (°C)
+                                                        </th>
+                                                        <th class="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase text-center border-r border-gray-300">
+                                                            Ave. Humidity (%)
+                                                        </th>
+                                                    </template>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-gray-100">
+                                                <tr v-for="(row, idx) in heatIndexSummaryMatrix.rows" :key="idx" class="hover:bg-gray-50 transition-colors">
+                                                    <td class="px-4 py-2 text-sm text-gray-500 font-bold border-r border-gray-200">{{ row.dateLabel }}</td>
+                                                    <template v-for="station in heatIndexSummaryMatrix.stations" :key="station + '_data'">
+                                                        <td 
+                                                            class="px-3 py-2 text-[10px] sm:text-xs font-bold text-center border-r border-gray-200"
+                                                            :style="{ 
+                                                                backgroundColor: getHeatIndexColor(row[station + '_hi']),
+                                                                color: getTextColorForBg(getHeatIndexColor(row[station + '_hi']))
+                                                            }"
+                                                        >
+                                                            {{ row[station + '_hi'] }}
+                                                        </td>
+                                                        <td class="px-3 py-2 text-[10px] sm:text-xs font-bold text-center border-r border-gray-200 text-gray-700 bg-gray-50/30">
+                                                            {{ row[station + '_avg_temp'] !== '-' ? row[station + '_avg_temp'] + '°C' : '-' }}
+                                                        </td>
+                                                        <td class="px-3 py-2 text-[10px] sm:text-xs font-bold text-center border-r border-gray-300 text-gray-700 bg-gray-50/30">
+                                                            {{ row[station + '_avg_hum'] !== '-' ? row[station + '_avg_hum'] + '%' : '-' }}
+                                                        </td>
+                                                    </template>
+                                                </tr>
+                                            </tbody>
+                                            <tfoot class="bg-gray-50 border-t-2 border-gray-200">
+                                                <tr class="font-bold">
+                                                    <td class="px-4 py-3 text-[10px] text-gray-600 uppercase border-r border-gray-200">Ave. / day</td>
+                                                    <template v-for="station in heatIndexSummaryMatrix.stations" :key="station + '_foot'">
+                                                        <td class="px-3 py-3 text-xs text-green-700 text-center border-r border-gray-200">
+                                                            {{ heatIndexSummaryMatrix.averages[station + '_hi'] }}
+                                                        </td>
+                                                        <td class="px-3 py-3 text-xs text-blue-700 text-center border-r border-gray-200">
+                                                            {{ heatIndexSummaryMatrix.averages[station + '_avg_temp'] !== '-' ? heatIndexSummaryMatrix.averages[station + '_avg_temp'] + '°C' : '-' }}
+                                                        </td>
+                                                        <td class="px-3 py-3 text-xs text-blue-700 text-center border-r border-gray-300">
+                                                            {{ heatIndexSummaryMatrix.averages[station + '_avg_hum'] !== '-' ? heatIndexSummaryMatrix.averages[station + '_avg_hum'] + '%' : '-' }}
+                                                        </td>
+                                                    </template>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
+
+                                    <div v-else class="overflow-x-auto">
+                                        <table class="w-full text-left min-w-[700px]">
+                                            <thead class="bg-gray-100 border-b border-gray-200">
+                                                <tr>
+                                                    <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">No.</th>
+                                                    <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">Station Name</th>
+                                                    <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Temp (°C)</th>
+                                                    <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Humidity (%)</th>
+                                                    <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Heat Index (°C)</th>
+                                                    <th class="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Date & Time</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-gray-100">
+                                                <tr v-for="(record, index) in paginatedHeatIndexRecords" :key="index" class="hover:bg-gray-50 transition-colors">
+                                                    <td class="px-4 py-3 text-sm text-gray-500 font-bold font-mono">{{ (currentPage - 1) * itemsPerPage + index + 1 }}</td>
+                                                    <td class="px-4 py-3 text-sm text-gray-800 font-bold uppercase tracking-wider">{{ record.station_name }}</td>
+                                                    <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">{{ record.temperature }}</td>
+                                                    <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">{{ record.humidity }}%</td>
+                                                    <td class="px-4 py-3 text-sm text-gray-800 font-bold text-center">
+                                                        <span 
+                                                            class="px-2 py-1 rounded text-xs font-bold"
+                                                            :style="{ 
+                                                                backgroundColor: getHeatIndexColor(record.heat_index),
+                                                                color: getTextColorForBg(getHeatIndexColor(record.heat_index))
+                                                            }"
+                                                        >
+                                                            {{ record.heat_index }}°C
+                                                        </span>
+                                                    </td>
+                                                    <td class="px-4 py-3 text-sm text-gray-500 font-bold text-center">
+                                                        {{ new Date(record.date_time).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) }}
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <!-- Pagination Controls -->
+                                    <div v-if="(heatIndexActiveTab || heatIndexTabs[0]) !== 'Summary' && heatIndexTotalPages > 1" class="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-100">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Page {{ currentPage }} of {{ heatIndexTotalPages }}</span>
+                                            <span class="text-[10px] text-gray-300 font-bold uppercase tracking-widest">({{ filteredHeatIndexRecords.length }} records)</span>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <button 
+                                                @click="currentPage--" 
+                                                :disabled="currentPage === 1"
+                                                class="p-1 rounded-sm bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                                                </svg>
+                                            </button>
+                                            <button 
+                                                @click="currentPage++" 
+                                                :disabled="currentPage === heatIndexTotalPages"
+                                                class="p-1 rounded-sm bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                                </svg>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

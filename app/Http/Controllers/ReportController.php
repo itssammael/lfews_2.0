@@ -16,8 +16,8 @@ class ReportController extends Controller
     public function index()
     {
         \Illuminate\Support\Facades\Gate::authorize('can-read');
-        $sensors = WaterLevelSensor::all();
-        $stations = WeatherStation::all();
+        $sensors = WaterLevelSensor::where('state', 1)->get();
+        $stations = WeatherStation::where('state', 1)->get();
 
         $waterLevelYears = WaterLevelSensorData::selectRaw('YEAR(date) as year')
             ->distinct()
@@ -149,9 +149,30 @@ class ReportController extends Controller
             });
         }
 
+        $monthsList = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        $fromIdx = 0;
+        $toIdx = 11;
+
         if ($request->reportType === 'Monthly') {
             $query->whereYear('date_time', $request->year)
                 ->whereMonth('date_time', date('m', strtotime('1 ' . $request->month)));
+        } else if ($request->reportType === 'Month Range') {
+            $monthFrom = $request->monthFrom ?: 'January';
+            $monthTo = $request->monthTo ?: 'December';
+            $fromIdx = array_search($monthFrom, $monthsList);
+            $toIdx = array_search($monthTo, $monthsList);
+            if ($fromIdx === false) $fromIdx = 0;
+            if ($toIdx === false) $toIdx = 11;
+            if ($fromIdx > $toIdx) {
+                $temp = $fromIdx;
+                $fromIdx = $toIdx;
+                $toIdx = $temp;
+            }
+            $startMonthNum = sprintf('%02d', $fromIdx + 1);
+            $endMonthNum = sprintf('%02d', $toIdx + 1);
+            $startDate = "{$request->year}-{$startMonthNum}-01 00:00:00";
+            $endDate = date('Y-m-t 23:59:59', strtotime("{$request->year}-{$endMonthNum}-01"));
+            $query->whereBetween('date_time', [$startDate, $endDate]);
         } else {
             if ($request->from && $request->to) {
                 $query->whereBetween('date_time', [$request->from . ' 00:00:00', $request->to . ' 23:59:59']);
@@ -172,6 +193,11 @@ class ReportController extends Controller
             $monthNum = date('m', strtotime('1 ' . $request->month));
             $startDate = "{$request->year}-{$monthNum}-01 00:00:00";
             $endDate = date('Y-m-t 23:59:59', strtotime($startDate));
+        } else if ($request->reportType === 'Month Range') {
+            $startMonthNum = sprintf('%02d', $fromIdx + 1);
+            $endMonthNum = sprintf('%02d', $toIdx + 1);
+            $startDate = "{$request->year}-{$startMonthNum}-01 00:00:00";
+            $endDate = date('Y-m-t 23:59:59', strtotime("{$request->year}-{$endMonthNum}-01"));
         } else {
             $startDate = $request->from . ' 00:00:00';
             $endDate = $request->to . ' 23:59:59';
@@ -206,9 +232,9 @@ class ReportController extends Controller
                     'wind_direction',
                     'wind_gust',
                     'date_time',
-                    DB::raw('ROW_NUMBER() OVER (PARTITION BY weather_station_id, DATE(date_time) ORDER BY ' . 
-                        ($request->report === 'Heat Index' ? 'heat_index DESC, date_time DESC' : 
-                         ($request->report === 'Wind Speed' ? 'wind_speed DESC, date_time DESC' : 'date_time DESC')) . ') as `rank`')
+                    DB::raw('ROW_NUMBER() OVER (PARTITION BY weather_station_id, DATE(date_time) ORDER BY ' .
+                        ($request->report === 'Heat Index' ? 'heat_index DESC, date_time DESC' :
+                            ($request->report === 'Wind Speed' ? 'wind_speed DESC, date_time DESC' : 'date_time DESC')) . ') as `rank`')
                 )
                     ->from('weather_station_observation_data')
                     ->whereBetween('date_time', [$startDate, $endDate])
@@ -241,7 +267,80 @@ class ReportController extends Controller
             ];
         });
 
-        if ($request->report === 'Rain') {
+        $chartDataAvg = [];
+        $chartDataMax = [];
+        $monthlyHeatIndexRecords = [];
+
+        if ($request->report === 'Heat Index' && $request->reportType === 'Month Range') {
+            $selectedMonths = array_slice($monthsList, $fromIdx, $toIdx - $fromIdx + 1);
+
+            $stationsQuery = WeatherStation::query();
+            if (!$isAllStations) {
+                $stationsQuery->where('name', $request->station);
+            } else {
+                $stationsQuery->whereHas('observations', function ($q) use ($startDate, $endDate) {
+                    $q->whereBetween('date_time', [$startDate, $endDate]);
+                });
+            }
+            $activeStations = $stationsQuery->pluck('name')->toArray();
+            if (empty($activeStations) && !$isAllStations) {
+                $activeStations = [$request->station];
+            }
+            $stationNames = $activeStations;
+
+            $monthlyAggQuery = DB::table('weather_station_observation_data')
+                ->join('weather_stations', 'weather_station_observation_data.weather_station_id', '=', 'weather_stations.id')
+                ->whereBetween('weather_station_observation_data.date_time', [$startDate, $endDate]);
+
+            if (!$isAllStations) {
+                $monthlyAggQuery->where('weather_stations.name', $request->station);
+            }
+
+            $monthlyAggData = $monthlyAggQuery
+                ->select(
+                    'weather_stations.name as station_name',
+                    DB::raw('MONTH(date_time) as month_num'),
+                    DB::raw('ROUND(AVG(heat_index), 2) as avg_heat_index'),
+                    DB::raw('ROUND(MAX(heat_index), 2) as max_heat_index')
+                )
+                ->groupBy('weather_stations.name', DB::raw('MONTH(date_time)'))
+                ->get();
+
+            $lookup = [];
+            foreach ($monthlyAggData as $row) {
+                $mNum = (int) $row->month_num;
+                $sName = $row->station_name;
+                $lookup[$mNum][$sName] = [
+                    'avg' => (float) $row->avg_heat_index,
+                    'max' => (float) $row->max_heat_index
+                ];
+            }
+
+            foreach ($selectedMonths as $mName) {
+                $mNum = array_search($mName, $monthsList) + 1;
+                $avgRow = ['month' => $mName];
+                $maxRow = ['month' => $mName];
+
+                foreach ($stationNames as $sName) {
+                    $val = $lookup[$mNum][$sName] ?? null;
+                    $avgVal = $val ? $val['avg'] : null;
+                    $maxVal = $val ? $val['max'] : null;
+
+                    $avgRow[$sName] = $avgVal;
+                    $maxRow[$sName] = $maxVal;
+
+                    $monthlyHeatIndexRecords[] = [
+                        'month' => $mName,
+                        'station_name' => $sName,
+                        'avg_heat_index' => $avgVal !== null ? $avgVal : '-',
+                        'max_heat_index' => $maxVal !== null ? $maxVal : '-'
+                    ];
+                }
+
+                $chartDataAvg[] = $avgRow;
+                $chartDataMax[] = $maxRow;
+            }
+        } else if ($request->report === 'Rain') {
             $chartData = $summaryResults->groupBy('date_only')->map(function ($items, $date) {
                 $entry = ['date' => $date];
                 foreach ($items as $item) {
@@ -300,6 +399,9 @@ class ReportController extends Controller
                 ];
             }),
             'chartData' => $chartData,
+            'chartDataAvg' => $chartDataAvg,
+            'chartDataMax' => $chartDataMax,
+            'monthlyHeatIndexRecords' => $monthlyHeatIndexRecords,
             'stationNames' => $stationNames,
             'summaryRecords' => $summaryRecords
         ]);
