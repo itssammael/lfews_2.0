@@ -70,4 +70,9 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(Role::class);
     }
+
+    public function ssoIdentityLinks()
+    {
+        return $this->hasMany(SsoIdentityLink::class);
+    }
 }
