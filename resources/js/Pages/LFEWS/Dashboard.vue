@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import AppLayout from "@/Layouts/AppLayout.vue";
-import CommandCenterOverview from "@/Components/CommandCenterOverview.vue";
+import CommandCenter4K from "@/Components/CommandCenter4K.vue";
 import { Link, usePage, router } from "@inertiajs/vue3";
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import WaterLevelChart from "@/Components/WaterLevelChart.vue";
@@ -341,13 +341,15 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters, showT
       </div>
     </template>
 
-    <CommandCenterOverview
+    <CommandCenter4K
       :sensors="sensors || []"
       :stations="stations || []"
       :water-readings="modbusResult as any"
+      :water-history="historyData || {}"
       :weather-readings="weatherResult as any"
-      :evacuation-centers="evacuationCenters || []"
-      :windy-api-key="windyApiKey"
+      :weather-history="historyWeatherData || {}"
+      :tides="tides || {}"
+      :tide-heights="tideHeights || []"
       :refreshing-water="processingWater"
       :refreshing-weather="processingWeather"
       @refresh-water="refreshData"
