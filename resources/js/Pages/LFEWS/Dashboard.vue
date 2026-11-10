@@ -235,6 +235,13 @@ onMounted(() => {
     if (isAutoWeatherPulling.value) {
       await refreshWeatherData();
     }
+
+    // Keep the predicted tidal timeline in sync with the same monitoring cycle.
+    router.reload({
+      only: ["tides", "tideHeights"],
+      preserveScroll: true,
+      preserveState: true,
+    });
   }, 300000); // 5 minutes
 });
 
