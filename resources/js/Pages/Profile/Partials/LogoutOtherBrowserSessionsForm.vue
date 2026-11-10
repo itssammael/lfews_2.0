@@ -10,7 +10,7 @@ import SecondaryButton from '@/Components/SecondaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 
 defineProps({
-    sessions: Array,
+    sessions: Array as () => any[],
 });
 
 const confirmingLogout = ref(false);

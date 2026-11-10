@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // @ts-ignore
 import AppLayout from '@/Layouts/AppLayout.vue';
-import { onMounted, ref, watch } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 import L from 'leaflet';
 // @ts-ignore
 import Checkbox from '@/Components/Checkbox.vue';
@@ -197,6 +197,8 @@ watch(showSitios, (newVal) => {
     }
 });
 
+let isUnmounted = false;
+
 const processContours = async () => {
     if (isLoadingContours.value || isContoursProcessed.value) return;
     
@@ -209,9 +211,10 @@ const processContours = async () => {
             let page = 1;
             let hasMorePages = true;
 
-            while (hasMorePages) {
+            while (hasMorePages && !isUnmounted) {
                 // @ts-ignore
                 const response = await axios.get(route('locator.api.contours', { page }));
+                if (isUnmounted) break;
                 const payload = response.data;
                 
                 if (page === 1) {
@@ -229,6 +232,7 @@ const processContours = async () => {
 
                 const chunkSize = 50;
                 for (let i = 0; i < features.length; i += chunkSize) {
+                    if (isUnmounted) break;
                     const chunk = features.slice(i, i + chunkSize);
                     
                     L.geoJSON({ type: "FeatureCollection", features: chunk } as any, {
@@ -375,9 +379,10 @@ const processSitios = async () => {
             let page = 1;
             let hasMorePages = true;
 
-            while (hasMorePages) {
+            while (hasMorePages && !isUnmounted) {
                 // @ts-ignore
                 const response = await axios.get(route('locator.api.sitios', { page }));
+                if (isUnmounted) break;
                 const payload = response.data;
                 
                 if (page === 1) {
@@ -395,6 +400,7 @@ const processSitios = async () => {
                 }));
 
                 for (let i = 0; i < features.length; i += chunkSize) {
+                    if (isUnmounted) break;
                     const chunk = features.slice(i, i + chunkSize);
                     
                     L.geoJSON({ type: "FeatureCollection", features: chunk } as any, {
@@ -750,6 +756,14 @@ onMounted(() => {
         if (hasPoints) {
             map.value.fitBounds(bounds, { padding: [50, 50] });
         }
+    }
+});
+
+onUnmounted(() => {
+    isUnmounted = true;
+    if (map.value) {
+        map.value.remove();
+        map.value = null;
     }
 });
 </script>

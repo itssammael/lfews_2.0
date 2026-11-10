@@ -374,7 +374,7 @@ const submitWindyApi = () => {
                                 ref="logoInput"
                                 @change="updateLogo"
                             />
-                            <PrimaryButton type="button" @click="$refs.logoInput.click()">
+                            <PrimaryButton type="button" @click="($refs.logoInput as HTMLInputElement).click()">
                                 Select New Logo
                             </PrimaryButton>
                             <InputError :message="logoForm.errors.value" class="mt-2" />
@@ -416,7 +416,7 @@ const submitWindyApi = () => {
                                 ref="iconInput"
                                 @change="updateIcon"
                             />
-                            <PrimaryButton type="button" @click="$refs.iconInput.click()">
+                            <PrimaryButton type="button" @click="($refs.iconInput as HTMLInputElement).click()">
                                 Select New Icon
                             </PrimaryButton>
                             <InputError :message="iconForm.errors.value" class="mt-2" />

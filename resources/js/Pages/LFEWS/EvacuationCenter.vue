@@ -5,14 +5,14 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 
 const props = defineProps({
     evacuationCenters: {
-        type: Array,
+        type: Array as () => any[],
         default: () => [],
     },
 });
 
 const loading = ref(false);
-const error = ref(null);
-const evacuationCenters = ref(props.evacuationCenters);
+const error = ref<string | null>(null);
+const evacuationCenters = ref<any[]>(props.evacuationCenters);
 
 const fetchEvacuationCenters = async () => {
     loading.value = true;

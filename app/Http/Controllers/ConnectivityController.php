@@ -24,8 +24,8 @@ class ConnectivityController extends Controller
 
         $ip = $request->input('ip');
 
-        // Basic validation for IP or hostname to prevent command injection
-        if (!filter_var($ip, FILTER_VALIDATE_IP) && !preg_match('/^[a-zA-Z0-9.-]+$/', $ip)) {
+        // Basic validation for IP or hostname to prevent command/option injection
+        if (!filter_var($ip, FILTER_VALIDATE_IP) && !preg_match('/^[a-zA-Z0-9][a-zA-Z0-9.-]*$/', $ip)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid IP address or hostname format.',
@@ -41,6 +41,7 @@ class ConnectivityController extends Controller
             // Linux/Unix: -c (count), -W (timeout in seconds)
             $process = new Process(['ping', '-c', '3', '-W', '2', $ip]);
         }
+        $process->setTimeout(10);
         $process->run();
 
         $output = $process->getOutput();

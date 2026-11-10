@@ -54,6 +54,7 @@ class PagesController extends Controller
 
     public function systemSettings()
     {
+        \Illuminate\Support\Facades\Gate::authorize('admin-only');
         $settings = SystemSetting::with('updatedBy')->get()->pluck('value', 'name');
         return Inertia::render('SystemSettings', [
             'settings' => $settings,
@@ -62,17 +63,25 @@ class PagesController extends Controller
 
     public function updateSystemSettings(Request $request)
     {
-        $validated = $request->validate([
-            'name' => 'required|string',
+        \Illuminate\Support\Facades\Gate::authorize('admin-only');
+
+        $rules = [
+            'name' => 'required|string|max:191',
             'value' => 'required',
-        ]);
+        ];
+
+        if ($request->hasFile('value')) {
+            $rules['value'] = 'required|file|mimes:jpg,jpeg,png,webp,ico|max:2048';
+        }
+
+        $validated = $request->validate($rules);
 
         $value = $validated['value'];
 
         // Handle file uploads if the value is a file (e.g., from Branding configuration)
         if ($request->hasFile('value')) {
             $file = $request->file('value');
-            $filename = time() . '_' . $file->getClientOriginalName();
+            $filename = time() . '_' . $file->hashName();
             $file->move(public_path('system'), $filename);
             $value = '/system/' . $filename;
         }
@@ -84,6 +93,7 @@ class PagesController extends Controller
                 'updated_by' => auth()->id(),
             ]
         );
+        \Illuminate\Support\Facades\Cache::forget('shared_system_settings');
         
         return redirect()->back()->with('success', 'Settings updated successfully.');
     }

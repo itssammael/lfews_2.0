@@ -286,11 +286,14 @@ const getCardinalDirection = (deg: number | string | null | undefined): string =
 };
 
 const getCardinalAbbr = (deg: number | string | null | undefined): string => {
-    const dir = getCardinalDirection(deg);
     const map: Record<string, string> = {
         'North': 'N', 'North East': 'NE', 'East': 'E', 'South East': 'SE',
         'South': 'S', 'South West': 'SW', 'West': 'W', 'North West': 'NW'
     };
+    if (typeof deg === 'string' && map[deg]) {
+        return map[deg];
+    }
+    const dir = getCardinalDirection(deg);
     return map[dir] || 'N/A';
 };
 
@@ -1176,6 +1179,8 @@ const initWaterLevelRangeChart = (rootElement: HTMLElement, data: any[], thresho
         layout: root.horizontalLayout
     }));
     
+    legend.data.setAll(chart.series.values);
+
     // Add custom legend item for Threshold if it exists
     if (thresholds && (thresholds.level_2 || thresholds.level_3 || thresholds.level_4)) {
         legend.data.push({
@@ -1188,8 +1193,6 @@ const initWaterLevelRangeChart = (rootElement: HTMLElement, data: any[], thresho
             })
         } as any);
     }
-
-    legend.data.setAll(chart.series.values);
 
     xAxis.data.setAll(data);
     rangeSeries.data.setAll(data);
@@ -1341,9 +1344,6 @@ const initHeatmapChart = (root: am5.Root, data: any[], numDays: number = 31) => 
         }
         return stroke;
     });
-
-    series.data.setAll(data);
-    series.appear(1000);
 
     series.data.setAll(data);
     series.appear(1000);

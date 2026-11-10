@@ -1,34 +1,52 @@
 import { ref, watch } from 'vue';
 
-const showWaterLevelSensors = ref(JSON.parse(localStorage.getItem('showWaterLevelSensors') || 'true'));
-const showWeatherStations = ref(JSON.parse(localStorage.getItem('showWeatherStations') || 'true'));
-const showEvacuationCenters = ref(JSON.parse(localStorage.getItem('showEvacuationCenters') || 'true'));
-const showTidalExtremes = ref(JSON.parse(localStorage.getItem('showTidalExtremes') || 'true'));
-const showBarangays = ref(JSON.parse(localStorage.getItem('showBarangays') || 'true'));
-const showSitios = ref(JSON.parse(localStorage.getItem('showSitios') || 'true'));
+const readStorage = (key: string, fallback: boolean): boolean => {
+    if (typeof window === 'undefined' || !window.localStorage) {
+        return fallback;
+    }
+    try {
+        const raw = window.localStorage.getItem(key);
+        return raw !== null ? JSON.parse(raw) : fallback;
+    } catch {
+        return fallback;
+    }
+};
+
+const writeStorage = (key: string, value: boolean): void => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(key, JSON.stringify(value));
+    }
+};
+
+const showWaterLevelSensors = ref(readStorage('showWaterLevelSensors', true));
+const showWeatherStations = ref(readStorage('showWeatherStations', true));
+const showEvacuationCenters = ref(readStorage('showEvacuationCenters', true));
+const showTidalExtremes = ref(readStorage('showTidalExtremes', true));
+const showBarangays = ref(readStorage('showBarangays', true));
+const showSitios = ref(readStorage('showSitios', true));
 
 watch(showWaterLevelSensors, (newValue) => {
-    localStorage.setItem('showWaterLevelSensors', JSON.stringify(newValue));
+    writeStorage('showWaterLevelSensors', newValue);
 });
 
 watch(showWeatherStations, (newValue) => {
-    localStorage.setItem('showWeatherStations', JSON.stringify(newValue));
+    writeStorage('showWeatherStations', newValue);
 });
 
 watch(showEvacuationCenters, (newValue) => {
-    localStorage.setItem('showEvacuationCenters', JSON.stringify(newValue));
+    writeStorage('showEvacuationCenters', newValue);
 });
 
 watch(showTidalExtremes, (newValue) => {
-    localStorage.setItem('showTidalExtremes', JSON.stringify(newValue));
+    writeStorage('showTidalExtremes', newValue);
 });
 
 watch(showBarangays, (newValue) => {
-    localStorage.setItem('showBarangays', JSON.stringify(newValue));
+    writeStorage('showBarangays', newValue);
 });
 
 watch(showSitios, (newValue) => {
-    localStorage.setItem('showSitios', JSON.stringify(newValue));
+    writeStorage('showSitios', newValue);
 });
 
 export function useDashboardSettings() {

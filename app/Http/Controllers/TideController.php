@@ -15,8 +15,8 @@ class TideController extends Controller
             ->orderBy('dt', 'asc')
             ->get();
 
-        // If no future tides, sync
-        if ($tides->where('dt', '>=', time())->isEmpty()) {
+        // If no future tides and not in cooldown, sync
+        if ($tides->where('dt', '>=', time())->isEmpty() && !\Illuminate\Support\Facades\Cache::has('tide_sync_cooldown')) {
             $this->syncTides();
             $tides = Tide::where('dt', '>=', time() - 86400)
                 ->orderBy('dt', 'asc')
@@ -30,10 +30,11 @@ class TideController extends Controller
 
     public function syncTides()
     {
+        \Illuminate\Support\Facades\Cache::put('tide_sync_cooldown', true, 900);
         $url = "https://www.tide-forecast.com/osm/points_of_interest.json?bbox=120.86334228515625,8.876930702774121,124.13177490234376,9.933682229573083";
 
         try {
-            $response = Http::timeout(30)
+            $response = Http::timeout(10)
                 ->withoutVerifying()
                 ->withHeaders([
                     'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
@@ -60,66 +61,68 @@ class TideController extends Controller
                     $lon = $targetStation['lon'] ?? 122.8;
                     $station = $targetStation['name'] ?? 'Bayawan City';
 
-                    $extremes = [];
-                    foreach ($targetStation['days'] as $day) {
-                        if (isset($day['tides']) && is_array($day['tides'])) {
-                            foreach ($day['tides'] as $tide) {
-                                $dt = (int)$tide['timestamp'];
-                                $height = (float)$tide['height'];
-                                $type = ucfirst(strtolower($tide['type']));
-                                $dateStr = date('Y-m-d H:i:s', $dt);
+                    \Illuminate\Support\Facades\DB::transaction(function () use ($targetStation, $lat, $lon, $station) {
+                        $extremes = [];
+                        foreach ($targetStation['days'] as $day) {
+                            if (isset($day['tides']) && is_array($day['tides'])) {
+                                foreach ($day['tides'] as $tide) {
+                                    $dt = (int) $tide['timestamp'];
+                                    $height = (float) $tide['height'];
+                                    $type = ucfirst(strtolower($tide['type']));
+                                    $dateStr = date('Y-m-d H:i:s', $dt);
 
-                                Tide::updateOrCreate(
-                                    ['dt' => $dt],
-                                    [
+                                    Tide::updateOrCreate(
+                                        ['dt' => $dt],
+                                        [
+                                            'date' => $dateStr,
+                                            'height' => $height,
+                                            'type' => $type,
+                                            'latitude' => $lat,
+                                            'longitude' => $lon,
+                                            'station' => $station,
+                                        ]
+                                    );
+
+                                    $extremes[] = [
+                                        'dt' => $dt,
                                         'date' => $dateStr,
                                         'height' => $height,
                                         'type' => $type,
-                                        'latitude' => $lat,
-                                        'longitude' => $lon,
-                                        'station' => $station,
-                                    ]
-                                );
-
-                                $extremes[] = [
-                                    'dt' => $dt,
-                                    'date' => $dateStr,
-                                    'height' => $height,
-                                    'type' => $type,
-                                ];
+                                    ];
+                                }
                             }
                         }
-                    }
 
-                    // Sort extremes chronologically
-                    usort($extremes, fn($a, $b) => $a['dt'] <=> $b['dt']);
+                        // Sort extremes chronologically
+                        usort($extremes, fn($a, $b) => $a['dt'] <=> $b['dt']);
 
-                    // Generate continuous interpolated heights for smooth wave rendering
-                    for ($i = 0; $i < count($extremes) - 1; $i++) {
-                        $e1 = $extremes[$i];
-                        $e2 = $extremes[$i + 1];
-                        $dt1 = $e1['dt'];
-                        $dt2 = $e2['dt'];
-                        $h1 = $e1['height'];
-                        $h2 = $e2['height'];
+                        // Generate continuous interpolated heights for smooth wave rendering
+                        for ($i = 0; $i < count($extremes) - 1; $i++) {
+                            $e1 = $extremes[$i];
+                            $e2 = $extremes[$i + 1];
+                            $dt1 = $e1['dt'];
+                            $dt2 = $e2['dt'];
+                            $h1 = $e1['height'];
+                            $h2 = $e2['height'];
 
-                        if ($dt2 > $dt1) {
-                            for ($t = $dt1; $t < $dt2; $t += 1800) {
-                                $ratio = ($t - $dt1) / ($dt2 - $dt1);
-                                $interpolatedH = $h1 + ($h2 - $h1) * (1 - cos($ratio * M_PI)) / 2;
+                            if ($dt2 > $dt1) {
+                                for ($t = $dt1; $t < $dt2; $t += 1800) {
+                                    $ratio = ($t - $dt1) / ($dt2 - $dt1);
+                                    $interpolatedH = $h1 + ($h2 - $h1) * (1 - cos($ratio * M_PI)) / 2;
 
-                                \App\Models\TideHeight::updateOrCreate(
-                                    ['dt' => $t],
-                                    [
-                                        'date' => date('Y-m-d H:i:s', $t),
-                                        'height' => round($interpolatedH, 3),
-                                        'latitude' => $lat,
-                                        'longitude' => $lon,
-                                    ]
-                                );
+                                    \App\Models\TideHeight::updateOrCreate(
+                                        ['dt' => $t],
+                                        [
+                                            'date' => date('Y-m-d H:i:s', $t),
+                                            'height' => round($interpolatedH, 3),
+                                            'latitude' => $lat,
+                                            'longitude' => $lon,
+                                        ]
+                                    );
+                                }
                             }
                         }
-                    }
+                    });
                 }
             }
         } catch (\Exception $e) {

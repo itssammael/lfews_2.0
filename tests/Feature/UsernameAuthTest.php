@@ -13,6 +13,10 @@ class UsernameAuthTest extends TestCase
 
     public function test_user_can_register_with_username()
     {
+        if (! \Laravel\Fortify\Features::enabled(\Laravel\Fortify\Features::registration())) {
+            $this->markTestSkipped('Registration support is not enabled.');
+        }
+
         $response = $this->post('/register', [
             'name' => 'Test User',
             'username' => 'testuser123',

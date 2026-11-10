@@ -129,7 +129,9 @@ class WeatherStationController extends Controller
             return redirect()->back()->with('error', 'Weather station not found.');
         }
         $location = Location::find($station->location_id);
-        $station->location = ['latitude' => $location->latitude, 'longitude' => $location->longitude];
+        if ($location) {
+            $station->location = ['latitude' => $location->latitude, 'longitude' => $location->longitude];
+        }
 
         $allStations = WeatherStation::all();
         $paginatedStations = WeatherStation::query()
@@ -151,6 +153,7 @@ class WeatherStationController extends Controller
             'locations' => $locations,
             'editingStation' => $station,
             'showCreateModal' => false,
+            'showEditModal' => true,
             'activeCount' => $allStations->where('state', 1)->count(),
             'inactiveCount' => $allStations->where('state', 0)->count(),
             'maintenanceCount' => $allStations->where('state', 2)->count(),
@@ -241,14 +244,49 @@ class WeatherStationController extends Controller
             $observations = [];
             foreach ($stations as $station) {
                 try {
+                    $weatherData = null;
                     if ($station->mode === 'API/wunderground') {
                         $response = $this->fetchWundergroundData($station);
-                        $weatherData = $response->json();
+                        if ($response && $response->successful()) {
+                            $weatherData = $response->json();
+                        } else {
+                            throw new \Exception('Failed to fetch data from Weather Underground.');
+                        }
                     } elseif ($station->mode === 'Davis') {
-                        $response = $this->davisWeatherStation($station);
-                        $weatherData = $response;
+                        $weatherData = $this->davisWeatherStation($station);
                     }
 
+                    if (empty($weatherData['observations'][0])) {
+                        throw new \Exception('No valid observation data returned from weather station.');
+                    }
+
+                    $obs = $weatherData['observations'][0];
+                    $obsDateTime = \Carbon\Carbon::parse($obs['obsTimeLocal'])->toDateTimeString();
+
+                    $trimmedData = [
+                        'weather_station_id' => $station->id,
+                        'temperature' => $obs['metric']['temp'] ?? null,
+                        'heat_index' => $obs['metric']['heatIndex'] ?? null,
+                        'dewpoint' => $obs['metric']['dewpt'] ?? null,
+                        'humidity' => $obs['humidity'] ?? null,
+                        'wind_speed' => $obs['metric']['windSpeed'] ?? null,
+                        'wind_direction' => $obs['winddir'] ?? null,
+                        'wind_gust' => $obs['metric']['windGust'] ?? null,
+                        'pressure' => $obs['metric']['pressure'] ?? null,
+                        'precipitation_rate' => $obs['metric']['precipRate'] ?? null,
+                        'precipitation_total' => $obs['metric']['precipTotal'] ?? null,
+                        'uv' => $obs['uv'] ?? null,
+                        'solar_radiation' => $obs['solarRadiation'] ?? null,
+                        'date_time' => $obsDateTime,
+                    ];
+
+                    \App\Models\WeatherStationObservationData::updateOrCreate(
+                        [
+                            'weather_station_id' => $station->id,
+                            'date_time' => $obsDateTime,
+                        ],
+                        $trimmedData
+                    );
 
                     $observations[$station->id] = [
                         'id' => $station->id,
@@ -256,22 +294,21 @@ class WeatherStationController extends Controller
                         'name' => $station->name,
                         'success' => true,
                         'data' => [
-                            'temperature' => $weatherData['observations'][0]['metric']['temp'],
-                            'heat_index' => $weatherData['observations'][0]['metric']['heatIndex'],
-                            'dewpoint' => $weatherData['observations'][0]['metric']['dewpt'],
-                            'humidity' => $weatherData['observations'][0]['humidity'],
-                            'wind_speed' => $weatherData['observations'][0]['metric']['windSpeed'],
-                            'wind_direction' => $weatherData['observations'][0]['winddir'],
-                            'wind_gust' => $weatherData['observations'][0]['metric']['windGust'],
-                            'pressure' => $weatherData['observations'][0]['metric']['pressure'],
-                            'precipitation_rate' => $weatherData['observations'][0]['metric']['precipRate'],
-                            'precipitation_total' => $weatherData['observations'][0]['metric']['precipTotal'],
-                            'uv' => $weatherData['observations'][0]['uv'],
-                            'solar_radiation' => $weatherData['observations'][0]['solarRadiation'],
-                            'date_time' => $weatherData['observations'][0]['obsTimeLocal'],
+                            'temperature' => $trimmedData['temperature'],
+                            'heat_index' => $trimmedData['heat_index'],
+                            'dewpoint' => $trimmedData['dewpoint'],
+                            'humidity' => $trimmedData['humidity'],
+                            'wind_speed' => $trimmedData['wind_speed'],
+                            'wind_direction' => $trimmedData['wind_direction'],
+                            'wind_gust' => $trimmedData['wind_gust'],
+                            'pressure' => $trimmedData['pressure'],
+                            'precipitation_rate' => $trimmedData['precipitation_rate'],
+                            'precipitation_total' => $trimmedData['precipitation_total'],
+                            'uv' => $trimmedData['uv'],
+                            'solar_radiation' => $trimmedData['solar_radiation'],
+                            'date_time' => $obs['obsTimeLocal'],
                         ],
                         'timestamp' => now()->toDateTimeString(),
-
                     ];
                 } catch (\Exception $e) {
                     $observations[$station->id] = [
@@ -287,8 +324,8 @@ class WeatherStationController extends Controller
 
             } //END of for loop
 
-            // Update latest data
-            \Illuminate\Support\Facades\Cache::put('latest_weather_observation_data', $observations, 60);
+            // Update latest data (24 hours TTL)
+            \Illuminate\Support\Facades\Cache::put('latest_weather_observation_data', $observations, 86400);
 
             //Update history
             $history = \Illuminate\Support\Facades\Cache::get('weather_observation_history', []);
@@ -309,7 +346,7 @@ class WeatherStationController extends Controller
                     }
                 }
             }
-            \Illuminate\Support\Facades\Cache::put('weather_observation_history', $history, 60); // 24 hours
+            \Illuminate\Support\Facades\Cache::put('weather_observation_history', $history, 86400); // 24 hours
 
             \Illuminate\Support\Facades\Cache::forget($lockKey);
 
@@ -340,13 +377,12 @@ class WeatherStationController extends Controller
         return Http::timeout(30)
             ->connectTimeout(15)
             ->withoutVerifying()
-            ->retry(3, 2000)
+            ->retry(3, 2000, throw: false)
             ->withOptions([
                 'curl' => [
                     CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
                 ],
             ])
-            ->retry(3, 2000)
             ->get('http://api.weather.com/v2/pws/observations/current', [
                 'stationId' => $station->station_id,
                 'format' => 'json',
@@ -360,84 +396,83 @@ class WeatherStationController extends Controller
     {
         $ip = $station->ip;
         $port = 22222;
-        $fp = fsockopen($ip, $port, $errno, $errstr, 2);
+        $fp = @fsockopen($ip, $port, $errno, $errstr, 2);
 
-        if ($fp) {
-            stream_set_timeout($fp, 2); // Set read timeout to 2 seconds
+        if (!$fp) {
+            return null;
+        }
 
-            // 1. Wake up the console
-            fwrite($fp, "\n");
-            usleep(500000); // Wait 0.5s
-            $response = fread($fp, 1024);
+        stream_set_timeout($fp, 2); // Set read timeout to 2 seconds
 
-            // 2. Request 1 LOOP packet
-            fwrite($fp, "LOOP 1\n");
-            usleep(500000);
+        // 1. Wake up the console
+        fwrite($fp, "\n");
+        usleep(500000); // Wait 0.5s
+        $response = fread($fp, 1024);
 
-            // 3. Read binary data (1 byte ACK + 99 bytes packet)
-            // Davis can be slow; ensure we get all 100 bytes
-            $binaryData = "";
-            $startTime = microtime(true);
-            while (strlen($binaryData) < 100 && (microtime(true) - $startTime) < 2) {
-                $chunk = fread($fp, 100 - strlen($binaryData));
-                if ($chunk === false || $chunk === "")
-                    break;
-                $binaryData .= $chunk;
-            }
+        // 2. Request 1 LOOP packet
+        fwrite($fp, "LOOP 1\n");
+        usleep(500000);
 
-            // 4. Verify ACK (Decimal 6) and we have a full packet
-            if (strlen($binaryData) === 100 && ord($binaryData[0]) === 6) {
-                $packet = substr($binaryData, 1);
+        // 3. Read binary data (1 byte ACK + 99 bytes packet)
+        // Davis can be slow; ensure we get all 100 bytes
+        $binaryData = "";
+        $startTime = microtime(true);
+        while (strlen($binaryData) < 100 && (microtime(true) - $startTime) < 2) {
+            $chunk = fread($fp, 100 - strlen($binaryData));
+            if ($chunk === false || $chunk === "")
+                break;
+            $binaryData .= $chunk;
+        }
 
-                // // Individual bytes/offsets based on Davis LOOP 1 Packet Spec
-                $barometer = unpack("v", substr($packet, 7, 2))[1];
-                $temp_out = unpack("v", substr($packet, 12, 2))[1];
-                $wind_speed = unpack("Cwind_speed/x4/", $packet);
-                $wind_direction = unpack("v", substr($packet, 16, 2))[1];
-                $humidity = ord($packet[33]);
-                $rain_day = unpack("v", substr($packet, 52, 2))[1] / 100; // Rain rate (clicks/hr)
-                $rain_rate = unpack("v", substr($packet, 41, 2))[1];
-                $rain_total = unpack("v", substr($packet, 50, 2))[1];
-                $wind_gust = unpack(
-                    "x64/" .       // Skip to Offset 64
-                    "vwind_gust",  // Read 2 bytes (unsigned short, little-endian)
-                    $packet
-                );
-                $solar = unpack("v", substr($packet, 67, 2))[1];
-                $uv = ord($packet[70]);
-                $dewpoint = unpack("c", $packet[42])[1]; // 1-byte signed
-                $heat_index = unpack("c", $packet[44])[1]; // 1-byte signed
-                //    $rain_storm     = unpack("v", substr($packet, 46, 2))[1] / 100; // Offset 46
-                // Scaling and "No Data" handling
-                // Davis sentinel values: 32767 or 65535 for words, 255 for bytes
+        // 4. Verify ACK (Decimal 6) and we have a full packet
+        if (strlen($binaryData) === 100 && ord($binaryData[0]) === 6) {
+            $packet = substr($binaryData, 1);
 
-                $weather = [
-                    'temperature' => ($temp_out == 32767) ? 0 : $temp_out / 10,
-                    'dewpoint' => ($dewpoint == 255) ? 0 : $dewpoint,
-                    'heat_index' => ($heat_index == 255) ? 0 : $heat_index,
-                    'humidity' => ($humidity == 255) ? 0 : $humidity,
-                    'wind_speed' => ($wind_speed['wind_speed'] == 255) ? 0 : $wind_speed['wind_speed'],
-                    'wind_direction' => ($wind_direction == 32767 || $wind_direction == 0) ? 0 : $wind_direction,
-                    'wind_gust' => ($wind_gust['wind_gust'] == 32767 || $wind_gust['wind_gust'] == 65535) ? 0 : $wind_gust['wind_gust'],
-                    'pressure' => ($barometer == 0) ? 0 : $barometer / 10,
-                    'precipitation_rate' => ($rain_rate == 65535) ? 0 : $rain_rate * 0.01,
-                    'precipitation_total' => ($rain_total == 65535) ? 0 : $rain_total * 0.01,
-                    'solar_radiation' => ($solar == 65535) ? 0 : $solar,
-                    'uv' => ($uv == 255) ? 0 : $uv / 10,
-                ];
+            // Individual bytes/offsets based on Davis LOOP 1 Packet Spec
+            $barometer = unpack("v", substr($packet, 7, 2))[1];
+            $temp_out = unpack("v", substr($packet, 12, 2))[1];
+            $wind_speed = unpack("Cwind_speed/x4/", $packet);
+            $wind_direction = unpack("v", substr($packet, 16, 2))[1];
+            $humidity = ord($packet[33]);
+            $rain_day = unpack("v", substr($packet, 52, 2))[1] / 100; // Rain rate (clicks/hr)
+            $rain_rate = unpack("v", substr($packet, 41, 2))[1];
+            $rain_total = unpack("v", substr($packet, 50, 2))[1];
+            $wind_gust = unpack(
+                "x64/" .       // Skip to Offset 64
+                "vwind_gust",  // Read 2 bytes (unsigned short, little-endian)
+                $packet
+            );
+            $solar = unpack("v", substr($packet, 67, 2))[1];
+            $uv = ord($packet[70]);
+            $dewpoint = unpack("c", $packet[42])[1]; // 1-byte signed
+            $heat_index = unpack("c", $packet[44])[1]; // 1-byte signed
+            // Scaling and "No Data" handling
+            // Davis sentinel values: 32767 or 65535 for words, 255 for bytes
 
-                //    dd($rain_day);    
-            }
+            $weather = [
+                'temperature' => ($temp_out == 32767) ? 0 : $temp_out / 10,
+                'dewpoint' => ($dewpoint == 255) ? 0 : $dewpoint,
+                'heat_index' => ($heat_index == 255) ? 0 : $heat_index,
+                'humidity' => ($humidity == 255) ? 0 : $humidity,
+                'wind_speed' => ($wind_speed['wind_speed'] == 255) ? 0 : $wind_speed['wind_speed'],
+                'wind_direction' => ($wind_direction == 32767 || $wind_direction == 0) ? 0 : $wind_direction,
+                'wind_gust' => ($wind_gust['wind_gust'] == 32767 || $wind_gust['wind_gust'] == 65535) ? 0 : $wind_gust['wind_gust'],
+                'pressure' => ($barometer == 0) ? 0 : $barometer / 10,
+                'precipitation_rate' => ($rain_rate == 65535) ? 0 : $rain_rate * 0.01,
+                'precipitation_total' => ($rain_total == 65535) ? 0 : $rain_total * 0.01,
+                'solar_radiation' => ($solar == 65535) ? 0 : $solar,
+                'uv' => ($uv == 255) ? 0 : $uv / 10,
+            ];
+
             $weather['heat_index'] = $this->calculateHeatIndex($weather['temperature'], $weather['humidity']);
             $weather['dewpoint'] = $this->calculateDewPoint($weather['temperature'], $weather['humidity']);
 
-
-
             fclose($fp);
-            $result = $this->formatResult($weather);
-            return $result;
+            return $this->formatResult($weather);
         }
 
+        fclose($fp);
+        return null;
     }
 
     public function formatResult($weather)

@@ -81,7 +81,7 @@ Route::middleware([
         ->middleware('can:can-create');
 
     Route::middleware('can:admin-only')->group(function () {
-        Route::resource('users', \App\Http\Controllers\UserController::class);
+        Route::resource('users', \App\Http\Controllers\UserController::class)->only(['index', 'store', 'edit', 'update', 'destroy']);
         Route::resource('roles', \App\Http\Controllers\RoleController::class)->only(['store', 'update', 'destroy']);
         Route::delete('/rivers/{river}', [\App\Http\Controllers\RiverController::class, 'destroy'])->name('can-delete');
     });
@@ -90,7 +90,7 @@ Route::middleware([
         ->middleware('can:can-read');
 
     Route::middleware('can:can-read')->group(function () {
-        Route::resource('rivers', \App\Http\Controllers\RiverController::class)->except(['index', 'destroy']);
+        Route::resource('rivers', \App\Http\Controllers\RiverController::class)->only(['store', 'update']);
     });
 
     Route::get('/locator', [\App\Http\Controllers\LocatorController::class, 'index'])->name('locator')
@@ -104,7 +104,7 @@ Route::middleware([
         ->middleware('can:can-read');
 
     Route::middleware('can:can-read')->group(function () {
-        Route::resource('hazard-map', \App\Http\Controllers\HazardMapController::class)->except(['index']);
+        Route::resource('hazard-map', \App\Http\Controllers\HazardMapController::class)->only(['store', 'update', 'destroy']);
     });
 
     Route::get('/data-migration', [\App\Http\Controllers\DataMigrationController::class, 'index'])->name('data-migration.index')
@@ -133,7 +133,7 @@ Route::middleware([
         ->middleware('can:can-read');
 
     Route::middleware('can:can-read')->group(function () {
-        Route::resource('flood_risks', \App\Http\Controllers\FloodRiskController::class)->except(['index']);
+        Route::resource('flood_risks', \App\Http\Controllers\FloodRiskController::class)->only(['store', 'update', 'destroy']);
     });
 
     Route::get('/barangays-sitios', [\App\Http\Controllers\BarangaySitioController::class, 'index'])->name('barangays-sitios.index')
@@ -148,11 +148,11 @@ Route::middleware([
 
     Route::get('/system-settings', [\App\Http\Controllers\PagesController::class, 'systemSettings'])
         ->name('system-settings')
-        ->middleware('auth:sanctum');
+        ->middleware(['auth:sanctum', 'can:admin-only']);
 
     Route::post('/system-settings', [\App\Http\Controllers\PagesController::class, 'updateSystemSettings'])
         ->name('system-settings.update')
-        ->middleware('auth:sanctum');
+        ->middleware(['auth:sanctum', 'can:admin-only']);
 
     Route::get('/update-geo-data', [\App\Http\Controllers\PagesController::class, 'updateGeoData'])
         ->name('update-geo-data')

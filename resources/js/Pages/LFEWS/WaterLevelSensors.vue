@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, onUnmounted, watch } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import WaterLevelSensorModal from '@/Components/WaterLevelSensorModal.vue';
@@ -47,21 +47,26 @@ const props = defineProps<{
 
 const search = ref(props.filters?.search || '');
 
-watch(search, debounce((value) => {
+const debouncedSearch = debounce((value: string) => {
     router.get(route('water-level-sensors'), { search: value }, {
         preserveState: true,
         replace: true,
     });
-}, 300));
+}, 300);
+
+watch(search, debouncedSearch);
+
+onUnmounted(() => {
+    debouncedSearch.cancel();
+});
 
 const showingModal = ref(false);
 const activeSensor = ref<Sensor | null>(null);
 
 watch(() => props.editingSensor, (newSensor: Sensor | undefined) => {
-    console.log(newSensor)
     if (newSensor) {
         activeSensor.value = newSensor;
-        showingModal.value = false;
+        showingModal.value = true;
     }
 }, { immediate: true });
 

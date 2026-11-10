@@ -159,6 +159,7 @@ class WaterLevelSensorController extends Controller
             'locations' => $locations,
             'editingSensor' => $sensor,
             'showCreateModal' => false,
+            'showEditModal' => true,
             'activeCount' => $allSensors->where('state', 1)->count(),
             'inactiveCount' => $allSensors->where('state', 0)->count(),
             'maintenanceCount' => $allSensors->where('state', 2)->count(),
@@ -257,10 +258,16 @@ class WaterLevelSensorController extends Controller
 
             foreach ($sensors as $sensor) {
                 try {
-
                     $result = $this->formatSensorData($sensor, $modbusService);
                     $results[$sensor->id] = $result;
 
+                    if (!empty($result['success'])) {
+                        WaterLevelSensorData::create([
+                            'water_level_sensor_id' => $sensor->id,
+                            'sensor_data' => $result['data'],
+                            'date' => $result['timestamp'],
+                        ]);
+                    }
                 } catch (\Exception $e) {
                     $results[$sensor->id] = [
                         'sensor_id' => $sensor->id,
@@ -294,26 +301,29 @@ class WaterLevelSensorController extends Controller
 
     public function updateModbusCache(array $results): void
     {
-        // Update latest data
-        \Illuminate\Support\Facades\Cache::put('latest_modbus_data', $results, 60);
+        // Update latest data (24 hours TTL)
+        \Illuminate\Support\Facades\Cache::put('latest_modbus_data', $results, 86400);
 
         // Update history
         $history = \Illuminate\Support\Facades\Cache::get('modbus_history', []);
 
         if (empty($history)) {
-            $todayData = WaterLevelSensorData::whereDate('date', Carbon::today())
-                ->orderBy('date', 'asc')
-                ->limit(50)
-                ->get();
+            $sensorIds = array_keys($results);
+            foreach ($sensorIds as $sId) {
+                $recentEntries = WaterLevelSensorData::where('water_level_sensor_id', $sId)
+                    ->whereDate('date', Carbon::today())
+                    ->orderBy('date', 'desc')
+                    ->limit(50)
+                    ->get()
+                    ->reverse();
 
-            foreach ($todayData as $entry) {
-                if (!isset($history[$entry->water_level_sensor_id])) {
-                    $history[$entry->water_level_sensor_id] = [];
+                $history[$sId] = [];
+                foreach ($recentEntries as $entry) {
+                    $history[$sId][] = [
+                        'value' => $entry->sensor_data,
+                        'timestamp' => $entry->date,
+                    ];
                 }
-                $history[$entry->water_level_sensor_id][] = [
-                    'value' => $entry->sensor_data,
-                    'timestamp' => $entry->date,
-                ];
             }
         }
 
@@ -335,7 +345,7 @@ class WaterLevelSensorController extends Controller
             }
         }
 
-        \Illuminate\Support\Facades\Cache::put('modbus_history', $history, 60);
+        \Illuminate\Support\Facades\Cache::put('modbus_history', $history, 86400);
     }
     public function formatSensorData($sensor, $modbusService)
     {
@@ -348,6 +358,9 @@ class WaterLevelSensorController extends Controller
                 (int) $sensor->slave_id,
                 1.5
             );
+            if (!isset($modbusData[5])) {
+                throw new \Exception('Incomplete Modbus register data');
+            }
             $data = $modbusData[5] / 10;
         } else {
             $data = $this->pullNodeMcuSensor($sensor);
@@ -382,7 +395,8 @@ class WaterLevelSensorController extends Controller
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_ENCODING => "",
             CURLOPT_MAXREDIRS => 10,
-            CURLOPT_TIMEOUT => 30,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_TIMEOUT => 10,
             CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
             CURLOPT_CUSTOMREQUEST => "GET",
             CURLOPT_HTTPHEADER => array(

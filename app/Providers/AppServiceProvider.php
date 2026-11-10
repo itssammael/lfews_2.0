@@ -23,7 +23,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // URL::forceScheme('https');
+        $request = $this->app['request'];
+        if (
+            $request->isSecure() ||
+            $request->header('X-Forwarded-Proto') === 'https' ||
+            str_contains((string) $request->header('CF-Visitor'), '"https"')
+        ) {
+            $request->server->set('HTTPS', 'on');
+            URL::forceScheme('https');
+        }
 
         RateLimiter::for('global', function (Request $request) {
             return Limit::perMinute(100)->by($request->user()?->id ?: $request->ip());

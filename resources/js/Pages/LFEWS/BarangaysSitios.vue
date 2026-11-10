@@ -1,10 +1,8 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, onUnmounted } from 'vue';
 import { router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
-import DangerButton from '@/Components/DangerButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import Pagination from '@/Components/Pagination.vue';
 import ViewDataModal from '@/Components/ViewDataModal.vue';
@@ -31,12 +29,18 @@ const activeTab = ref('barangays');
 const showingViewModal = ref(false);
 const dataToView = ref<any>(null);
 
-watch(search, debounce((value) => {
+const debouncedSearch = debounce((value: string) => {
     router.get(route('barangays-sitios.index'), { search: value }, {
         preserveState: true,
         replace: true,
     });
-}, 300));
+}, 300);
+
+watch(search, debouncedSearch);
+
+onUnmounted(() => {
+    debouncedSearch.cancel();
+});
 
 const openViewModal = (data: any) => {
     dataToView.value = data;
@@ -118,9 +122,11 @@ const closeViewModal = () => {
                                     <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">
                                         <pre class="text-xs overflow-auto max-w-xs max-h-20">{{ JSON.stringify(barangay.properties, null, 2) }}</pre>
                                     </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                         <SecondaryButton @click="openViewModal(barangay)">
                                             View
                                         </SecondaryButton>
+                                    </td>
                                 </tr>
                                 <tr v-if="barangays.data.length === 0">
                                     <td colspan="3" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
@@ -162,9 +168,11 @@ const closeViewModal = () => {
                                     <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">
                                         <pre class="text-xs overflow-auto max-w-xs max-h-20">{{ JSON.stringify(sitio.properties, null, 2) }}</pre>
                                     </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                         <SecondaryButton @click="openViewModal(sitio)">
                                             View
                                         </SecondaryButton>
+                                    </td>
                                 </tr>
                                 <tr v-if="sitios.data.length === 0">
                                     <td colspan="4" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">

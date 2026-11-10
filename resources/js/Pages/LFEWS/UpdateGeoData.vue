@@ -9,7 +9,6 @@ import proj4 from 'proj4';
 import ConfirmationModal from '@/Components/ConfirmationModal.vue';
 import DangerButton from '@/Components/DangerButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
-import Toast from '@/Components/Toast.vue';
 import ProgressLoader from '@/Components/ProgressLoader.vue';
 
 // Define the CRS for Bayawan (UTM Zone 51N)
@@ -275,8 +274,6 @@ watch(selectedType, () => {
             :subtitle="'Uploading & Processing ' + selectedType.replace('_', ' ')"
             :progress="updateProgress" 
         />
-
-        <Toast />
 
         <ConfirmationModal :show="confirmingUpdate" @close="confirmingUpdate = false">
             <template #title>

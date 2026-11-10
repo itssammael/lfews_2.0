@@ -300,10 +300,14 @@ const addDataPoint = (value: number, timestamp: string) => {
 const updateYAxisMax = () => {
     if (!yAxis) return;
     const l3 = Number(props.level3 || 0);
+    const l4 = Number(props.level4 || 0);
     const val = Number(props.value || 0);
-    const newMax = l3 + val;
+    const historyMax = props.history?.length
+        ? Math.max(...props.history.map((p: { value: number }) => Number(p.value) || 0))
+        : 0;
+    const newMax = Math.max(l3 + val, l4 * 1.1, historyMax * 1.1);
     
-    // Set a reasonable minimum max if both are very small or zero
+    // Set a reasonable minimum max if values are very small or zero
     yAxis.set("max", newMax > 10 ? newMax : 100);
 };
 

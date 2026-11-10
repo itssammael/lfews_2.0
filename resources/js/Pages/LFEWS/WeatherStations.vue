@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted, onUnmounted, watch } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import WeatherStationModal from '@/Components/WeatherStationModal.vue';
@@ -47,21 +47,26 @@ const props = defineProps<{
 
 const search = ref(props.filters?.search || '');
 
-watch(search, debounce((value) => {
+const debouncedSearch = debounce((value: string) => {
     router.get(route('weather-stations'), { search: value }, {
         preserveState: true,
         replace: true,
     });
-}, 300));
+}, 300);
+
+watch(search, debouncedSearch);
+
+onUnmounted(() => {
+    debouncedSearch.cancel();
+});
 
 const showingModal = ref(false);
 const activeStation = ref<Station | null>(null);
 
 watch(() => props.editingStation, (newStation: Station | undefined) => {
-    console.log(newStation)
     if (newStation) {
         activeStation.value = newStation;
-        showingModal.value = false;
+        showingModal.value = true;
     }
 }, { immediate: true });
 

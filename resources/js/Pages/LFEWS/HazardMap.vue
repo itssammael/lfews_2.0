@@ -1,10 +1,8 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, onUnmounted } from 'vue';
 import { router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
-import DangerButton from '@/Components/DangerButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import ViewDataModal from '@/Components/ViewDataModal.vue';
 import Pagination from '@/Components/Pagination.vue';
@@ -26,12 +24,18 @@ const search = ref(props.filters.search);
 const showingViewModal = ref(false);
 const dataToView = ref<any>(null);
 
-watch(search, debounce((value) => {
+const debouncedSearch = debounce((value: string) => {
     router.get(route('hazard-map.index'), { search: value }, {
         preserveState: true,
         replace: true,
     });
-}, 300));
+}, 300);
+
+watch(search, debouncedSearch);
+
+onUnmounted(() => {
+    debouncedSearch.cancel();
+});
 
 const openViewModal = (contour: any) => {
     dataToView.value = contour;

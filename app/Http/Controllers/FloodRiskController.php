@@ -8,6 +8,7 @@ class FloodRiskController extends Controller
 {
     public function index()
     {
+        \Illuminate\Support\Facades\Gate::authorize('can-read');
         return \Inertia\Inertia::render('LFEWS/FloodHazardMap', [
             'floodRisks' => \App\Models\FloodRisk::query()
                 ->when(request('search'), function ($query, $search) {
@@ -21,35 +22,35 @@ class FloodRiskController extends Controller
 
     public function store(\Illuminate\Http\Request $request)
     {
-        \Illuminate\Support\Facades\Gate::authorize('create', \App\Models\FloodRisk::class);
-        $request->validate([
+        \Illuminate\Support\Facades\Gate::authorize('can-create');
+        $validated = $request->validate([
             'name' => 'required|string',
             'properties' => 'nullable|array',
             'geometry' => 'required',
         ]);
 
-        \App\Models\FloodRisk::create($request->all());
+        \App\Models\FloodRisk::create($validated);
 
         return redirect()->route('flood_risks.index')->with('success', 'Flood risk area created successfully.');
     }
 
     public function update(\Illuminate\Http\Request $request, \App\Models\FloodRisk $floodRisk)
     {
-        \Illuminate\Support\Facades\Gate::authorize('update', $floodRisk);
-        $request->validate([
+        \Illuminate\Support\Facades\Gate::authorize('can-update');
+        $validated = $request->validate([
             'name' => 'required|string',
             'properties' => 'nullable|array',
             'geometry' => 'required',
         ]);
 
-        $floodRisk->update($request->all());
+        $floodRisk->update($validated);
 
         return redirect()->route('flood_risks.index')->with('success', 'Flood risk area updated successfully.');
     }
 
     public function destroy(\App\Models\FloodRisk $floodRisk)
     {
-        \Illuminate\Support\Facades\Gate::authorize('delete', $floodRisk);
+        \Illuminate\Support\Facades\Gate::authorize('can-delete');
         $floodRisk->delete();
         return redirect()->route('flood_risks.index')->with('success', 'Flood risk area deleted successfully.');
     }

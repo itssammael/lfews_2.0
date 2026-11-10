@@ -986,10 +986,10 @@ const downloadTemplate = (type: "weather_station" | "water_level_sensor") => {
                 <button
                   v-if="$page.props.auth.can.create"
                   @click="importData"
-                  :disabled="form.processing || !targetId"
+                  :disabled="isImporting || !targetId"
                   class="inline-flex items-center px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold rounded-full shadow-lg shadow-orange-500/20 transition-all duration-200 disabled:opacity-50 disabled:shadow-none"
                 >
-                  <span v-if="form.processing" class="flex items-center">
+                  <span v-if="isImporting" class="flex items-center">
                     <svg
                       class="animate-spin -ml-1 mr-3 h-4 w-4 text-white"
                       fill="none"

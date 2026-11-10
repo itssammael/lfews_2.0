@@ -1,3 +1,3 @@
 @echo off
-cd /d c:\Development\lfews_2.0
+cd /d "%~dp0"
 php artisan schedule:run

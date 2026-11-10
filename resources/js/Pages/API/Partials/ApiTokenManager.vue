@@ -16,18 +16,18 @@ import SectionBorder from '@/Components/SectionBorder.vue';
 import TextInput from '@/Components/TextInput.vue';
 
 const props = defineProps({
-    tokens: Array,
-    availablePermissions: Array,
-    defaultPermissions: Array,
+    tokens: Array as () => any[],
+    availablePermissions: Array as () => string[],
+    defaultPermissions: Array as () => string[],
 });
 
 const createApiTokenForm = useForm({
     name: '',
-    permissions: props.defaultPermissions,
+    permissions: props.defaultPermissions || [],
 });
 
 const updateApiTokenForm = useForm({
-    permissions: [],
+    permissions: [] as string[],
 });
 
 const deleteApiTokenForm = useForm({});

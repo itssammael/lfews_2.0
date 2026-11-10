@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue';
-import { Link } from "@inertiajs/vue3";
+import { ref, watch, onMounted, onUnmounted } from 'vue';
 import ResponsiveNavLink from "@/Components/ResponsiveNavLink.vue";
 import { useDashboardSettings } from '@/Composables/useDashboardSettings';
 
@@ -38,12 +37,18 @@ watch(showSidebar, (val) => {
 });
 
 // Click outside to close popover
+const handleWindowClick = (e: MouseEvent) => {
+    if (geoDataContainer.value && !geoDataContainer.value.contains(e.target as Node)) {
+        showGeoDataPopover.value = false;
+    }
+};
+
 onMounted(() => {
-    window.addEventListener('click', (e) => {
-        if (geoDataContainer.value && !geoDataContainer.value.contains(e.target as Node)) {
-            showGeoDataPopover.value = false;
-        }
-    });
+    window.addEventListener('click', handleWindowClick);
+});
+
+onUnmounted(() => {
+    window.removeEventListener('click', handleWindowClick);
 });
 
 </script>

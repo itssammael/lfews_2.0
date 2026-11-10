@@ -11,7 +11,9 @@ class EvacuationCenterController extends Controller
     {
         \Illuminate\Support\Facades\Gate::authorize('can-read');
 
-        $evacuationCenters = $this->fetchEvacuationCentersData();
+        $evacuationCenters = \Illuminate\Support\Facades\Cache::remember('evacuation_centers', 86400, function () {
+            return $this->fetchEvacuationCentersData();
+        });
 
         return Inertia::render('LFEWS/EvacuationCenter', [
             'evacuationCenters' => $evacuationCenters,
@@ -23,9 +25,10 @@ class EvacuationCenterController extends Controller
         \Illuminate\Support\Facades\Gate::authorize('can-read');
 
         $fetch = $this->fetchEvacuationCentersData();
-        // dd($fetch);
-        \Illuminate\Support\Facades\Cache::put('evacuation_centers', $fetch, 60 * 24 * 7);
-        $data = \Illuminate\Support\Facades\Cache::get('evacuation_centers');
+        if (!empty($fetch)) {
+            \Illuminate\Support\Facades\Cache::put('evacuation_centers', $fetch, 86400 * 7);
+        }
+        $data = \Illuminate\Support\Facades\Cache::get('evacuation_centers', []);
 
         return response()->json([
             'data' => $data

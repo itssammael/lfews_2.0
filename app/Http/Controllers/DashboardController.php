@@ -50,7 +50,7 @@ class DashboardController extends Controller
                 return \Illuminate\Support\Carbon::parse($tide->date)->format('Y-m-d');
             });
 
-        if ($tides->isEmpty()) {
+        if ($tides->isEmpty() && !\Illuminate\Support\Facades\Cache::has('tide_sync_cooldown')) {
             $tideController = new TideController();
             $tideController->syncTides();
 
@@ -138,10 +138,10 @@ class DashboardController extends Controller
         }
 
         if (!empty($results)) {
-            \Illuminate\Support\Facades\Cache::put('latest_modbus_data', $results, 60);
+            \Illuminate\Support\Facades\Cache::put('latest_modbus_data', $results, 86400);
         }
         if (!empty($history)) {
-            \Illuminate\Support\Facades\Cache::put('modbus_history', $history, 60);
+            \Illuminate\Support\Facades\Cache::put('modbus_history', $history, 86400);
         }
 
         return redirect()->route('dashboard')->with('modbusResult', $results);
@@ -203,10 +203,10 @@ class DashboardController extends Controller
         }
 
         if (!empty($observations)) {
-            \Illuminate\Support\Facades\Cache::put('latest_weather_observation_data', $observations, 60);
+            \Illuminate\Support\Facades\Cache::put('latest_weather_observation_data', $observations, 86400);
         }
         if (!empty($history)) {
-            \Illuminate\Support\Facades\Cache::put('weather_observation_history', $history, 60);
+            \Illuminate\Support\Facades\Cache::put('weather_observation_history', $history, 86400);
         }
 
         return redirect()->route('dashboard')->with('weatherResult', $observations);

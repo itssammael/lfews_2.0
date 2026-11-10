@@ -44,11 +44,18 @@ class HandleInertiaRequests extends Middleware
                 'modbusResult' => $request->session()->get('modbusResult'),
                 'weatherResult' => $request->session()->get('weatherResult'),
             ],
-            'system_settings' => fn() => SystemSetting::all()->pluck('value', 'name'),
+            'system_settings' => fn() => \Illuminate\Support\Facades\Cache::remember(
+                'shared_system_settings',
+                300,
+                fn() => SystemSetting::whereNotIn('name', ['api_key'])->get()->pluck('value', 'name')
+            ),
             'auth' => [
                 'user' => $request->user() ? [
                     'id' => $request->user()->id,
                     'name' => $request->user()->name,
+                    'username' => $request->user()->username,
+                    'email' => $request->user()->email,
+                    'profile_photo_url' => $request->user()->profile_photo_url,
                     'roles' => $request->user()->roles->pluck('name'),
                 ] : null,
                 'can' => $request->user() ? [

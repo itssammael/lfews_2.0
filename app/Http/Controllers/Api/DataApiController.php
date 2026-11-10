@@ -29,8 +29,10 @@ class DataApiController extends Controller
         if ($request->data_source === 'water_level_sensor_data') {
             $data = WaterLevelSensorData::with('sensor')
                 ->whereBetween('date', [$startDate, $endDate])
+                ->select(['water_level_sensor_id', 'sensor_data', 'date'])
+                ->orderBy('date', 'asc')
                 ->get()
-                ->groupBy(fn($item) => $item->sensor->name)
+                ->groupBy(fn($item) => $item->sensor?->name ?? 'Unknown Sensor')
                 ->map(fn($group) => $group->map(fn($item) => [
                     'water_level' => (float) $item->sensor_data,
                     'date_time' => $item->date,

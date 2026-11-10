@@ -103,37 +103,39 @@ class WundergroundIntegrationController extends Controller
         ];
         $nullableFields = ['uv', 'solar_radiation'];
 
-        foreach ($data as $row) {
-            $normalized = [];
-            foreach ($row as $key => $val) {
-                $normalized[strtolower(trim($key))] = $val;
-            }
+        \Illuminate\Support\Facades\DB::transaction(function () use ($data, $targetId, $numericFields, $nullableFields) {
+            foreach ($data as $row) {
+                $normalized = [];
+                foreach ($row as $key => $val) {
+                    $normalized[strtolower(trim($key))] = $val;
+                }
 
-            $dateTimeVal = $normalized['date_time']
-                ?? $normalized['date']
-                ?? $normalized['datetime']
-                ?? $normalized['timestamp']
-                ?? now()->toDateTimeString();
+                $dateTimeVal = $normalized['date_time']
+                    ?? $normalized['date']
+                    ?? $normalized['datetime']
+                    ?? $normalized['timestamp']
+                    ?? now()->toDateTimeString();
 
-            $cleanedRow = [
-                'weather_station_id' => $targetId,
-                'date_time' => $dateTimeVal,
-            ];
+                $cleanedRow = [
+                    'weather_station_id' => $targetId,
+                    'date_time' => $dateTimeVal,
+                ];
 
-            foreach ($numericFields as $field) {
-                if (array_key_exists($field, $normalized)) {
-                    $val = $normalized[$field];
-                    $default = in_array($field, $nullableFields) ? null : 0;
-                    $cleanedRow[$field] = $this->cleanNumeric($val, $default);
-                } else {
-                    if (!in_array($field, $nullableFields)) {
-                        $cleanedRow[$field] = 0;
+                foreach ($numericFields as $field) {
+                    if (array_key_exists($field, $normalized)) {
+                        $val = $normalized[$field];
+                        $default = in_array($field, $nullableFields) ? null : 0;
+                        $cleanedRow[$field] = $this->cleanNumeric($val, $default);
+                    } else {
+                        if (!in_array($field, $nullableFields)) {
+                            $cleanedRow[$field] = 0;
+                        }
                     }
                 }
-            }
 
-            WeatherStationObservationData::create($cleanedRow);
-        }
+                WeatherStationObservationData::create($cleanedRow);
+            }
+        });
 
         return response()->json(['message' => 'Data imported successfully.']);
     }

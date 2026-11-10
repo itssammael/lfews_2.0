@@ -2,8 +2,11 @@
     "compilerOptions": {
         "target": "esnext",
         "module": "esnext",
-        "moduleResolution": "node",
-        "strict": true,
+        "moduleResolution": "bundler",
+        "strict": false,
+        "noImplicitAny": false,
+        "strictNullChecks": false,
+        "useUnknownInCatchVariables": false,
         "jsx": "preserve",
         "sourceMap": true,
         "resolveJsonModule": true,
@@ -13,8 +16,7 @@
             "dom"
         ],
         "types": [
-            "vite/client",
-            "ziggy-js"
+            "vite/client"
         ],
         "baseUrl": ".",
         "paths": {

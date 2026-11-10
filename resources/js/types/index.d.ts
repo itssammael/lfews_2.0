@@ -1,25 +1,33 @@
 export interface User {
     id: number;
     name: string;
+    username?: string;
     email: string;
-    email_verified_at: string;
+    email_verified_at?: string;
     profile_photo_url?: string;
     profile_photo_path?: string;
     roles?: string[];
+    two_factor_enabled?: boolean;
+    current_team?: any;
+    current_team_id?: number;
+    all_teams?: any[];
 }
 
 export interface JetstreamProps {
-    canUpdateProfileInformation: boolean;
-    canUpdatePassword: boolean;
+    canCreateTeams: boolean;
     canManageTwoFactorAuthentication: boolean;
+    canUpdatePassword: boolean;
+    canUpdateProfileInformation: boolean;
+    hasEmailVerification: boolean;
+    flash: any;
     hasAccountDeletionFeatures: boolean;
     hasApiFeatures: boolean;
     hasTeamFeatures: boolean;
+    hasTermsAndPrivacyPolicyFeature: boolean;
     managesProfilePhotos: boolean;
-    hasEmailVerification: boolean;
 }
 
-export type PageProps<T extends Record<string, unknown> = Record<string, unknown>> = T & {
+export interface AppPageProps {
     auth: {
         user: User;
         can: {
@@ -32,12 +40,25 @@ export type PageProps<T extends Record<string, unknown> = Record<string, unknown
         };
     };
     jetstream: JetstreamProps;
+    system_settings?: {
+        system_logo?: string | null;
+        system_favicon?: string | null;
+        [key: string]: any;
+    };
     flash: {
         modbusResult?: any;
         weatherResult?: any;
+        success?: string;
+        error?: string;
+        warning?: string;
+        message?: string;
         [key: string]: any;
     };
-};
+    errorBags: Record<string, Record<string, string[]>>;
+    errors: Record<string, string>;
+}
+
+export type PageProps<T extends Record<string, unknown> = Record<string, unknown>> = T & AppPageProps;
 
 export interface LocationType {
     id: number;

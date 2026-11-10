@@ -150,8 +150,12 @@ const updateYAxisMax = () => {
     
     props.sensors.forEach(sensor => {
         const l3 = Number(sensor.level_3 || 0);
+        const l4 = Number(sensor.level_4 || 0);
         const latestVal = Number(props.latestData?.[sensor.id]?.data || 0);
-        const sensorMax = l3 + latestVal;
+        const historyMax = props.historyData?.[sensor.id]?.length
+            ? Math.max(...props.historyData[sensor.id].map((p: { value: number }) => Number(p.value) || 0))
+            : 0;
+        const sensorMax = Math.max(l3 + latestVal, l4 * 1.1, historyMax * 1.1);
         if (sensorMax > maxFound) {
             maxFound = sensorMax;
         }

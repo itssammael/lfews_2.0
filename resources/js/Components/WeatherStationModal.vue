@@ -38,7 +38,7 @@ const props = defineProps({
         default: null,
     },
     locations: {
-        type: Array,
+        type: Array as () => any[],
         default: () => [],
     },
 });
