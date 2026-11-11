@@ -63,12 +63,19 @@ onUnmounted(() => {
 const showingModal = ref(false);
 const activeSensor = ref<Sensor | null>(null);
 
+watch(() => props.showCreateModal, (val) => {
+    if (val) {
+        activeSensor.value = null;
+        showingModal.value = true;
+    }
+});
+
 watch(() => props.editingSensor, (newSensor: Sensor | undefined) => {
     if (newSensor) {
         activeSensor.value = newSensor;
         showingModal.value = true;
     }
-}, { immediate: true });
+});
 
 onMounted(() => {
     if (props.showCreateModal && !props.editingSensor) {
@@ -83,6 +90,12 @@ onMounted(() => {
 const closeModal = () => {
     showingModal.value = false;
     activeSensor.value = null;
+    if (props.showCreateModal || props.editingSensor) {
+        router.get(route('water-level-sensors'), {}, {
+            preserveState: true,
+            replace: true,
+        });
+    }
 };
 
 const confirmingSensorDeletion = ref(false);

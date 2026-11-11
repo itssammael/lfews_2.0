@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import AppLayout from '@/Layouts/AppLayout.vue';
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import UserModal from '@/Components/UserModal.vue';
 import RoleModal from '@/Components/RoleModal.vue';
@@ -39,6 +39,18 @@ const tabs = ['System Users', 'System Roles'];
 const showingUserModal = ref(props.showCreateModal || props.showEditModal);
 const userToEdit = ref<any>(props.editingUser);
 
+watch(() => props.showCreateModal, (val) => {
+    if (val) {
+        openCreateModal();
+    }
+});
+
+watch(() => props.editingUser, (newUser) => {
+    if (newUser) {
+        openEditModal(newUser);
+    }
+});
+
 const openCreateModal = () => {
     userToEdit.value = null;
     showingUserModal.value = true;
@@ -52,6 +64,12 @@ const openEditModal = (user: any) => {
 const closeUserModal = () => {
     showingUserModal.value = false;
     userToEdit.value = null;
+    if (props.showCreateModal || props.showEditModal) {
+        router.get(route('users.index'), {}, {
+            preserveState: true,
+            replace: true,
+        });
+    }
 };
 
 const deleteUser = (user: any) => {

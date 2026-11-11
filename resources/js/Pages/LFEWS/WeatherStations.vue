@@ -63,12 +63,19 @@ onUnmounted(() => {
 const showingModal = ref(false);
 const activeStation = ref<Station | null>(null);
 
+watch(() => props.showCreateModal, (val) => {
+    if (val) {
+        activeStation.value = null;
+        showingModal.value = true;
+    }
+});
+
 watch(() => props.editingStation, (newStation: Station | undefined) => {
     if (newStation) {
         activeStation.value = newStation;
         showingModal.value = true;
     }
-}, { immediate: true });
+});
 
 onMounted(() => {
     if (props.showCreateModal && !props.editingStation) {
@@ -83,6 +90,12 @@ onMounted(() => {
 const closeModal = () => {
     showingModal.value = false;
     activeStation.value = null;
+    if (props.showCreateModal || props.editingStation) {
+        router.get(route('weather-stations'), {}, {
+            preserveState: true,
+            replace: true,
+        });
+    }
 };
 
 const confirmingStationDeletion = ref(false);
