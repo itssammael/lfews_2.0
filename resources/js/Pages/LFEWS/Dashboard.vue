@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AppLayout from "@/Layouts/AppLayout.vue";
+import CommandCenter4K from "@/Components/CommandCenter4K.vue";
 import { Link, usePage, router } from "@inertiajs/vue3";
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import WaterLevelChart from "@/Components/WaterLevelChart.vue";
@@ -234,6 +235,13 @@ onMounted(() => {
     if (isAutoWeatherPulling.value) {
       await refreshWeatherData();
     }
+
+    // Keep the predicted tidal timeline in sync with the same monitoring cycle.
+    router.reload({
+      only: ["tides", "tideHeights"],
+      preserveScroll: true,
+      preserveState: true,
+    });
   }, 300000); // 5 minutes
 });
 
@@ -340,6 +348,22 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters, showT
       </div>
     </template>
 
+    <CommandCenter4K
+      :sensors="sensors || []"
+      :stations="stations || []"
+      :water-readings="modbusResult as any"
+      :water-history="historyData || {}"
+      :weather-readings="weatherResult as any"
+      :weather-history="historyWeatherData || {}"
+      :tides="tides || {}"
+      :tide-heights="tideHeights || []"
+      :refreshing-water="processingWater"
+      :refreshing-weather="processingWeather"
+      @refresh-water="refreshData"
+      @refresh-weather="refreshWeatherData"
+    />
+    <details class="command-center-detail">
+      <summary>Detailed monitoring charts, sensor diagnostics, tides &amp; legacy controls</summary>
     <div class="pt-0 mb-12">
       <div class="w-full space-y-12 bg-gray-200/[0.25]">
         <div
@@ -1270,5 +1294,6 @@ const { showWaterLevelSensors, showWeatherStations, showEvacuationCenters, showT
         </div>
       </div>
     </div>
+    </details>
   </AppLayout>
 </template>
