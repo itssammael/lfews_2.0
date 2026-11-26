@@ -168,6 +168,24 @@ onUnmounted(() => {
     if (root) root.dispose();
 });
 
+// Replace chart series when the refreshed historical window changes.
+// This keeps the combined chart synchronized with Inertia's five-minute data reloads.
+watch(() => props.historyData, (history) => {
+    if (!history) return;
+    props.sensors.forEach(sensor => {
+        const series = seriesMap.get(sensor.id);
+        const records = history[sensor.id];
+        if (!series || !records) return;
+        const points = records.map(point => ({
+            date: new Date(point.timestamp.replace(' ', 'T')).getTime(),
+            value: Number(point.value),
+        })).filter(point => Number.isFinite(point.date) && Number.isFinite(point.value))
+          .sort((a, b) => a.date - b.date);
+        series.data.setAll(points);
+    });
+    updateYAxisMax();
+}, { deep: true });
+
 // Watch for latest data updates
 watch(() => props.latestData, (newData) => {
     if (!newData) return;
