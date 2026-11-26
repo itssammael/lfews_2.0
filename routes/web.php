@@ -1,6 +1,5 @@
 <?php
 
-use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -21,7 +20,8 @@ Route::get('/user-manual', function () {
 // SSO Routes
 Route::get('/sso/redirect', [\App\Http\Controllers\Auth\SsoClientController::class, 'redirect'])->name('sso.redirect');
 Route::get('/sso/callback', [\App\Http\Controllers\Auth\SsoClientController::class, 'callback'])->name('sso.callback');
-
+Route::post('/sso/verify-credentials', [\App\Http\Controllers\Auth\SsoVerifyCredentialsController::class, 'verify'])->name('sso.verify-credentials');
+Route::post('/api/sso/verify-credentials', [\App\Http\Controllers\Auth\SsoVerifyCredentialsController::class, 'verify']);
 
 Route::middleware([
     'auth:sanctum',

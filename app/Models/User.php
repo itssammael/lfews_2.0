@@ -16,6 +16,7 @@ class User extends Authenticatable
 
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory;
+
     use HasProfilePhoto;
     use Notifiable;
     use TwoFactorAuthenticatable;
@@ -30,6 +31,8 @@ class User extends Authenticatable
         'username',
         'email',
         'password',
+        'login_portal_user_id',
+        'sso_provider',
     ];
 
     /**
@@ -63,6 +66,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'login_portal_user_id' => 'integer',
         ];
     }
 

@@ -41,6 +41,12 @@ const submit = () => {
             {{ status }}
         </div>
 
+        <div v-if="$page.props.errors && Object.keys($page.props.errors).length > 0" class="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md">
+            <div v-for="(error, key) in $page.props.errors" :key="key" class="font-medium text-sm text-red-600 dark:text-red-400">
+                {{ error }}
+            </div>
+        </div>
+
         <!-- Single Sign-On (SSO) Section -->
         <div class="mb-6">
             <a
@@ -50,7 +56,7 @@ const submit = () => {
                 <svg class="size-5 text-white shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                 </svg>
-                <span>Login with LGUNET Portal</span>
+                <span>Sign in with Central Login Portal (SSO)</span>
             </a>
 
             <div class="relative my-5">

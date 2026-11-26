@@ -36,11 +36,11 @@ return [
     ],
 
     'login_portal' => [
-        'url' => env('LOGIN_PORTAL_URL', 'http://127.0.0.1:8000'),
-        'client_id' => env('LOGIN_PORTAL_CLIENT_ID', 'lfews_client_id'),
-        'client_secret' => env('LOGIN_PORTAL_CLIENT_SECRET', 'lfews_client_secret'),
-        'redirect_uri' => env('LOGIN_PORTAL_REDIRECT_URI', 'http://127.0.0.1:8001/sso/callback'),
+        'url' => env('LOGIN_PORTAL_URL', 'https://loginportal.ink'),
+        'client_id' => env('LOGIN_PORTAL_CLIENT_ID'),
+        'client_secret' => env('LOGIN_PORTAL_CLIENT_SECRET'),
+        'redirect_uri' => env('LOGIN_PORTAL_REDIRECT_URI'),
+        'auto_provision' => filter_var(env('LOGIN_PORTAL_AUTO_PROVISION', true), FILTER_VALIDATE_BOOLEAN),
     ],
 
 ];
-
